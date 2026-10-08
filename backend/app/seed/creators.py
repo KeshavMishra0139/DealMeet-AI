@@ -4,7 +4,7 @@ from __future__ import annotations
 import random
 from datetime import date, timedelta
 
-from .catalog import CAPTIONS, CITIES, LANG_CITIES, NICHES, TOPICS
+from .catalog import CAPTIONS, CITIES, FOOD_CAPTIONS, LANG_CITIES, NICHES, TOPICS
 
 FICTIONAL = "Fictional demo profile."
 
@@ -50,7 +50,7 @@ ROSTER: list[tuple] = [
     ("cr_g06", "Tanvi Joshi", "tanvi.cosplay.craft", "anime_edits", ["en", "hi"], "Mumbai", 19_800, 640, {}),
     ("cr_g07", "Arjun Nair", "arjun.speedrun", "gaming", ["en"], "Kochi", 4_200, 190, {}),
     ("cr_g08", "Kabir Malhotra", "kabir.anime.recaps", "anime_edits", ["hinglish"], "Delhi", 27_600, 300, {"copyright": True, "twin_of": "cr_g01"}),
-    ("cr_g09", "Yash Patel", "yash.gg.clips", "gaming", ["gu", "hi"], "Ahmedabad", 41_000, 7_600, {"low_trust": "f4f"}),
+    ("cr_g09", "Yash Patel", "yash.gg.clips", "gaming", ["gu", "hi"], "Ahmedabad", 41_000, 24_500, {"low_trust": "f4f"}),
     ("cr_g10", "Pooja Verma", "pooja.manga.panels", "anime_edits", ["hi"], "Jaipur", 6_400, 280, {"copyright": True}),
     ("cr_g11", "Sahil Qureshi", "sahil.lofi.edits", "anime_edits", ["hinglish"], "Indore", 15_300, 330, {"copyright": True}),
     # Finance
@@ -165,7 +165,17 @@ def _audience(niche: str, langs: list[str], city: str, rng: random.Random) -> di
     }
 
 
-def _caption(niche: str, langs: list[str], i: int) -> tuple[str | None, str | None]:
+# Only one Tamil food creator posts quick breakfasts: the content gap Creator B can fill.
+TAMIL_BREAKFAST_POSTERS = {"cr_f07"}
+
+
+def _caption(niche: str, langs: list[str], i: int, topic: str = "") -> tuple[str | None, str | None]:
+    if niche == "food":
+        for lang in langs:
+            bank = FOOD_CAPTIONS.get(lang, {}).get(topic)
+            if bank:
+                return bank[i % len(bank)], lang
+        return None, None
     for lang in langs:
         bank = CAPTIONS.get((niche, lang))
         if bank:
@@ -188,6 +198,8 @@ def _reels(cid: str, niche: str, langs: list[str], followers: int, extras: dict,
         median *= 0.25
         like_rate *= 0.6
     topics = TOPICS[niche]
+    if niche == "food" and langs[0] == "ta" and cid not in TAMIL_BREAKFAST_POSTERS:
+        topics = [t for t in topics if t != "Quick breakfast"]
     reels = []
     d = LAST_DATE
     n = 12
@@ -202,7 +214,7 @@ def _reels(cid: str, niche: str, langs: list[str], followers: int, extras: dict,
         comment_ratio = rng.uniform(0.012, 0.03)
         if low == "pod":
             comment_ratio = rng.uniform(0.11, 0.16)
-        caption, lang = _caption(niche, langs, i)
+        caption, lang = _caption(niche, langs, i, topic)
         reels.append(
             {
                 "id": f"{cid}_r{i:02d}",
@@ -287,7 +299,7 @@ def build_creator_b() -> dict:
         likes = int(views * 0.062)
         reels.append({
             "id": f"b_r{i:02d}", "date": d, "views": views, "likes": likes, "saves": saves,
-            "shares": shares, "comments": max(2, int(likes * 0.04)), "format": "reels",
+            "shares": shares, "comments": max(2, int(likes * 0.022)), "format": "reels",
             "topic": topic, "caption": cap, "lang": "ta", "copyrighted_clips": False,
             "original_voiceover": True, "is_recent": i < 6,
         })

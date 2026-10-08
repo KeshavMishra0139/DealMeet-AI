@@ -1,0 +1,285 @@
+"""Fair-Price AI: a fair rupee rate per creator-brand match, priced on reach.
+
+base = median views of the last 6 reels x the niche's rupees per 1,000 views
+then capped adjustments for engagement quality, audience fit to this brand,
+consistency, brand safety, Trust Score and deal terms. Each step carries its
+reason and the provenance of its inputs so the waterfall can explain itself.
+"""
+from __future__ import annotations
+
+from ..seed.catalog import NICHES
+from . import brand_safety, metrics
+from .common import clamp, estimate, inp, inr, inr_full, nice_round, round_to, short, why
+from .matching import audience_fit
+from .trust import trust_score
+
+# Each adjustment is capped so no single factor can swing the price wildly.
+CAPS = {
+    "engagement": (-0.15, 0.15),
+    "fit": (-0.20, 0.12),
+    "consistency": (-0.08, 0.08),
+    "safety": (-0.15, 0.0),
+    "trust": (-0.20, 0.05),
+    "terms": (0.0, 0.40),
+}
+# The common follower-count rule of thumb for micro creators (rupees per follower).
+FOLLOWER_RATE = 0.33
+# Minimum fee per reel-equivalent: making a reel takes hours, whatever the reach.
+PRODUCTION_FLOOR = 1_000
+DELIVERABLE_UNITS = {"reel": 1.0, "short": 1.0, "story": 0.25, "carousel": 0.6, "link_in_bio": 0.15, "live": 1.2}
+
+
+def _pct(v: float) -> str:
+    return f"{'+' if v > 0 else ''}{v * 100:.0f}%"
+
+
+def follower_price(c: dict) -> int:
+    return nice_round(c.get("followers", 0) * FOLLOWER_RATE)
+
+
+def consistency_score(c: dict) -> float:
+    cadence = clamp(metrics.posts_per_week(c) / 3, 0, 1)
+    steadiness = 1 - clamp(metrics.views_cv(c) / 1.2, 0, 1)
+    return 0.6 * cadence + 0.4 * steadiness
+
+
+def factors(c: dict, lister: dict | None = None) -> dict:
+    """Raw inputs to the price, also used to train and query the cross-check model."""
+    niche = NICHES[c["niche"]]
+    ss = metrics.ss_rate(c) if metrics.has_reels(c) else niche["ss_bench"]
+    fit = audience_fit(c, lister)["fit"] if lister else None
+    t = trust_score(c)
+    safety = brand_safety.assess(c)
+    return {
+        "median_views": metrics.median_views(c),
+        "cpm": niche["cpm"],
+        "ss_ratio": ss / niche["ss_bench"],
+        "fit": fit,
+        "consistency": consistency_score(c),
+        "trust": t["score"] if t else 70,
+        "safety_penalty": safety["penalty"],
+        "safety": safety,
+        "trust_detail": t,
+        "ss": ss,
+    }
+
+
+def adjustments(f: dict) -> dict:
+    return {
+        "engagement": clamp((f["ss_ratio"] - 1) * 0.20, *CAPS["engagement"]),
+        "fit": clamp(((f["fit"] if f["fit"] is not None else 0.85) - 0.75) * 0.45, *CAPS["fit"]),
+        "consistency": clamp((f["consistency"] - 0.45) * 0.25, *CAPS["consistency"]),
+        "safety": clamp(-f["safety_penalty"], *CAPS["safety"]),
+        "trust": clamp((f["trust"] - 75) / 100 * 0.25, *CAPS["trust"]),
+    }
+
+
+def terms_adjustment(terms: dict | None) -> tuple[float, float, list[str]]:
+    """Returns (units, uplift, notes). Units scale the per-reel price; uplift covers rights."""
+    terms = terms or {}
+    deliverables = terms.get("deliverables") or [{"kind": "reel", "count": 1}]
+    units = sum(DELIVERABLE_UNITS.get(d["kind"], 1.0) * d.get("count", 1) for d in deliverables)
+    usage = terms.get("usage_rights_days") or 0
+    excl = terms.get("exclusivity_days") or 0
+    uplift = min(0.25, 0.05 * usage / 15) + min(0.30, 0.10 * excl / 30)
+    uplift = clamp(uplift, *CAPS["terms"])
+    notes = []
+    if usage:
+        notes.append(f"{usage} days of paid usage rights")
+    if excl:
+        notes.append(f"{excl} days of category exclusivity")
+    return units, uplift, notes
+
+
+def deliverables_label(terms: dict | None) -> str:
+    ds = (terms or {}).get("deliverables") or [{"kind": "reel", "count": 1}]
+    names = {"reel": "reel", "story": "story", "carousel": "carousel", "link_in_bio": "link in bio", "short": "short", "live": "live"}
+    parts = []
+    for d in ds:
+        n = d.get("count", 1)
+        name = names.get(d["kind"], d["kind"])
+        parts.append(f"{n} {name}{'' if n == 1 or d['kind'] == 'link_in_bio' else ('ies' if name.endswith('y') else 's')}".replace("storys", "stories"))
+    return " + ".join(parts)
+
+
+def fair_price(c: dict, lister: dict | None = None, terms: dict | None = None, with_model: bool = True) -> dict:
+    niche = NICHES[c["niche"]]
+    f = factors(c, lister)
+    adj = adjustments(f)
+    mv = f["median_views"]
+    base = mv / 1000 * f["cpm"]
+    real_views = metrics.has_reels(c)
+    sim_ss = metrics.fields_simulated(c, "reels.saves", "reels.shares")
+    sim_aud = metrics.fields_simulated(c, "audience")
+    sim_trust = metrics.fields_simulated(c, "follower_history", "comment_insights")
+
+    steps = [
+        {
+            "key": "base",
+            "label": "Reach base",
+            "pct": None,
+            "amount": round(base),
+            "reason": (
+                f"Median of your last 6 reels is {short(mv)} views. At {inr(f['cpm'])} per 1,000 views for "
+                f"{niche['label'].lower()}, that's {inr_full(base)}."
+                if real_views
+                else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+            ),
+            "simulated": False,
+            "estimated": not real_views,
+        }
+    ]
+    running = base
+
+    def add(key: str, label: str, reason: str, simulated: list[str] | None = None):
+        nonlocal running
+        pct = adj[key]
+        amount = running * pct
+        lo, hi = CAPS[key]
+        steps.append(
+            {
+                "key": key,
+                "label": label,
+                "pct": round(pct, 4),
+                "amount": round(amount),
+                "reason": reason,
+                "capped": abs(pct - lo) < 1e-9 or abs(pct - hi) < 1e-9,
+                "cap": [lo, hi],
+                "simulated": bool(simulated),
+                "simulated_fields": simulated or [],
+            }
+        )
+        running += amount
+
+    ss_pct = f["ss"] * 100
+    add(
+        "engagement",
+        "Engagement quality",
+        f"{ss_pct:.1f}% of viewers save or share, against {niche['ss_bench'] * 100:.1f}% typical for the niche."
+        if adj["engagement"] >= 0
+        else f"{ss_pct:.1f}% of viewers save or share, below the {niche['ss_bench'] * 100:.1f}% niche typical.",
+        sim_ss,
+    )
+    if lister:
+        fit = audience_fit(c, lister)
+        top = fit["reasons"][:2] or fit["cautions"][:2]
+        add("fit", f"Audience fit to {lister['name']}", f"Fit {fit['score']}/100. " + "; ".join(top) + ".", sim_aud)
+    else:
+        add("fit", "Audience fit", "Assumes a brand whose audience matches yours well (fit 85/100).", sim_aud)
+    add(
+        "consistency",
+        "Consistency",
+        f"{metrics.posts_per_week(c):.1f} reels a week over the last 4 weeks; views vary by {metrics.views_cv(c) * 100:.0f}% reel to reel.",
+    )
+    safety = f["safety"]
+    add(
+        "safety",
+        "Brand safety",
+        safety["flags"][0]["label"] + ". " + safety["flags"][0]["fix"] if safety["flags"] else "No brand-safety concerns found.",
+    )
+    t = f["trust_detail"]
+    add(
+        "trust",
+        "Trust Score",
+        f"Trust {t['score']}/100: {t['reasons'][0].lower()}." if t else "Trust not yet measured; neutral.",
+        sim_trust,
+    )
+    reach_per_reel = running  # what the market model is checked against
+    if running < PRODUCTION_FLOOR:
+        steps.append(
+            {
+                "key": "floor",
+                "label": "Production floor",
+                "pct": None,
+                "amount": round(PRODUCTION_FLOOR - running),
+                "reason": f"Below this reach we price at least {inr_full(PRODUCTION_FLOOR)} per reel to cover the time it takes to make one.",
+                "simulated": False,
+            }
+        )
+        running = PRODUCTION_FLOOR
+    per_reel = running
+
+    units, uplift, notes = terms_adjustment(terms)
+    if units != 1:
+        amount = per_reel * (units - 1)
+        steps.append(
+            {
+                "key": "deliverables",
+                "label": "Deliverables",
+                "pct": round(units - 1, 4),
+                "amount": round(amount),
+                "reason": f"{deliverables_label(terms)}: {units:g}x a single reel.",
+                "simulated": False,
+            }
+        )
+        running += amount
+    if uplift:
+        amount = running * uplift
+        steps.append(
+            {
+                "key": "terms",
+                "label": "Usage rights and exclusivity",
+                "pct": round(uplift, 4),
+                "amount": round(amount),
+                "reason": ", ".join(notes).capitalize() + f" ({_pct(uplift)}, capped at +40%).",
+                "capped": uplift >= CAPS["terms"][1],
+                "simulated": False,
+            }
+        )
+        running += amount
+
+    total = running
+    lo, hi = round_to(total * 0.97, 500 if total >= 5_000 else 50), round_to(total * 1.03, 500 if total >= 5_000 else 50)
+    simulated_fields = sorted({x for s in steps for x in s.get("simulated_fields", [])})
+    confidence = "medium" if real_views else "low"
+    if real_views and not simulated_fields and len(metrics.recent(c)) >= 6:
+        confidence = "high"
+    fp = follower_price(c)
+
+    result = {
+        "creator_id": c["_id"],
+        "lister_id": lister["_id"] if lister else None,
+        "lister_name": lister["name"] if lister else None,
+        "deliverables": deliverables_label(terms),
+        "base": round(base),
+        "per_reel": round(per_reel),
+        "total": round(total),
+        "range": {"low": int(lo), "high": int(hi)},
+        "steps": steps,
+        "follower_price": fp,
+        "follower_rate": FOLLOWER_RATE,
+        "uplift_vs_followers": round(per_reel / fp, 2) if fp else None,
+        "estimate": estimate(
+            lo,
+            hi,
+            "inr",
+            "deal",
+            [
+                f"Priced on the median of your last 6 reels ({short(mv)} views), not on followers",
+                f"{inr(f['cpm'])} per 1,000 views is the seeded rate for {niche['label'].lower()}",
+                "Each adjustment is capped so no single factor dominates",
+            ],
+            confidence,
+        ),
+        "why": why(
+            [
+                f"Your price follows how many people actually watch: {short(mv)} median views.",
+                f"Priced on followers alone it would be about {inr(fp)}.",
+            ]
+            + [s["reason"] for s in steps[1:3]],
+            [
+                inp("Median views (last 6 reels)", short(mv), metrics.prov(c, "reels.0.views") if real_views else None),
+                inp("Rate per 1,000 views", inr(f["cpm"])),
+                inp("Followers", short(c.get("followers", 0)), metrics.prov(c, "followers")),
+            ],
+            simulated_fields,
+            title="How we priced this",
+        ),
+    }
+    if with_model:
+        from .price_model import cross_check
+
+        reach_total = reach_per_reel * units * (1 + uplift)
+        result["model_check"] = cross_check(f, adj, units, uplift, reach_total)
+        result["model_check"]["checked_before_floor"] = reach_per_reel < PRODUCTION_FLOOR
+    return result

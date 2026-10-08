@@ -7,6 +7,10 @@ const Login = lazy(() => import("@/features/public/Login"));
 const NotFound = lazy(() => import("@/features/public/NotFound"));
 const CreatorShell = lazy(() => import("@/features/creator/CreatorShell"));
 const BrandShell = lazy(() => import("@/features/brand/BrandShell"));
+const CreatorHome = lazy(() => import("@/features/creator/Home"));
+const CreatorRoadmap = lazy(() => import("@/features/creator/Roadmap"));
+const CreatorMoney = lazy(() => import("@/features/creator/Money"));
+const CreatorOnboarding = lazy(() => import("@/features/creator/Onboarding"));
 
 const soon = (title: string, body: string): ReactNode => <Upcoming title={title} body={body} />;
 
@@ -21,10 +25,11 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
 
+        <Route path="/creator/onboarding" element={<CreatorOnboarding />} />
         <Route path="/creator" element={<CreatorShell />}>
-          <Route index element={soon("Your next 3 moves", "The Next-Step Engine arrives in Phase 2.")} />
-          <Route path="roadmap" element={soon("Growth roadmap", "Content gaps, skills, reference twins and a 30-day plan arrive in Phase 2.")} />
-          <Route path="money" element={soon("Money paths", "Ranked monetisation paths and the Fair-Price waterfall arrive in Phase 2.")} />
+          <Route index element={<CreatorHome />} />
+          <Route path="roadmap" element={<CreatorRoadmap />} />
+          <Route path="money" element={<CreatorMoney />} />
           <Route path="opportunities" element={soon("Opportunities", "The consent-based marketplace arrives in Phase 3.")} />
           <Route path="deals" element={soon("Deals", "The deal rail arrives in Phase 4.")} />
           <Route path="kit" element={soon("Media kit and link-in-bio", "Arrives in Phase 4.")} />

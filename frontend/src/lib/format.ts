@@ -30,12 +30,19 @@ export function count(value: number) {
   return shortNumber(value, 1);
 }
 
-/** ₹17K–18K. Shares a unit suffix when both ends use the same one. */
+/**
+ * Rupee ranges that never hide precision: below ₹10K both ends are shown in
+ * full (₹600–1,600); above, compact with one decimal (₹5.2K–12K, ₹21K–32.5K).
+ */
 export function inrRange(low: number, high: number) {
-  const a = shortNumber(low, low >= 1e5 ? 1 : 0);
-  const b = shortNumber(high, high >= 1e5 ? 1 : 0);
-  if (a === b) return `₹${a}`;
-  return `₹${a}–${b}`;
+  if (high < 10_000) {
+    const a = fullINR.format(Math.round(low));
+    const b = fullINR.format(Math.round(high));
+    return a === b ? `₹${a}` : `₹${a}–${b}`;
+  }
+  const a = shortNumber(low, 1);
+  const b = shortNumber(high, 1);
+  return a === b ? `₹${a}` : `₹${a}–${b}`;
 }
 
 export function pct(value: number, digits = 0) {
@@ -47,9 +54,11 @@ export function signedPct(value: number, digits = 0) {
   return value > 0 ? `+${s}%` : `${s}%`;
 }
 
-const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" });
-const dateYearFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" });
-const timeFmt = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" });
+// Always show dates in India time, whatever the viewer's device timezone.
+const TZ = "Asia/Kolkata";
+const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: TZ });
+const dateYearFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
+const timeFmt = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", timeZone: TZ });
 
 export function shortDate(iso: string, withYear = false) {
   const d = new Date(iso.length <= 10 ? `${iso}T00:00:00+05:30` : iso);

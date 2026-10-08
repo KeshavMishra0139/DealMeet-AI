@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from ..config import get_settings, now_iso, today
 from ..db import db_mode
-from ..seed.catalog import FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
+from ..seed.catalog import CITIES, FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
 
 router = APIRouter(prefix="/api", tags=["meta"])
 
@@ -31,4 +31,5 @@ def meta():
         "stages": STAGES,
         "income_types": [{"id": k, "label": v} for k, v in INCOME_TYPES.items()],
         "formats": [{"id": k, "label": v} for k, v in FORMATS.items()],
+        "cities": [{"name": k, "state": v[0], "region": v[1]} for k, v in sorted(CITIES.items())],
     }

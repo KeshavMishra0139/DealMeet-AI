@@ -115,8 +115,8 @@ export default function Landing() {
 function CreatorEntry() {
   const moves = [
     { t: "Raise your reel rate", v: "₹17K–18K" },
-    { t: "Post 2 more beat-sync edits", v: "+60K–1.4L views" },
-    { t: "Apply to 2 matched offers", v: "₹25K–43K" },
+    { t: "Post 2 more beat-sync edits", v: "+2.8L–3.5L views" },
+    { t: "Apply to 2 matched offers", v: "₹21K–33K" },
   ];
   return (
     <Link

@@ -1,0 +1,245 @@
+"""Creator Studio API."""
+from __future__ import annotations
+
+import random
+import re
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from ..ai.regional import tag_captions
+from ..config import now_iso
+from ..db import get_db
+from ..engines import money_paths, next_step, roadmap
+from ..engines.fair_price import fair_price
+from ..engines.matching import audience_fit
+from ..seed.catalog import CITIES, NICHES
+from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
+from ..services import cache
+from ..services import creator_ctx as cc
+from ..services.views import creator_card
+
+router = APIRouter(prefix="/api", tags=["creators"])
+
+
+def _summary(c: dict) -> dict:
+    card = creator_card(c)
+    card["reference_note"] = c.get("reference_note")
+    card["income_goal"] = c.get("income_goal")
+    return card
+
+
+@router.get("/creators/{creator_id}/home")
+def home(creator_id: str):
+    c = cc.load_creator(creator_id)
+    ctx = cc.build(c)
+    return {
+        "creator": _summary(c),
+        "stage": ctx["stage"],
+        "plan": ctx["plan"],
+        "durable": ctx["durable"],
+        "rate_gap": cc.rate_gap(c, ctx["fair"]),
+        "pipeline": cc.pipeline(c),
+        "context": cc.context_line(c),
+    }
+
+
+class MoveAction(BaseModel):
+    action: Literal["done", "skip", "reopen"]
+    result: Literal["worked", "partly", "no"] | None = None
+    amount: int | None = Field(default=None, ge=0, le=10_000_000)
+    note: str | None = Field(default=None, max_length=280)
+
+
+@router.post("/creators/{creator_id}/moves/{move_id}")
+def update_move(creator_id: str, move_id: str, body: MoveAction):
+    c = cc.load_creator(creator_id)
+    status = {"done": "done", "skip": "skipped", "reopen": "open"}[body.action]
+    try:
+        return next_step.record_outcome(c, move_id, body.result, body.amount, body.note, status)
+    except KeyError:
+        raise HTTPException(404, "Move not found")
+
+
+@router.post("/creators/{creator_id}/plan/next")
+def plan_next(creator_id: str):
+    c = cc.load_creator(creator_id)
+    ctx = cc.build(c, with_plan=False)
+    return next_step.next_week(c, ctx)
+
+
+@router.get("/creators/{creator_id}/roadmap")
+def get_roadmap(creator_id: str):
+    c = cc.load_creator(creator_id)
+    ctx = cc.build(c)
+    return {
+        "creator": _summary(c),
+        "stage": ctx["stage"],
+        **roadmap.build(c, ctx["stage"]["id"], ctx["plan"]["moves"], ctx["paths"]),
+    }
+
+
+@router.get("/creators/{creator_id}/money")
+def money(creator_id: str):
+    c = cc.load_creator(creator_id)
+    ctx = cc.build(c, with_plan=False)
+    brands = sorted(
+        (b for b in get_db().brands.find({"kind": "brand", "verified": True})),
+        key=lambda b: -audience_fit(c, b)["fit"],
+    )
+    best = ctx["brand"]
+    options = [{"id": b["_id"], "name": b["name"], "category": b["category"], "fit": audience_fit(c, b)["score"]} for b in brands]
+    first = next((o for o in options if best and o["id"] == best["_id"]), options[0])
+    options = [first, options[-1]] + [o for o in options if o not in (first, options[-1])]
+    return {
+        "creator": _summary(c),
+        "stage": ctx["stage"],
+        "fair": ctx["fair"],
+        "brand_options": options,
+        "paths": ctx["paths"],
+        "goal": money_paths.goal_summary(c, ctx["paths"]),
+        "durable": ctx["durable"],
+        "rate_gap": cc.rate_gap(c, ctx["fair"]),
+    }
+
+
+@router.get("/creators/{creator_id}/fair-price")
+def get_fair_price(creator_id: str, lister_id: str | None = None, listing_id: str | None = None):
+    c = cc.load_creator(creator_id)
+    db = get_db()
+    lister = db.brands.find_one({"_id": lister_id}) if lister_id else None
+    terms = None
+    if listing_id:
+        listing = db.listings.find_one({"_id": listing_id})
+        if not listing:
+            raise HTTPException(404, "Listing not found")
+        lister = lister or db.brands.find_one({"_id": listing["owner_id"]})
+        terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")}
+    return fair_price(c, lister, terms)
+
+
+# ------------------------------------------------------------------ onboarding
+STAGE_FOLLOWERS = {"zero": 0, "under_1k": 450, "1k_10k": 3_200, "10k_100k": 24_000, "100k_plus": 140_000}
+
+
+class OnboardingIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    niche: str
+    platforms: list[str] = ["instagram"]
+    formats: list[str] = ["reels"]
+    audience_stage: Literal["zero", "under_1k", "1k_10k", "10k_100k", "100k_plus"]
+    followers: int | None = Field(default=None, ge=0, le=50_000_000)
+    income_goal: int = Field(ge=0, le=10_000_000)
+    income_types: list[str] = []
+    languages: list[str] = Field(min_length=1)
+    city: str
+    expertise: str | None = Field(default=None, max_length=80)
+    captions: list[str] = []
+    connected: dict[str, bool] = {}
+    discoverable: bool = True
+    consent_defaults: dict[str, bool] = {"stats": True, "demographics": False, "rate_card": False}
+
+
+def _handle(name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", ".", name.lower()).strip(".") or "creator"
+    db = get_db()
+    handle, n = base, 1
+    while db.creators.count_documents({"handle": handle}):
+        n += 1
+        handle = f"{base}{n}"
+    return handle
+
+
+@router.post("/creators")
+def create_creator(body: OnboardingIn):
+    if body.niche not in NICHES:
+        raise HTTPException(422, "Unknown niche")
+    db = get_db()
+    followers = body.followers if body.followers is not None else STAGE_FOLLOWERS[body.audience_stage]
+    cid = f"cr_new_{db.creators.count_documents({'created_by': 'onboarding'}) + 1}"
+    while db.creators.count_documents({"_id": cid}):
+        cid += "x"
+    rng = random.Random(cid)
+    city = body.city if body.city in CITIES else "Mumbai"
+    connected = bool(body.connected.get("instagram") or body.connected.get("youtube"))
+    langs = body.languages
+    doc = {
+        "_id": cid,
+        "handle": _handle(body.name),
+        "name": body.name.strip(),
+        "avatar_hue": rng.randint(0, 359),
+        "is_reference": False,
+        "reference_note": "Your profile. Insights come from the official login you connected (demo sandbox)." if connected else "Your profile, from what you typed in onboarding.",
+        "bio": f"{NICHES[body.niche]['label']} from {city}.",
+        "niche": body.niche,
+        "sub_niches": [],
+        "platforms": body.platforms or ["instagram"],
+        "formats": body.formats or ["reels"],
+        "languages": langs,
+        "city": city,
+        "state": CITIES[city][0],
+        "region": CITIES[city][1],
+        "followers": followers,
+        "following": max(50, int(followers * 0.05)) if followers else 0,
+        "posts": 0,
+        "reels": _reels(cid, body.niche, langs, followers, {}, rng) if connected and followers > 0 else [],
+        "follower_history": _follower_history(followers, {}, rng) if connected and followers > 0 else [],
+        "comment_insights": {"generic_share": 0.14, "sample_size": 60} if connected else {},
+        "audience": _audience(body.niche, langs, city, rng),
+        "income_goal": {"monthly": body.income_goal, "types": body.income_types},
+        "income_history": [],
+        "past_deals": [],
+        "best_deal": None,
+        "current_rate": None,
+        "inbound_channels": [],
+        "skills": [],
+        "expertise": body.expertise or None,
+        "content_flags": [],
+        "discoverable": body.discoverable,
+        "consent_defaults": body.consent_defaults,
+        "insights_connected": {"instagram": bool(body.connected.get("instagram")), "youtube": bool(body.connected.get("youtube"))},
+        "insights_source": "mock_official_api" if connected else "typed",
+        "caption_tags": tag_captions(body.captions) if body.captions else None,
+        "onboarded": True,
+        "created_by": "onboarding",
+        "created_at": now_iso(),
+        "provenance": {},
+        "provenance_default": "real",
+    }
+    if doc["reels"]:
+        doc["posts"] = len(doc["reels"]) * 3
+        doc["avg_likes"] = int(sum(r["likes"] for r in doc["reels"]) / len(doc["reels"]))
+        doc["avg_comments"] = int(sum(r["comments"] for r in doc["reels"]) / len(doc["reels"]))
+    if AGE_PROFILES.get(body.niche) is None:
+        raise HTTPException(422, "Unknown niche")
+    db.creators.insert_one(doc)
+    cache.invalidate("trust")
+    cache.invalidate("spam")
+    return {"id": cid, "handle": doc["handle"]}
+
+
+class TagIn(BaseModel):
+    captions: list[str] = Field(min_length=1, max_length=8)
+
+
+@router.post("/ai/tag")
+def ai_tag(body: TagIn):
+    return tag_captions(body.captions)
+
+
+@router.post("/oauth/{platform}/authorize")
+def mock_oauth(platform: Literal["instagram", "youtube"]):
+    """Stands in for the official Instagram Graph API / YouTube Data API consent
+    screen. Returns the scopes a real integration would request."""
+    scopes = {
+        "instagram": ["instagram_basic", "instagram_manage_insights", "pages_show_list"],
+        "youtube": ["youtube.readonly", "yt-analytics.readonly"],
+    }[platform]
+    return {
+        "platform": platform,
+        "granted": True,
+        "scopes": scopes,
+        "mode": "demo sandbox",
+        "note": "Official login only. JodiDar AI never reads accounts that haven't connected, and never scrapes.",
+    }

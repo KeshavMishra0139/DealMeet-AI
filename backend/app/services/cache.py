@@ -18,5 +18,10 @@ def invalidate(prefix: str = "") -> None:
         del _store[k]
 
 
+# Models that don't depend on demo data survive a reset.
+KEEP = {"price_model"}
+
+
 def clear_runtime() -> None:
-    _store.clear()
+    for k in [k for k in _store if k not in KEEP]:
+        del _store[k]

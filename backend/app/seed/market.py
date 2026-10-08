@@ -264,7 +264,7 @@ def _ev(stage, at, note):
 DEALS: list[dict] = [
     # Creator A: an incoming offer well below fair price (triggers the low-offer alert).
     {"_id": "dl_a_senpai", "kind": "single", "listing_id": "lst_senpai_hoodie", "brand_id": "br_senpai", "creator_id": "cr_a",
-     "amount": 7_300, "deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}], "usage_rights_days": 30, "exclusivity_days": 0,
+     "amount": 7_300, "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 0, "exclusivity_days": 0,
      "stage": "offer", "message": "We like your edits and would love you on our winter hoodie drop.",
      "timeline": [_ev("offer", "2026-10-07T17:30:00+05:30", "Offer sent by Senpai Supply Co.")], "created_at": "2026-10-07T17:30:00+05:30"},
     # Creator A: post is live; brand confirmation is overdue (payment-delay nudge).
