@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 from ..db import get_db
 from ..engines import durable_income, hindi, money_paths, next_step, roadmap, stage
-from ..engines.common import inp, inr, inr_range, short, why
+from ..engines.common import day_month, inp, inr, inr_range, short, why
 from ..engines.fair_price import fair_price, follower_price
 from ..engines.matching import audience_fit
 from ..engines.opportunities import matched
@@ -136,8 +136,8 @@ def pipeline(c: dict) -> dict:
                     "kind": "invoice_late",
                     "invoice_id": inv["_id"],
                     "text": f"{inr(inv['amount'])} invoice is {days} days late",
-                    "detail": f"{inv['to']} was due to pay on {date.fromisoformat(inv['due']).strftime('%-d %b')}. Send a reminder with the invoice attached.",
-                    "hi": hindi.alert("invoice_late", amount=inv["amount"], days=days, to=inv["to"], due=date.fromisoformat(inv["due"]).strftime("%-d %b")),
+                    "detail": f"{inv['to']} was due to pay on {day_month(inv['due'])}. Send a reminder with the invoice attached.",
+                    "hi": hindi.alert("invoice_late", amount=inv["amount"], days=days, to=inv["to"], due=day_month(inv["due"])),
                 }
             )
     return {

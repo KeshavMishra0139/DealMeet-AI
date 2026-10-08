@@ -19,7 +19,7 @@ from fastapi import HTTPException
 
 from ..config import get_settings, now_iso, today
 from ..db import get_db
-from ..engines.common import inr, inr_full
+from ..engines.common import day_month, inr, inr_full
 from ..engines.fair_price import deliverables_label, fair_price
 
 RAIL = [
@@ -309,7 +309,7 @@ def view(d: dict, role: str) -> dict:
         alerts.append(
             {
                 "kind": "verify_late" if late else "verify_window",
-                "text": (f"{brand.get('name', 'The brand')} is {(today() - date.fromisoformat(d['verify_due'])).days} days late confirming" if late else f"{brand.get('name', 'The brand')} has until {date.fromisoformat(d['verify_due']).strftime('%-d %b')} to confirm"),
+                "text": (f"{brand.get('name', 'The brand')} is {(today() - date.fromisoformat(d['verify_due'])).days} days late confirming" if late else f"{brand.get('name', 'The brand')} has until {day_month(d['verify_due'])} to confirm"),
                 "detail": f"Escrow auto-releases to the creator in {days_left} day{'s' if days_left != 1 else ''} if there's no response.",
             }
         )
