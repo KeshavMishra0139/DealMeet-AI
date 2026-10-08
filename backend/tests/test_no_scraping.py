@@ -43,8 +43,14 @@ def test_no_direct_platform_fetches():
     assert not hits, "Direct platform fetches found:\n" + "\n".join(hits)
 
 
-def test_qa_scripts_only_target_localhost():
+def test_qa_scripts_only_visit_localhost():
+    """QA scripts may type sample links into forms, but only ever navigate to
+    or fetch the local app, and refuse to run against any other host."""
     for qa in (ROOT / "qa").glob("*.mjs"):
         text = qa.read_text(encoding="utf-8")
-        urls = re.findall(r"https?://[^\s\"'`]+", text)
-        assert all(re.match(r"https?://(localhost|127\.0\.0\.1)", u) for u in urls), (qa.name, urls)
+        assert "QA only runs against localhost" in text, qa.name
+        targets = [t.strip() for t in re.findall(r"(?:goto|fetch)\(\s*([^,)]+)", text)]
+        assert targets, qa.name
+        allowed = ("BASE", "API", "`${BASE}", "`${API}", '"http://localhost', "'http://localhost", "`http://localhost")
+        for t in targets:
+            assert t.startswith(allowed), (qa.name, t)

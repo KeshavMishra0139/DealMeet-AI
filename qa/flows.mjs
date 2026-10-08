@@ -2,19 +2,31 @@
 // End-to-end checks of the demo's key journeys, by clicking through the real UI.
 // Only ever visits the local app (localhost). Run with `make dev` running:
 //   node qa/flows.mjs
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const BASE = process.env.QA_BASE ?? "http://localhost:5173";
 const API = process.env.QA_API ?? "http://localhost:8000";
 if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE)) throw new Error("QA only runs against localhost");
 
 const results = [];
+let page;
 async function step(name, fn) {
   try {
     await fn();
     results.push(["PASS", name]);
   } catch (e) {
     results.push(["FAIL", name, String(e).split("\n")[0]]);
+    try {
+      mkdirSync(join(here, "report"), { recursive: true });
+      await page.screenshot({ path: join(here, "report", `fail-${results.length}.png`), fullPage: true });
+    } catch {
+      /* page may be closed */
+    }
   }
 }
 
@@ -28,7 +40,7 @@ async function launch() {
 
 await fetch(`${API}/api/demo/reset`, { method: "POST" });
 const browser = await launch();
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 
@@ -111,6 +123,41 @@ await step("Privacy: revoking a brand logs it and hides the creator", async () =
   await page.getByRole("button", { name: "Revoke" }).first().click();
   await page.getByText("Revoked", { exact: true }).first().waitFor();
   await page.getByText("access revoked").first().waitFor();
+});
+
+await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify, UPI payout", async () => {
+  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
+  await page.getByText(/58% below the fair price/).waitFor();
+  await page.getByRole("button", { name: /Counter at/ }).click();
+  await page.getByRole("button", { name: "Send counter" }).click();
+  await page.getByText(/You countered at/).waitFor();
+  await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
+  await page.getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByRole("button", { name: /Fund escrow/ }).click();
+  await page.getByRole("button", { name: /Pay .*simulated/ }).click();
+  await page.getByText(/held in escrow/).first().waitFor();
+  await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
+  await page.getByRole("button", { name: "Submit post link" }).click();
+  await page.getByLabel(/Instagram reel or YouTube Short link/).fill("https://www.instagram.com/reel/DEMOA1/");
+  await page.getByRole("dialog").getByRole("button", { name: "Submit link" }).click();
+  await page.getByRole("button", { name: "Remind the brand" }).waitFor();
+  await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
+  await page.getByRole("button", { name: /Confirm post and release payment/ }).click();
+  await page.getByText(/paid by UPI to/).first().waitFor();
+  await page.getByRole("link", { name: /Invoice JD-/ }).waitFor();
+});
+
+await step("Link-in-bio: a brand books from the public page; it lands in the creator's deals", async () => {
+  await page.goto(`${BASE}/c/creator.a`);
+  await page.getByRole("button", { name: /Book Creator/ }).click();
+  await page.getByLabel("Brand").fill("Otaku Threads");
+  await page.getByLabel("Work email").fill("hello@otaku.test");
+  await page.getByRole("button", { name: "Send booking request" }).click();
+  await page.getByText("Request sent").waitFor();
+  await page.goto(`${BASE}/creator/deals?as=cr_a`);
+  await page.getByText("Otaku Threads").first().waitFor();
 });
 
 await browser.close();
