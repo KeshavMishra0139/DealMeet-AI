@@ -1,6 +1,9 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, BadgeIndianRupee, Lock, Play, Scale, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ParallaxAurora, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
+import { Stage3D } from "@/components/three/Stage3D";
+import { HeroOrbit } from "@/components/three/lazy";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
@@ -17,9 +20,7 @@ export default function Landing() {
 
   return (
     <div className="theme-creator grain relative min-h-dvh overflow-x-clip">
-      <div className="aurora" aria-hidden>
-        <span />
-      </div>
+      <ParallaxAurora />
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-5">
         <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
@@ -36,7 +37,11 @@ export default function Landing() {
       </header>
 
       <main id="main" className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
-        <section aria-labelledby="pitch" className="pt-4 sm:pt-12 lg:pt-16">
+        {/* 3D hero: creator core with brand cards and coins in orbit. Desktop only; follows the pointer and the scroll. */}
+        <Stage3D media="(min-width: 1280px)" className="pointer-events-none absolute -right-36 -top-12 hidden h-[560px] w-[680px] xl:block">
+          {(active) => <HeroOrbit active={active} still={!!reduce} />}
+        </Stage3D>
+        <section aria-labelledby="pitch" className="relative pt-4 sm:pt-12 lg:pt-16">
           <motion.p
             {...rise(0)}
             className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2 backdrop-blur"
@@ -47,7 +52,7 @@ export default function Landing() {
           <motion.h1
             {...rise(0.05)}
             id="pitch"
-            className="max-w-[18ch] font-display text-[29px] font-semibold leading-[1.12] tracking-[-0.03em] sm:max-w-[22ch] sm:text-5xl sm:leading-[1.06] lg:max-w-[24ch] lg:text-[60px]"
+            className="max-w-[18ch] font-display text-[29px] font-semibold leading-[1.12] tracking-[-0.03em] sm:max-w-[22ch] sm:text-5xl sm:leading-[1.06] lg:max-w-[24ch] lg:text-[60px] xl:max-w-[17ch]"
           >
             <span className="text-muted">Other dashboards tell creators how they're doing. </span>
             JodiDar AI tells them <span className="text-gradient">what to do next</span>, prices it fairly, and makes
@@ -57,10 +62,14 @@ export default function Landing() {
 
         <section aria-label="Choose your side" className="mt-7 grid gap-3 sm:mt-10 sm:gap-4 md:grid-cols-2">
           <motion.div {...rise(0.15)}>
-            <CreatorEntry />
+            <TiltCard className="h-full rounded-[28px]" max={5}>
+              <CreatorEntry />
+            </TiltCard>
           </motion.div>
           <motion.div {...rise(0.22)}>
-            <BrandEntry />
+            <TiltCard className="h-full rounded-[28px]" max={5}>
+              <BrandEntry />
+            </TiltCard>
           </motion.div>
         </section>
 
@@ -77,7 +86,7 @@ export default function Landing() {
           <h2 id="principles" className="sr-only">
             How JodiDar AI works
           </h2>
-          <div className="grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
+          <Stagger className="grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
             {[
               {
                 icon: Scale,
@@ -95,17 +104,19 @@ export default function Landing() {
                 body: "Brands fund escrow before a post goes live. Collective deals split payouts automatically over UPI.",
               },
             ].map((p) => (
-              <div key={p.title} className="bg-[var(--bg)]/80 p-6 backdrop-blur">
+              <StaggerItem key={p.title} className="bg-[var(--bg)]/80 p-6 backdrop-blur">
                 <p.icon className="size-5 text-accent" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold">{p.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted">{p.body}</p>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
-          <footer className="mt-10 flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          </Stagger>
+          <Reveal as="div" className="mt-10">
+          <footer className="flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <p>Built by Team TheVortex for CodeX 3.0, Problem Statement 3.</p>
             <p>All brands and profiles are fictional, except one anonymised reference profile.</p>
           </footer>
+          </Reveal>
         </section>
       </main>
     </div>

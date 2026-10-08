@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import { Waterfall } from "@/components/charts/Waterfall";
 import { ErrorState, ReferenceNote } from "@/components/shared/Bits";
+import { Reveal } from "@/components/motion/Motion";
 import { RangeValue } from "@/components/shared/Estimate";
 import { EstimateNote, SimulatedChip, WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ export default function Money() {
 
       <FairPriceCard creatorId={id} initial={m.fair} options={m.brand_options} />
 
-      <section aria-labelledby="goal" className="mt-8">
+      <Reveal as="section" aria-labelledby="goal" className="mt-8">
         <div className="card-surface flex flex-col gap-3 rounded-[var(--radius-card)] p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 id="goal" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -70,9 +71,9 @@ export default function Money() {
             <EstimateNote estimate={m.goal.top3} />
           </div>
         </div>
-      </section>
+      </Reveal>
 
-      <section aria-labelledby="paths" className="mt-8">
+      <Reveal as="section" aria-labelledby="paths" className="mt-8">
         <h2 id="paths" className="mb-3 font-display text-lg font-semibold">
           Ranked paths
         </h2>
@@ -81,7 +82,7 @@ export default function Money() {
             <PathCard key={p.type} path={p} />
           ))}
         </ol>
-      </section>
+      </Reveal>
     </div>
   );
 }
@@ -105,7 +106,7 @@ function FairPriceCard({
   const choices = options.slice(0, 2);
 
   return (
-    <section aria-labelledby="fair" className="card-surface mt-6 overflow-hidden rounded-[28px]">
+    <Reveal as="section" aria-labelledby="fair" className="card-surface mt-6 overflow-hidden rounded-[28px]">
       <div className="relative p-5 sm:p-7">
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-[radial-gradient(circle,rgb(124_58_237/0.28),transparent_65%)] blur-2xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -189,7 +190,7 @@ function FairPriceCard({
           </tbody>
         </table>
       </div>
-    </section>
+    </Reveal>
   );
 }
 

@@ -32,3 +32,9 @@ def test_brand_safety_notes_are_shown_to_brands_without_the_maths(client, db):
     assert "penalty" not in a["safety"]["flags"][0]
     profile = client.get("/api/brands/br_thalam/creators/cr_b").json()
     assert profile["safety"]["flags"] == []
+
+
+def test_home_sends_the_last_six_reels_for_the_reach_chart(client, db):
+    ctx = client.get("/api/creators/cr_a/home").json()["context"]
+    assert [r["views"] for r in ctx["recent"]] == [359_000, 142_000, 88_900, 33_200, 210_000, 117_000]
+    assert ctx["recent"][0]["date"] == "2026-09-20" and ctx["recent_provenance"] == {"views": "real", "followers": "real"}

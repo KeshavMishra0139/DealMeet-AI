@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bot, CheckCircle2, FileText, GraduationCap, Lightbulb, Repeat, Search, Sparkles, UserRound } from "lucide-react";
 import { ErrorState, ReferenceNote, SectionTitle } from "@/components/shared/Bits";
+import { Reveal } from "@/components/motion/Motion";
 import { WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/form";
@@ -37,7 +38,7 @@ export default function Roadmap() {
       {r.creator.is_reference && r.creator.reference_note && <ReferenceNote text={r.creator.reference_note} className="mt-2" />}
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
-        <section aria-labelledby="working" className="card-surface rounded-[var(--radius-card)] p-5">
+        <Reveal as="section" aria-labelledby="working" className="card-surface rounded-[var(--radius-card)] p-5">
           <SectionTitle id="working" eyebrow="Keep doing" title="What's working" />
           {r.working.length === 0 ? (
             <p className="text-sm text-muted">Connect your account or post a few reels and we'll show what's working.</p>
@@ -57,9 +58,9 @@ export default function Roadmap() {
               ))}
             </ul>
           )}
-        </section>
+        </Reveal>
 
-        <section aria-labelledby="gaps" className="card-surface rounded-[var(--radius-card)] p-5">
+        <Reveal as="section" aria-labelledby="gaps" className="card-surface rounded-[var(--radius-card)] p-5">
           <SectionTitle id="gaps" eyebrow="Add next" title="Content gaps" />
           {r.gaps.length === 0 ? (
             <p className="text-sm text-muted">No clear gap yet. Keep posting your best format and check back next week.</p>
@@ -83,10 +84,10 @@ export default function Roadmap() {
               ))}
             </ul>
           )}
-        </section>
+        </Reveal>
       </div>
 
-      <section aria-labelledby="topics" className="mt-8">
+      <Reveal as="section" aria-labelledby="topics" className="mt-8">
         <SectionTitle
           id="topics"
           eyebrow={`In ${r.topics.language}`}
@@ -108,10 +109,10 @@ export default function Roadmap() {
             </li>
           ))}
         </ul>
-      </section>
+      </Reveal>
 
       <div className="mt-8 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
-        <section aria-labelledby="skills" className="card-surface rounded-[var(--radius-card)] p-5">
+        <Reveal as="section" aria-labelledby="skills" className="card-surface rounded-[var(--radius-card)] p-5">
           <SectionTitle id="skills" eyebrow="Top 3" title="Skills to build" />
           <ol className="space-y-3">
             {r.skills.map((s) => (
@@ -127,9 +128,9 @@ export default function Roadmap() {
               </li>
             ))}
           </ol>
-        </section>
+        </Reveal>
 
-        <section aria-labelledby="plan30" className="card-surface rounded-[var(--radius-card)] p-5">
+        <Reveal as="section" aria-labelledby="plan30" className="card-surface rounded-[var(--radius-card)] p-5">
           <SectionTitle id="plan30" eyebrow="Next 30 days" title="Your plan" />
           <ol className="relative ml-3 border-l border-line-strong">
             {r.plan.map((w) => (
@@ -158,10 +159,10 @@ export default function Roadmap() {
               </li>
             ))}
           </ol>
-        </section>
+        </Reveal>
       </div>
 
-      <section aria-labelledby="twins" className="mt-8">
+      <Reveal as="section" aria-labelledby="twins" className="mt-8">
         <SectionTitle id="twins" eyebrow="One or two stages ahead" title="Reference twins" />
         <ul className="grid gap-3 md:grid-cols-3">
           {r.twins.map((tw) => (
@@ -193,7 +194,7 @@ export default function Roadmap() {
             </li>
           ))}
         </ul>
-      </section>
+      </Reveal>
     </div>
   );
 }

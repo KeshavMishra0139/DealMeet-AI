@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -63,9 +64,8 @@ function Studio() {
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
-      <div className="aurora" aria-hidden>
-        <span />
-      </div>
+      <ParallaxAurora />
+      <ScrollProgress />
       <a
         href="#main"
         className="sr-only z-50 rounded-lg bg-accent px-3 py-2 text-accent-fg focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -112,7 +112,9 @@ function Studio() {
           id="main"
           className="mx-auto w-full max-w-[1000px] px-4 pb-[calc(96px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10"
         >
-          <Outlet />
+          <PageFade>
+            <Outlet />
+          </PageFade>
         </main>
       </div>
 

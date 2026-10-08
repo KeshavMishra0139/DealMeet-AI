@@ -218,6 +218,18 @@ await step("Live demo: a counter on the phone appears in the brand console witho
   await desk.getByText(/Synced · Deal updated/).waitFor();
 });
 
+await step("3D: the reach chart and the match space draw with WebGL", async () => {
+  await desk.goto(`${BASE}/creator?as=cr_a&phone=0`);
+  const reach = desk.locator("section[aria-labelledby=reach]");
+  await reach.scrollIntoViewIfNeeded();
+  await reach.locator("canvas").waitFor();
+  await desk.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
+  const space = desk.locator("section[aria-labelledby=space]");
+  await space.locator("canvas").waitFor();
+  const box = await space.locator("canvas").boundingBox();
+  if (!box || box.height < 300) throw new Error("Match space canvas too small");
+});
+
 await browser.close();
 for (const r of results) console.log(r.join("  "));
 if (errors.length) console.log("Page errors:", errors);

@@ -90,6 +90,12 @@ export const hi: Dict = {
   "period.a month": "हर महीने",
   "common.simulated": "सिम्युलेटेड",
   "common.trust": "भरोसा",
+  "reach.title": "पहुँच बनाम फ़ॉलोअर्स",
+  "reach.ratio": "आपकी रील्स फ़ॉलोअर्स से करीब {n}x लोगों तक पहुँचती हैं",
+  "reach.same": "आपकी रील्स लगभग उतने ही लोगों तक पहुँचती हैं जितने फ़ॉलोअर्स हैं",
+  "reach.caption": "पिछली 6 रील्स। बार व्यूज़ हैं; काँच की सतह आपके फ़ॉलोअर्स हैं।",
+  "reach.views": "व्यूज़",
+  "reach.followers": "फ़ॉलोअर्स",
 };
 
 /** Fixed phrases the API sends in English (CTA labels, headlines). */

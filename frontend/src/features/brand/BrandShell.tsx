@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Handshake, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { PageFade, ScrollProgress } from "@/components/motion/Motion";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -108,7 +109,10 @@ export default function BrandShell() {
 
       <div className="lg:pl-[232px]">
         <main id="main" className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pt-8">
-          <Outlet />
+          <ScrollProgress />
+          <PageFade>
+            <Outlet />
+          </PageFade>
         </main>
       </div>
 
