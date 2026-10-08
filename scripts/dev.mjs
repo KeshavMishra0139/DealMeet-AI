@@ -4,7 +4,7 @@
 // Works on macOS, Linux and Windows with only Node 20+ and Python 3.10+.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,23 +27,55 @@ function log(msg) {
   console.log(`${magenta("jodidar")} ${msg}`);
 }
 
+// The pinned API packages ship ready-made builds for Python 3.10 to 3.14 on Windows,
+// macOS and Linux. Outside that range pip tries to compile numpy and friends from
+// source, which fails without a C compiler.
+const PY_RANGE = "3.10 to 3.14";
+const PY_PROBE = "import sys; print([3, 10] <= list(sys.version_info[:2]) <= [3, 14])";
+const PY_PREFERRED = ["3.13", "3.12", "3.14", "3.11", "3.10"];
+
+function supportedPython(cmd, pre = []) {
+  const r = spawnSync(cmd, [...pre, "-c", PY_PROBE], { encoding: "utf8" });
+  return r.status === 0 && r.stdout.trim() === "True";
+}
+
 function findPython() {
-  const candidates = isWin ? [["py", ["-3"]], ["python", []]] : [["python3", []], ["python", []]];
-  for (const [cmd, pre] of candidates) {
-    const r = spawnSync(cmd, [...pre, "-c", "import sys; print(sys.version_info >= (3, 10))"], {
-      encoding: "utf8",
-    });
-    if (r.status === 0 && r.stdout.trim() === "True") return [cmd, pre];
-  }
+  // Prefer a specific supported version over "newest installed": on Windows `py -3`
+  // picks the newest Python, which may be too new for the pinned packages.
+  const candidates = isWin
+    ? [...PY_PREFERRED.map((v) => ["py", [`-${v}`]]), ["py", ["-3"]], ["python", []]]
+    : [...PY_PREFERRED.map((v) => [`python${v}`, []]), ["python3", []], ["python", []]];
+  for (const [cmd, pre] of candidates) if (supportedPython(cmd, pre)) return [cmd, pre];
   return null;
 }
 
+// npm is npm.cmd on Windows, which Node can only start through cmd.exe. Everything
+// else (python.exe, py.exe) is started directly so paths with spaces stay intact.
+const needsShell = (cmd) => isWin && (cmd === "npm" || cmd === "npx");
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { stdio: "inherit", shell: isWin, ...opts });
+  const r = spawnSync(cmd, args, { stdio: "inherit", shell: needsShell(cmd), ...opts });
   if (r.status !== 0) {
+    if (r.error) console.error(r.error.message);
     console.error(`\n${magenta("jodidar")} command failed: ${cmd} ${args.join(" ")}`);
     process.exit(r.status ?? 1);
   }
+}
+
+/** Windows limits paths to 260 characters unless long paths are enabled; one installed file is deep. */
+function warnLongPaths() {
+  if (!isWin) return;
+  const deepest = join(backend, ".venv", "Lib", "site-packages").length + 110;
+  if (deepest < 255) return;
+  const reg = spawnSync("reg", ["query", "HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem", "/v", "LongPathsEnabled"], {
+    encoding: "utf8",
+  });
+  if (/LongPathsEnabled\s+REG_DWORD\s+0x1\b/i.test(reg.stdout ?? "")) return;
+  log(
+    "warning: this folder path is long, and Windows may refuse to install some packages.\n" +
+      "  If the install fails, move the project to a shorter path (for example C:\\JodiDar-AI)\n" +
+      "  or enable long paths: https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation",
+  );
 }
 
 function hashFile(p) {
@@ -57,10 +89,15 @@ const venvPython = isWin
 function ensureBackend() {
   const reqs = join(backend, "requirements.txt");
   const stamp = join(backend, ".deps-stamp");
+  if (existsSync(venvPython) && !supportedPython(venvPython)) {
+    log(`the API environment uses a Python outside ${PY_RANGE}; rebuilding it`);
+    rmSync(join(backend, ".venv"), { recursive: true, force: true });
+    rmSync(stamp, { force: true });
+  }
   if (!existsSync(venvPython)) {
     const py = findPython();
     if (!py) {
-      console.error("Python 3.10+ is required. Install it from python.org and run again.");
+      console.error(`Python ${PY_RANGE} is required. Install Python 3.13 from python.org and run again.`);
       process.exit(1);
     }
     log("creating Python virtual environment (first run only)");
@@ -70,6 +107,7 @@ function ensureBackend() {
   const have = existsSync(stamp) ? readFileSync(stamp, "utf8").trim() : "";
   if (want !== have) {
     log("installing API dependencies");
+    warnLongPaths();
     run(venvPython, ["-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", reqs]);
     writeFileSync(stamp, want);
   }
@@ -96,7 +134,7 @@ if (setupOnly) {
 
 const procs = [];
 function start(name, color, cmd, args, cwd) {
-  const p = spawn(cmd, args, { cwd, shell: isWin, env: { ...process.env, FORCE_COLOR: "1" } });
+  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, FORCE_COLOR: "1" } });
   const tag = color(name.padEnd(4));
   const pipe = (stream) => {
     let buf = "";
@@ -116,11 +154,22 @@ function start(name, color, cmd, args, cwd) {
   procs.push(p);
 }
 
+function stop(p) {
+  if (p.exitCode !== null || p.signalCode !== null) return; // already gone
+  if (isWin) {
+    // kill() only ends the top process; /T also ends what it started (the uvicorn
+    // reloader and worker, or npm and vite), so nothing keeps holding the port.
+    spawnSync("taskkill", ["/pid", String(p.pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    p.kill();
+  }
+}
+
 let stopping = false;
 function shutdown(code) {
   if (stopping) return;
   stopping = true;
-  for (const p of procs) if (!p.killed) p.kill();
+  for (const p of procs) stop(p);
   setTimeout(() => process.exit(code), 300);
 }
 process.on("SIGINT", () => shutdown(0));
