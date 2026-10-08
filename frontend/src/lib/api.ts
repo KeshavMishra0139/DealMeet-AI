@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { announceChange } from "./sync";
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
@@ -35,6 +36,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
     }
     throw new ApiError(res.status, detail);
   }
+  if (rest.method && rest.method !== "GET") announceChange(path);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

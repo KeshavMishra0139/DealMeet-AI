@@ -52,9 +52,12 @@ def features(c: dict) -> list[float] | None:
 
 
 def _model():
+    # Trained on the seeded population, not the live collection: deterministic, unaffected by a
+    # reset in progress, and new sign-ups can't shift what "normal" looks like.
+    from ..seed.load import all_creators
+
     rows, ids = [], []
-    for c in get_db().creators.find({}, {"reels": 1, "followers": 1, "following": 1, "follower_history": 1,
-                                         "comment_insights": 1, "insights_connected": 1}):
+    for c in all_creators():
         fv = features(c)
         if fv:
             rows.append(fv)

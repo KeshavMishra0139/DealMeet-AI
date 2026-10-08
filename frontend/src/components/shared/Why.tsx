@@ -1,5 +1,6 @@
 import { Info, ShieldAlert } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger, Tooltip } from "@/components/ui/overlays";
+import { useI18n } from "@/i18n";
 import type { Confidence, Estimate, Why } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +13,7 @@ const CONFIDENCE_LABEL: Record<Confidence, string> = {
 /** Every score, price and recommendation carries one of these. */
 export function WhyPopover({
   why,
-  label = "Why?",
+  label,
   className,
   subject,
 }: {
@@ -21,6 +22,8 @@ export function WhyPopover({
   className?: string;
   subject?: string;
 }) {
+  const { t } = useI18n();
+  label ??= t("common.why");
   const hasSimulated = (why.simulated_fields?.length ?? 0) > 0;
   return (
     <Popover>
@@ -76,6 +79,7 @@ export function WhyPopover({
 }
 
 export function SimulatedChip({ className }: { className?: string }) {
+  const { t } = useI18n();
   return (
     <Tooltip content="Not shared by the creator; illustrative for the demo.">
       <span
@@ -85,7 +89,7 @@ export function SimulatedChip({ className }: { className?: string }) {
           className,
         )}
       >
-        Simulated
+        {t("common.simulated")}
       </span>
     </Tooltip>
   );
@@ -93,8 +97,9 @@ export function SimulatedChip({ className }: { className?: string }) {
 
 /** "Estimate, not a promise" with its assumptions one tap away. */
 export function EstimateNote({ estimate, className }: { estimate?: Pick<Estimate, "assumptions" | "confidence">; className?: string }) {
+  const { t } = useI18n();
   if (!estimate) {
-    return <span className={cn("text-[11px] text-muted", className)}>Estimate, not a promise</span>;
+    return <span className={cn("text-[11px] text-muted", className)}>{t("est.note")}</span>;
   }
   return (
     <Popover>
@@ -104,7 +109,7 @@ export function EstimateNote({ estimate, className }: { estimate?: Pick<Estimate
           className,
         )}
       >
-        {`Estimate, not a promise · ${CONFIDENCE_LABEL[estimate.confidence]}`}
+        {`${t("est.note")} · ${t(`est.${estimate.confidence}`)}`}
       </PopoverTrigger>
       <PopoverContent>
         <p className="font-display text-sm font-semibold">What this estimate assumes</p>

@@ -26,7 +26,7 @@ import { api, post } from "@/lib/api";
 import type { FairPrice } from "@/lib/api-types";
 import type { Deal, DealAction } from "@/lib/deal-types";
 import { STAGE_LABEL } from "@/lib/deal-types";
-import { count, inr, shortDate, timeOfDay } from "@/lib/format";
+import { count, inr, possessive, shortDate, timeOfDay } from "@/lib/format";
 import { fundEscrow } from "@/lib/payments";
 import { cn } from "@/lib/utils";
 
@@ -115,10 +115,16 @@ export default function DealView({ role }: { role: Role }) {
           className={cn("flex flex-wrap items-center gap-3 rounded-2xl border p-3.5", a.kind === "low_offer" ? "border-warn/40 bg-warn-soft" : "border-line bg-surface-2")}
         >
           {a.kind === "low_offer" ? <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden /> : <Clock className="size-5 shrink-0 text-muted" aria-hidden />}
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[200px] flex-1">
             <p className="text-sm font-semibold">{a.text}</p>
             {a.detail && <p className="text-xs text-fg-2">{a.detail}</p>}
-            {a.kind === "low_offer" && a.fair && <p className="text-xs text-fg-2">Your fair price for {d.deliverables} is {inr(a.fair)}, priced on your reach.</p>}
+            {a.kind === "low_offer" && a.fair && (
+              <p className="text-xs text-fg-2">
+                {role === "creator"
+                  ? `Your fair price for ${d.deliverables} is ${inr(a.fair)}, priced on your reach.`
+                  : `${possessive(d.creator.name)} fair price for ${d.deliverables} is ${inr(a.fair)}, priced on their reach. Offers this far below fair are often countered.`}
+              </p>
+            )}
           </div>
           {a.kind === "low_offer" && role === "creator" && d.actions.some((x) => x.id === "counter") && (
             <Button size="sm" variant="primary" onClick={() => setDialog("counter")}>

@@ -9,27 +9,29 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
-import { useI18n } from "@/i18n";
+import { useI18n, useTr } from "@/i18n";
 import { post } from "@/lib/api";
 import type { Move, Plan } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 
 const CATEGORY = {
-  money: { label: "Money", icon: IndianRupee },
-  growth: { label: "Growth", icon: TrendingUp },
-  opportunity: { label: "Opportunity", icon: Sparkles },
+  money: { label: "cat.money", icon: IndianRupee },
+  growth: { label: "cat.growth", icon: TrendingUp },
+  opportunity: { label: "cat.opportunity", icon: Sparkles },
 } as const;
 
 const RESULTS = [
-  { value: "worked", label: "It worked" },
-  { value: "partly", label: "Partly" },
-  { value: "no", label: "It didn't land" },
+  { value: "worked", label: "move.worked" },
+  { value: "partly", label: "move.partly" },
+  { value: "no", label: "move.no" },
 ] as const;
 
 export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: string; index: number }) {
-  const { t } = useI18n();
+  const { t, pick } = useI18n();
+  const tr = useTr();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const title = pick(move.title, move.hi?.title);
   const [result, setResult] = useState<(typeof RESULTS)[number]["value"]>("worked");
   const [amount, setAmount] = useState("");
   const [celebrate, setCelebrate] = useState(false);
@@ -65,20 +67,20 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
         <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
           <span className="num grid size-6 place-items-center rounded-full bg-accent-soft text-[12px] text-accent">{index + 1}</span>
           <cat.icon className="size-3.5" aria-hidden />
-          {cat.label}
+          {t(cat.label)}
         </span>
         <span className="flex items-center gap-1.5">
-          {move.carried_over && <Badge size="sm">Carried over</Badge>}
-          <Badge size="sm" variant="outline" title={move.effort_hint}>
+          {move.carried_over && <Badge size="sm">{t("move.carried")}</Badge>}
+          <Badge size="sm" variant="outline" title={t(`effort.${move.effort}`)}>
             {t("common.effort")} {move.effort}
           </Badge>
         </span>
       </div>
 
       <h3 id={`${move.id}-title`} className="mt-4 font-display text-[21px] font-semibold leading-[1.2] tracking-tight sm:text-[22px]">
-        {move.title}
+        {title}
       </h3>
-      <p className="mt-2 text-[15px] leading-relaxed text-fg-2">{move.reason}</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-fg-2">{pick(move.reason, move.hi?.reason)}</p>
 
       <div className="mt-auto pt-5">
         <div className="rounded-2xl border border-line bg-surface p-3.5">
@@ -95,12 +97,12 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
               <span className="inline-flex h-10 items-center gap-2 rounded-xl bg-success-soft px-3.5 text-sm font-medium text-success">
                 <Check className="size-4" aria-hidden />
                 {t("home.done")}
-                {move.outcome?.result && ` · ${RESULTS.find((r) => r.value === move.outcome?.result)?.label}`}
+                {move.outcome?.result && ` · ${t(RESULTS.find((r) => r.value === move.outcome?.result)!.label)}`}
               </span>
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={`Undo: ${move.title}`}
+                aria-label={t("move.undo", { title })}
                 onClick={() => mutate.mutate({ action: "reopen" })}
               >
                 <RotateCcw />
@@ -113,17 +115,17 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
           )}
           <Button asChild variant="ghost" size="md" className="px-3">
             <Link to={move.cta.to}>
-              {move.cta.label} <ArrowRight aria-hidden />
+              {tr(move.cta.label)} <ArrowRight aria-hidden />
             </Link>
           </Button>
-          <WhyPopover why={move.why} subject={move.title} label={t("common.why")} className="ml-auto" />
+          <WhyPopover why={move.why} subject={title} label={t("common.why")} className="ml-auto" />
         </div>
       </div>
 
       <Celebration show={celebrate} />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent sheet title={t("home.logOutcome")} description={move.title}>
+        <DialogContent sheet title={t("home.logOutcome")} description={title}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -134,8 +136,8 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
             }}
           >
             <fieldset>
-              <legend className="mb-2 text-sm text-fg-2">Your answer shapes next week's plan.</legend>
-              <div role="radiogroup" aria-label="Outcome" className="grid grid-cols-3 gap-2">
+              <legend className="mb-2 text-sm text-fg-2">{t("move.shapes")}</legend>
+              <div role="radiogroup" aria-label={t("move.outcome")} className="grid grid-cols-3 gap-2">
                 {RESULTS.map((r) => (
                   <button
                     type="button"
@@ -148,14 +150,14 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
                       result === r.value ? "border-transparent bg-accent text-accent-fg" : "border-line-strong bg-surface-2 text-fg-2 hover:text-fg",
                     )}
                   >
-                    {r.label}
+                    {t(r.label)}
                   </button>
                 ))}
               </div>
             </fieldset>
             {asksAmount && result !== "no" && (
               <div className="mt-4">
-                <Label htmlFor={`${move.id}-amount`}>Rate agreed (₹ per reel)</Label>
+                <Label htmlFor={`${move.id}-amount`}>{t("move.rateAgreed")}</Label>
                 <Input
                   id={`${move.id}-amount`}
                   inputMode="numeric"
@@ -171,7 +173,7 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
               </p>
             )}
             <Button type="submit" variant="primary" size="lg" className="mt-5 w-full" loading={mutate.isPending}>
-              Save
+              {t("move.save")}
             </Button>
           </form>
         </DialogContent>
@@ -183,6 +185,7 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
 /** A small burst of signature-gradient dots. Skipped when motion is reduced. */
 function Celebration({ show }: { show: boolean }) {
   const reduce = useReducedMotion();
+  const { t } = useI18n();
   const dots = Array.from({ length: 14 }, (_, i) => i);
   const colors = ["#A78BFA", "#F472B6", "#FB923C"];
   return (
@@ -214,7 +217,7 @@ function Celebration({ show }: { show: boolean }) {
           exit={{ opacity: 0 }}
           className="absolute right-5 top-5 rounded-full bg-success-soft px-3 py-1 text-xs font-semibold text-success"
         >
-          Nice. Logged.
+          {t("move.logged")}
         </motion.p>
       )}
     </AnimatePresence>

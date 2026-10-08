@@ -43,7 +43,8 @@ def _scan() -> dict[str, dict]:
             y_owner = owners.get(y["owner_id"])
             if y_owner and y_owner.get("verified") and not verified:
                 dup_of = y["_id"]
-                reasons.append(f"Copies a listing by {y_owner['name']} ({sim[i, j] * 100:.0f}% similar)")
+                similar = "word for word" if sim[i, j] >= 0.995 else f"({sim[i, j] * 100:.0f}% similar)"
+                reasons.append(f"Copies a listing by {y_owner['name']} {similar}")
                 break
         flagged = bool(dup_of) or (not verified and len(reasons) >= 2) or len(reasons) >= 2
         out[x["_id"]] = {"flagged": flagged, "dup_of": dup_of, "reasons": reasons}

@@ -281,3 +281,8 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Devanagari joins letters along a headline bar; extra letter-spacing breaks it. */
+[lang="hi"] [class*="tracking-"] {
+  letter-spacing: normal;
+}

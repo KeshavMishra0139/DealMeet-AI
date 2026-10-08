@@ -66,7 +66,7 @@ export default function Landing() {
 
         <motion.div {...rise(0.3)} className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-7">
           <Button asChild variant="outline" size="lg" className="h-11 sm:h-12">
-            <Link to="/demo/compare">
+            <Link to="/demo/compare?guide=1">
               <Play className="fill-current" aria-hidden /> Watch the demo
             </Link>
           </Button>

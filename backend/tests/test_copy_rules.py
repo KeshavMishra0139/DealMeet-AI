@@ -31,7 +31,7 @@ def test_no_promises_in_api_copy():
 
 
 def test_rules_catch_examples():
-    bad = ["Guaranteed income", "you will go viral", "Overnight growth", "100% sure", "a viral hit"]
+    bad = ["Guaranteed income", "you will go viral", "Overnight growth", "100% sure", "a viral hit", "100 % pakka", "गारंटी के साथ", "रातों-रात फ़ेमस"]
     good = ["Estimate, not a promise", "Rs 14K to 19K a month if you post 3 reels a week"]
     for s in bad:
         assert any(rx.search(s) for rx, _ in PATTERNS), s
@@ -40,9 +40,17 @@ def test_rules_catch_examples():
 
 
 def test_api_responses_have_no_promises(client, db):
-    """Runtime copy (engine output) is checked too, not just source strings."""
-    paths = ["/api/creators/cr_a", "/api/creators/cr_b", "/api/meta", "/api/auth/personas"]
+    """Runtime copy (engine output, English and Hindi) is checked too, not just source strings."""
+    creators = ["cr_a", "cr_b", "cr_n01", "cr_t01", "cr_f08", "cr_g09"] + [c["_id"] for c in db.creators.find({}, {"_id": 1})][::9]
+    paths = ["/api/meta", "/api/auth/personas", "/api/demo/compare"]
+    for cid in dict.fromkeys(creators):
+        paths += [f"/api/creators/{cid}{s}" for s in ("", "/home", "/money", "/roadmap", "/opportunities", "/kit")]
+    for bid in ("br_senpai", "br_thalam"):
+        paths += [f"/api/brands/{bid}/console", f"/api/brands/{bid}/campaigns"]
+    paths += ["/api/listings/lst_senpai_hoodie/matches", "/api/listings/lst_thalam_collective/matches"]
     for p in paths:
-        body = client.get(p).text
+        r = client.get(p)
+        assert r.status_code == 200, p
         for rx, why in PATTERNS:
-            assert not rx.search(body), f"{p}: {why}"
+            m = rx.search(r.text)
+            assert not m, f"{p}: {why} ({r.text[max(0, m.start() - 60):m.end() + 20]!r})"

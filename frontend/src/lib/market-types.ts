@@ -3,6 +3,10 @@ import type { TrustInfo } from "./api-types";
 
 export type ListingType = "brand_campaign" | "pr_service" | "page" | "creator_collab" | "collective";
 export type Scopes = { stats: boolean; demographics: boolean; rate_card: boolean };
+/** Brand-safety notes as brands see them: the flag and the fix suggested to the creator. */
+export interface Safety {
+  flags: { id: string; label: string; fix: string }[];
+}
 
 export interface Opportunity {
   id: string;
@@ -75,6 +79,7 @@ export interface BrandMatch {
   reasons: string[];
   cautions: string[];
   trust: TrustInfo | null;
+  safety?: Safety;
   fair: { range: { low: number; high: number }; total: number; per_reel: number; deliverables: string };
   within_budget: boolean;
   rate_card: number | null;

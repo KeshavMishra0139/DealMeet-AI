@@ -10,7 +10,7 @@ from ..db import get_db
 from ..seed.catalog import LANGS, NICHES
 from ..services.consent import scopes_for
 from ..services.views import audience_stage
-from . import metrics
+from . import brand_safety, metrics
 from .common import clamp
 from .fair_price import fair_price
 from .matching import listing_fit
@@ -71,6 +71,7 @@ def rank_creator(c: dict, listing: dict, brand: dict, scopes: dict) -> dict:
         "reasons": redact(fit["reasons"], scopes)[:3],
         "cautions": fit["cautions"][:2],
         "trust": t,
+        "safety": brand_safety.public(c),
         "fair": {"range": fp["range"], "total": fp["total"], "per_reel": fp["per_reel"], "deliverables": fp["deliverables"]},
         "within_budget": not cap or fp["total"] <= cap,
         "rate_card": c.get("current_rate") if scopes.get("rate_card") else None,

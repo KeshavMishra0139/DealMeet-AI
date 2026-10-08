@@ -160,6 +160,64 @@ await step("Link-in-bio: a brand books from the public page; it lands in the cre
   await page.getByText("Otaku Threads").first().waitFor();
 });
 
+await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () => {
+  await page.goto(`${BASE}/creator?as=cr_a&lang=en`);
+  await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
+  await page.getByRole("button", { name: /Switch to Hindi/ }).click();
+  await page.getByRole("heading", { name: "इस हफ़्ते क्या करना है" }).waitFor();
+  await page.getByRole("heading", { name: /अपना रील रेट ₹17K–18K करें/ }).waitFor();
+  await page.getByText("कमा रहे हैं, पर कम रेट पर").first().waitFor();
+  await page.getByRole("button", { name: /Switch to English/ }).click();
+  await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
+});
+
+// Presenting on a laptop: compare, phone view and the live split.
+const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+desk.on("pageerror", (e) => errors.push(String(e)));
+page = desk;
+
+await step("Compare: guided demo steps through both creators with captions", async () => {
+  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await desk.goto(`${BASE}/demo/compare?phone=0`);
+  await desk.getByText("Earning, underpriced").first().waitFor();
+  await desk.getByText("Starting").first().waitFor();
+  await desk.getByRole("button", { name: "Guided demo" }).click();
+  const bar = desk.getByRole("region", { name: "Guided demo" });
+  await bar.getByText("Step 1 of 7").waitFor();
+  await desk.keyboard.press("ArrowRight");
+  await desk.keyboard.press("ArrowRight");
+  await bar.getByText("Step 3 of 7").waitFor();
+  await bar.getByText(/Fair price ₹17K–18K a reel/).waitFor();
+  await desk.keyboard.press("Escape");
+  await bar.waitFor({ state: "detached" });
+});
+
+await step("Phone view: P puts the app in a 390 x 844 phone and back", async () => {
+  await desk.goto(`${BASE}/creator?as=cr_b&phone=0`);
+  await desk.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
+  await desk.keyboard.press("p");
+  const phone = desk.frameLocator('iframe[title="JodiDar AI on a phone"]');
+  await phone.getByRole("heading", { name: /Post 2 Tamil quick-breakfast reels/ }).waitFor();
+  const box = await desk.locator('iframe[title="JodiDar AI on a phone"]').boundingBox();
+  if (!box || Math.abs(box.width / box.height - 390 / (844 - 47 - 21)) > 0.02) throw new Error(`Unexpected frame size ${JSON.stringify(box)}`);
+  await phone.getByRole("link", { name: "Money", exact: true }).click();
+  await desk.waitForURL(/\/creator\/money/);
+  await desk.getByRole("button", { name: "Exit phone view" }).click();
+  await desk.getByRole("heading", { name: /Money paths/ }).waitFor();
+});
+
+await step("Live demo: a counter on the phone appears in the brand console without a reload", async () => {
+  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await desk.goto(`${BASE}/demo/live`);
+  const phone = desk.frameLocator('iframe[title="Creator A\'s Creator Studio"]');
+  const consoleFrame = desk.frameLocator('iframe[title="Senpai Supply Co. Brand Console"]');
+  await consoleFrame.getByText(/58% below the fair price/).waitFor();
+  await phone.getByRole("button", { name: /Counter at/ }).click();
+  await phone.getByRole("button", { name: "Send counter" }).click();
+  await consoleFrame.getByRole("button", { name: /Accept .* and sign/ }).waitFor({ timeout: 2500 });
+  await desk.getByText(/Synced · Deal updated/).waitFor();
+});
+
 await browser.close();
 for (const r of results) console.log(r.join("  "));
 if (errors.length) console.log("Page errors:", errors);

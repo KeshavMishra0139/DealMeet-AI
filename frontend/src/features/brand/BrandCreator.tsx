@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Waterfall } from "@/components/charts/Waterfall";
 import { Avatar, ErrorState, ReferenceNote } from "@/components/shared/Bits";
+import { SafetyNote } from "@/components/shared/SafetyNote";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { SimulatedChip } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { Skeleton } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
 import type { FairPrice, PriceStep } from "@/lib/api-types";
 import { count, inr, inrRange, pct, shortDate } from "@/lib/format";
-import type { Scopes } from "@/lib/market-types";
+import type { Safety, Scopes } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
 import type { Provenance } from "@/lib/types";
 import { OfferDialog } from "./Campaign";
@@ -31,6 +32,7 @@ interface CreatorView {
   location: string | null;
   audience_stage: string;
   trust: { score: number; level: "high" | "medium" | "low"; reasons: string[]; method: string } | null;
+  safety?: Safety;
   scopes: Scopes;
   scope_source: string;
   scope_labels: Record<keyof Scopes, string>;
@@ -97,6 +99,7 @@ export default function BrandCreator() {
           <div>
             <h1 className="flex flex-wrap items-center gap-2 font-display text-2xl font-semibold tracking-tight">
               {c.name} <TrustBadge trust={c.trust} />
+              <SafetyNote safety={c.safety} />
             </h1>
             <p className="text-sm text-muted">
               @{c.handle} · {c.niche_label} · {c.languages.join(", ")} · {c.location} · {c.audience_stage} followers
