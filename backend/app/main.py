@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 from .config import ROOT
 from .db import get_db
-from .routers import auth, brands, creators, demo, market, meta, profiles
+from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles
 from .seed.load import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -43,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (meta, auth, demo, profiles, creators, market, brands):
+for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit):
     app.include_router(r.router)
 
 # Single-port mode: serve the built web app when it exists (npm run build).

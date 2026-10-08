@@ -1,0 +1,438 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BadgeCheck,
+  CheckCircle2,
+  Clock,
+  Download,
+  ExternalLink,
+  FileSignature,
+  IndianRupee,
+  Lock,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { Rail } from "@/components/deals/Rail";
+import { Avatar, ErrorState } from "@/components/shared/Bits";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input, Label, Skeleton, Textarea } from "@/components/ui/form";
+import { Dialog, DialogContent } from "@/components/ui/overlays";
+import { api, post } from "@/lib/api";
+import type { FairPrice } from "@/lib/api-types";
+import type { Deal, DealAction } from "@/lib/deal-types";
+import { STAGE_LABEL } from "@/lib/deal-types";
+import { count, inr, shortDate, timeOfDay } from "@/lib/format";
+import { fundEscrow } from "@/lib/payments";
+import { cn } from "@/lib/utils";
+
+type Role = "creator" | "brand";
+
+export function useDeal(id: string, role: Role) {
+  return useQuery({
+    queryKey: ["deal", id, role],
+    queryFn: () => api<Deal>(`/deals/${id}?role=${role}`),
+    refetchInterval: 3000,
+  });
+}
+
+export default function DealView({ role }: { role: Role }) {
+  const { id = "" } = useParams();
+  const q = useDeal(id, role);
+  const qc = useQueryClient();
+  const [dialog, setDialog] = useState<null | "counter" | "url" | "pay" | "sign">(null);
+  const [pending, setPending] = useState<DealAction | null>(null);
+
+  const act = useMutation({
+    mutationFn: (body: Record<string, unknown>) => post<Deal>(`/deals/${id}/action`, { role, ...body }),
+    onSuccess: (d) => {
+      qc.setQueryData(["deal", id, role], d);
+      qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "deal" });
+      setDialog(null);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
+  if (!q.data) return <Skeleton className="h-96 rounded-2xl" />;
+  const d = q.data;
+  const other = role === "creator" ? { name: d.brand.name, hue: d.brand.hue, generic: false } : { name: d.creator.name, hue: d.creator.avatar_hue, generic: d.creator.is_reference };
+  const back = role === "creator" ? "/creator/deals" : d.collective ? `/brand/collectives/${d.collective.id}` : "/brand/deals";
+
+  const run = (a: DealAction) => {
+    if (a.needs === "amount") return setDialog("counter");
+    if (a.needs === "url") return setDialog("url");
+    if (a.needs === "payment") return setDialog("pay");
+    if (a.id === "sign" || a.id === "accept" || a.id === "accept_counter") {
+      setPending(a);
+      return setDialog("sign");
+    }
+    act.mutate({ action: a.id });
+  };
+
+  return (
+    <div className="space-y-5">
+      <Link to={back} className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-fg">
+        <ArrowLeft className="size-3.5" aria-hidden /> {role === "creator" ? "Deals" : d.collective ? "Collective" : "Deals"}
+      </Link>
+
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={other.name} hue={other.hue} size={44} generic={other.generic} className={role === "creator" ? "rounded-xl" : undefined} />
+          <div>
+            <h1 className="flex flex-wrap items-center gap-2 font-display text-xl font-semibold tracking-tight sm:text-2xl">
+              {other.name}
+              {role === "creator" && (d.brand.verified ? <BadgeCheck className="size-4 text-accent" aria-label="Verified" /> : <Badge size="sm" variant="warn">Unverified</Badge>)}
+              {d.kind === "collective" && (
+                <Badge size="sm" variant="accent">
+                  <Users aria-hidden /> Collective
+                </Badge>
+              )}
+            </h1>
+            <p className="text-sm text-muted">
+              {d.listing ? d.listing.title : "Direct booking"} · {d.deliverables}
+              {d.usage_rights_days > 0 && ` · ${d.usage_rights_days} days usage`}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="num font-display text-2xl font-semibold">{inr(d.amount)}</p>
+          <p className="text-xs text-muted">
+            {STAGE_LABEL[d.stage]}
+            {d.fair_total ? ` · fair ${inr(d.fair_total)}` : ""}
+          </p>
+        </div>
+      </header>
+
+      {d.alerts.map((a) => (
+        <div
+          key={a.text}
+          role="status"
+          className={cn("flex flex-wrap items-center gap-3 rounded-2xl border p-3.5", a.kind === "low_offer" ? "border-warn/40 bg-warn-soft" : "border-line bg-surface-2")}
+        >
+          {a.kind === "low_offer" ? <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden /> : <Clock className="size-5 shrink-0 text-muted" aria-hidden />}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{a.text}</p>
+            {a.detail && <p className="text-xs text-fg-2">{a.detail}</p>}
+            {a.kind === "low_offer" && a.fair && <p className="text-xs text-fg-2">Your fair price for {d.deliverables} is {inr(a.fair)}, priced on your reach.</p>}
+          </div>
+          {a.kind === "low_offer" && role === "creator" && d.actions.some((x) => x.id === "counter") && (
+            <Button size="sm" variant="primary" onClick={() => setDialog("counter")}>
+              Counter at {inr(a.fair ?? d.amount)}
+            </Button>
+          )}
+        </div>
+      ))}
+
+      <section aria-labelledby="rail" className="card-surface rounded-2xl p-5">
+        <h2 id="rail" className="sr-only">
+          Progress
+        </h2>
+        <Rail steps={d.steps} declined={d.stage === "declined"} />
+        {d.stage === "declined" && <p className="mt-3 text-sm text-muted">This deal was declined. Nothing was charged.</p>}
+
+        {d.counter && !d.counter.accepted_at && !d.counter.declined_at && (
+          <p className="mt-4 rounded-xl bg-accent-soft p-3 text-sm">
+            {role === "creator" ? "You countered" : `${d.creator.name} countered`} at <span className="num font-semibold">{inr(d.counter.amount)}</span>
+            {role === "creator" ? `. Waiting for ${d.brand.name}.` : "."}
+          </p>
+        )}
+
+        {d.actions.length > 0 && (
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
+            {d.actions.map((a) => (
+              <Button key={a.id} variant={a.kind === "primary" ? "primary" : a.kind === "secondary" ? "outline" : "ghost"} onClick={() => run(a)} loading={act.isPending && act.variables?.action === a.id}>
+                {a.label}
+              </Button>
+            ))}
+          </div>
+        )}
+        {d.actions.length === 0 && d.stage !== "paid" && d.stage !== "declined" && (
+          <p className="mt-4 flex items-center gap-1.5 border-t border-line pt-4 text-sm text-muted">
+            <Clock className="size-4" aria-hidden /> Waiting for {role === "creator" ? d.brand.name : d.creator.name}.
+          </p>
+        )}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section aria-labelledby="money" className="card-surface rounded-2xl p-5">
+          <h2 id="money" className="flex items-center gap-1.5 text-sm font-semibold">
+            <Lock className="size-4 text-muted" aria-hidden /> Escrow and payout
+          </h2>
+          {d.escrow ? (
+            <dl className="mt-3 space-y-2 text-[13px]">
+              <Row k="Held in escrow" v={inr(d.escrow.amount ?? d.amount)} />
+              <Row k="Payment" v={`${d.escrow.mode === "razorpay-test" ? "Razorpay test" : "Simulated"} · ${d.escrow.ref}`} />
+              <Row k="Funded" v={`${shortDate(d.escrow.funded_at)}, ${timeOfDay(d.escrow.funded_at)}`} />
+              {d.collective && <Row k="Your split of the collective" v={`${((d.collective.split ?? 0) * 100).toFixed(1)}% of ${inr(d.collective.total)}`} />}
+            </dl>
+          ) : (
+            <p className="mt-3 text-sm text-muted">
+              {d.kind === "collective" ? "Funded once for the whole collective." : `${d.brand.name} funds escrow after both sides sign. You post only once the money is held.`}
+            </p>
+          )}
+          {d.payouts.map((p) => (
+            <div key={p.utr} className="mt-3 flex items-center gap-2.5 rounded-xl bg-success-soft p-3 text-sm text-success">
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+              <span>
+                {inr(p.amount)} paid by UPI to {p.upi}. UTR <span className="num">{p.utr}</span>
+              </span>
+            </div>
+          ))}
+          {d.invoice && (
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <a href={`/api/invoices/${d.invoice.id}.pdf`} target="_blank" rel="noreferrer">
+                <Download aria-hidden /> Invoice {d.invoice.number}
+              </a>
+            </Button>
+          )}
+        </section>
+
+        <section aria-labelledby="post" className="card-surface rounded-2xl p-5">
+          <h2 id="post" className="flex items-center gap-1.5 text-sm font-semibold">
+            <ShieldCheck className="size-4 text-muted" aria-hidden /> Post and verification
+          </h2>
+          {d.proof_url ? (
+            <a href={d.proof_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 break-all text-sm text-accent underline-offset-4 hover:underline">
+              {d.proof_url} <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+            </a>
+          ) : (
+            <p className="mt-3 text-sm text-muted">The post link appears here once it's live.</p>
+          )}
+          {d.verification ? (
+            <div className="mt-3">
+              <p className="text-xs text-muted">
+                {d.verification.auto ? "Auto-verified" : "Checked"} via {d.verification.source} · {count(d.verification.views_so_far)} views so far
+              </p>
+              <ul className="mt-2 space-y-1">
+                {d.verification.checks.map((c) => (
+                  <li key={c.label} className="flex items-center gap-2 text-[13px]">
+                    <CheckCircle2 className="size-4 text-success" aria-hidden /> {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            d.auto_release_on && <p className="mt-3 text-xs text-muted">If {d.brand.name} doesn't respond, escrow releases to the creator on {shortDate(d.auto_release_on)}.</p>
+          )}
+        </section>
+      </div>
+
+      {d.contract && (
+        <section aria-labelledby="contract" className="card-surface rounded-2xl p-5">
+          <h2 id="contract" className="flex items-center gap-1.5 text-sm font-semibold">
+            <FileSignature className="size-4 text-muted" aria-hidden /> Contract
+          </h2>
+          <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed text-fg-2">
+            {d.contract.terms.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ol>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <Sig who={d.creator.name} at={d.contract.signed_by_creator} name={d.contract.creator_signature} />
+            <Sig who={d.brand.name} at={d.contract.signed_by_brand} name={d.contract.brand_signature} />
+          </div>
+        </section>
+      )}
+
+      <section aria-labelledby="tl" className="card-surface rounded-2xl p-5">
+        <h2 id="tl" className="text-sm font-semibold">
+          Timeline
+        </h2>
+        <ol className="mt-3 space-y-2.5">
+          {d.timeline.map((e, i) => (
+            <li key={`${e.at}-${i}`} className="flex gap-3 text-[13px]">
+              <span className="num w-24 shrink-0 text-xs text-muted">
+                {shortDate(e.at)}, {timeOfDay(e.at)}
+              </span>
+              <span className="text-fg-2">{e.note}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {d.message && (
+        <p className="text-sm text-fg-2">
+          <span className="font-medium text-fg">Message from {d.brand.name}:</span> {d.message}
+        </p>
+      )}
+
+      {dialog === "counter" && <CounterDialog deal={d} onClose={() => setDialog(null)} onSubmit={(amount, note) => act.mutate({ action: "counter", amount, note })} pending={act.isPending} />}
+      {dialog === "url" && <PostDialog onClose={() => setDialog(null)} onSubmit={(url) => act.mutate({ action: "submit_post", url })} pending={act.isPending} />}
+      {dialog === "sign" && pending && (
+        <SignDialog
+          deal={d}
+          role={role}
+          action={pending}
+          onClose={() => setDialog(null)}
+          onSubmit={(name) => act.mutate({ action: pending.id, name })}
+          pending={act.isPending}
+        />
+      )}
+      {dialog === "pay" && (
+        <PayDialog
+          deal={d}
+          onClose={() => setDialog(null)}
+          onPaid={async () => {
+            await qc.invalidateQueries();
+            setDialog(null);
+            toast.success(`${inr(d.amount)} held in escrow`, { description: `${d.creator.name} can post now.` });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-muted">{k}</dt>
+      <dd className="num text-right font-medium">{v}</dd>
+    </div>
+  );
+}
+
+function Sig({ who, at, name }: { who: string; at?: string | null; name?: string }) {
+  return (
+    <div className={cn("rounded-xl border p-3", at ? "border-success/40 bg-success-soft" : "border-dashed border-line-strong")}>
+      <p className="text-xs text-muted">{who}</p>
+      {at ? (
+        <>
+          <p className="font-display text-base italic text-fg">{name ?? who}</p>
+          <p className="num text-[11px] text-muted">
+            E-signed {shortDate(at)}, {timeOfDay(at)}
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-muted">Not signed yet</p>
+      )}
+    </div>
+  );
+}
+
+function CounterDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClose: () => void; onSubmit: (amount: number, note: string) => void; pending: boolean }) {
+  const fair = deal.fair_total ?? deal.amount;
+  const fp = useQuery({
+    queryKey: ["fair", deal.creator.id, deal.brand.id],
+    queryFn: () => api<FairPrice>(`/creators/${deal.creator.id}/fair-price?lister_id=${deal.brand.id}`),
+  });
+  const reasons = fp.data ? fp.data.steps.slice(0, 3).map((s) => s.reason) : [];
+  const [amount, setAmount] = useState(String(fair));
+  const [note, setNote] = useState("");
+  const defaultNote = reasons.length ? `My rate is priced on reach, not followers. ${reasons[0]}` : "My rate is priced on reach, not followers.";
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent sheet title={`Counter ${deal.brand.name}`} description={`They offered ${inr(deal.amount)} for ${deal.deliverables}.`}>
+        <div className="rounded-xl bg-surface-2 p-3 text-sm">
+          <p className="flex items-center gap-1.5 font-medium">
+            <IndianRupee className="size-4 text-accent" aria-hidden /> Your fair price: {inr(fair)}
+          </p>
+          <ul className="mt-1.5 space-y-1 text-xs text-fg-2">
+            {reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[11px] text-muted">These reasons go with your counter so the brand sees how it's priced.</p>
+        </div>
+        <div className="mt-4">
+          <Label htmlFor="counter-amt">Counter amount (₹)</Label>
+          <Input id="counter-amt" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div className="mt-3">
+          <Label htmlFor="counter-note">Note</Label>
+          <Textarea id="counter-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder={defaultNote} className="min-h-20" />
+        </div>
+        <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(Number(amount.replace(/[^\d]/g, "")), note || defaultNote)}>
+          Send counter
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PostDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSubmit: (url: string) => void; pending: boolean }) {
+  const [url, setUrl] = useState("https://www.instagram.com/reel/");
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent sheet title="Submit your post link" description="We check it through the official API before payment is released.">
+        <Label htmlFor="post-url">Instagram reel or YouTube Short link</Label>
+        <Input id="post-url" type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <p className="mt-2 text-xs text-muted">The brand has 3 days to confirm. If they don't respond, payment releases to you automatically a few days later.</p>
+        <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(url)}>
+          Submit link
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SignDialog({ deal, role, action, onClose, onSubmit, pending }: { deal: Deal; role: Role; action: DealAction; onClose: () => void; onSubmit: (name: string) => void; pending: boolean }) {
+  const [name, setName] = useState(role === "creator" ? deal.creator.name : deal.brand.name);
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent sheet title="E-sign the contract" description={`${deal.deliverables} for ${inr(action.id === "accept_counter" && deal.counter ? deal.counter.amount : deal.amount)}`}>
+        <ol className="max-h-48 list-decimal space-y-1 overflow-y-auto rounded-xl bg-surface-2 p-3 pl-7 text-xs leading-relaxed text-fg-2">
+          {(deal.contract?.terms ?? []).map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ol>
+        <div className="mt-4">
+          <Label htmlFor="sig-name">Type your full name to sign</Label>
+          <Input id="sig-name" value={name} onChange={(e) => setName(e.target.value)} className="font-display italic" />
+        </div>
+        <p className="mt-2 text-xs text-muted">Your typed name, the time and this device are recorded with the contract.</p>
+        <Button variant="primary" size="lg" className="mt-5 w-full" disabled={name.trim().length < 2} loading={pending} onClick={() => onSubmit(name.trim())}>
+          <FileSignature aria-hidden /> {action.label}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function PayDialog({ deal, onClose, onPaid, path, amount }: { deal?: Deal; onClose: () => void; onPaid: () => void; path?: string; amount?: number }) {
+  const total = amount ?? deal?.amount ?? 0;
+  const [upi, setUpi] = useState("brand.payments@okbank");
+  const [busy, setBusy] = useState(false);
+  const mode = deal?.payments_mode ?? "simulated";
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent title="Fund escrow" description={mode === "razorpay-test" ? "Razorpay test mode. No real money moves." : "Simulated payment. No real money moves."}>
+        <div className="rounded-2xl border border-line bg-surface-2 p-4 text-center">
+          <p className="text-xs text-muted">Pay into JodiDar escrow</p>
+          <p className="num mt-1 font-display text-3xl font-semibold">{inr(total)}</p>
+          <p className="mt-1 text-xs text-muted">Held until the post is verified, then paid out by UPI{deal?.kind === "collective" ? " to each member" : ""}.</p>
+        </div>
+        {mode === "simulated" && (
+          <div className="mt-4">
+            <Label htmlFor="upi">Pay from UPI ID</Label>
+            <Input id="upi" value={upi} onChange={(e) => setUpi(e.target.value)} />
+          </div>
+        )}
+        <Button
+          variant="primary"
+          size="lg"
+          className="mt-5 w-full"
+          loading={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await fundEscrow(path ?? `/deals/${deal?.id}/pay`, deal?.listing?.title ?? "Creator collaboration");
+              onPaid();
+            } catch (e) {
+              toast.error((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Lock aria-hidden /> Pay {inr(total)} {mode === "simulated" ? "(simulated)" : "with Razorpay"}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}

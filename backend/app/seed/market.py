@@ -277,7 +277,7 @@ DEALS: list[dict] = [
          _ev("contract", "2026-09-26T19:20:00+05:30", "Contract signed by both sides"),
          _ev("escrow_funded", "2026-09-27T12:00:00+05:30", "15,000 rupees held in escrow"),
          _ev("live", "2026-10-02T20:05:00+05:30", "Post link submitted"),
-     ], "verify_due": "2026-10-05", "created_at": "2026-09-24T12:10:00+05:30"},
+     ], "verify_due": "2026-10-06", "created_at": "2026-09-24T12:10:00+05:30"},
     # Creator B: a page feature offer.
     {"_id": "dl_b_tiffin", "kind": "single", "listing_id": "lst_pg_tiffin", "brand_id": "pg_tiffin", "creator_id": "cr_b",
      "amount": 1_500, "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 0, "exclusivity_days": 0,

@@ -111,13 +111,17 @@ def pipeline(c: dict) -> dict:
             awaiting.append(item)
             due = d.get("verify_due")
             if due and due < today().isoformat():
+                from . import deals as rail
+
                 days = (today() - date.fromisoformat(due)).days
+                release = rail.auto_release_due(d)
+                left = (release - today()).days if release else 0
                 alerts.append(
                     {
                         "kind": "verify_late",
                         "deal_id": d["_id"],
-                        "text": f"{b.get('name', 'The brand')} is {days} days late confirming your post",
-                        "detail": f"{inr(d['amount'])} is safe in escrow. We've nudged them; it auto-releases in 2 days.",
+                        "text": f"{b.get('name', 'The brand')} is {days} day{'s' if days != 1 else ''} late confirming your post",
+                        "detail": f"{inr(d['amount'])} is safe in escrow. We've nudged them; it auto-releases to you in {left} day{'s' if left != 1 else ''}.",
                     }
                 )
     for inv in db.invoices.find({"creator_id": c["_id"], "status": "unpaid"}):
