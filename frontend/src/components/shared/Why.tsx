@@ -100,13 +100,11 @@ export function EstimateNote({ estimate, className }: { estimate?: Pick<Estimate
     <Popover>
       <PopoverTrigger
         className={cn(
-          "inline-flex items-center gap-1 text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-fg",
+          "inline text-left text-[11px] leading-relaxed text-muted underline decoration-dotted underline-offset-4 hover:text-fg",
           className,
         )}
       >
-        Estimate, not a promise
-        <span aria-hidden>·</span>
-        {CONFIDENCE_LABEL[estimate.confidence]}
+        {`Estimate, not a promise · ${CONFIDENCE_LABEL[estimate.confidence]}`}
       </PopoverTrigger>
       <PopoverContent>
         <p className="font-display text-sm font-semibold">What this estimate assumes</p>

@@ -1,4 +1,4 @@
-.PHONY: dev setup test shots demo reset
+.PHONY: dev setup test shots e2e reset
 
 # Start API (:8000) and web (:5173). Installs dependencies on first run.
 dev:
@@ -16,6 +16,11 @@ test:
 shots:
 	npm install --no-audit --no-fund --silent
 	node qa/screenshots.mjs
+
+# Click through the key journeys in a real browser (needs `make dev` running).
+e2e:
+	npm install --no-audit --no-fund --silent
+	node qa/flows.mjs
 
 # Reset the in-memory demo data while the app is running.
 reset:

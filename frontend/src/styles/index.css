@@ -89,11 +89,11 @@
   --grad-text: linear-gradient(100deg, #c4b5fd 0%, #f9a8d4 48%, #fdba74 100%);
   --card-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 40px -16px rgb(0 0 0 / 0.6);
   --card-blur: 18px;
-  --chart-1: #a78bfa;
-  --chart-2: #f472b6;
-  --chart-3: #fb923c;
-  --chart-pos: #6ee7b7;
-  --chart-neg: #fda4af;
+  /* Waterfall palette, validated for CVD and contrast on the dark surface. */
+  --chart-base: #7c3aed;
+  --chart-up: #0d9488;
+  --chart-down: #ea580c;
+  --chart-muted: #4a4566;
   --chart-grid: rgb(255 255 255 / 0.08);
 }
 
@@ -124,11 +124,11 @@
   --grad-text: linear-gradient(100deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
   --card-shadow: 0 1px 2px rgb(22 19 43 / 0.04), 0 1px 1px rgb(22 19 43 / 0.03);
   --card-blur: 0px;
-  --chart-1: #7c3aed;
-  --chart-2: #db2777;
-  --chart-3: #ea580c;
-  --chart-pos: #059669;
-  --chart-neg: #e11d48;
+  /* Waterfall palette, validated for CVD and contrast on white. */
+  --chart-base: #7c3aed;
+  --chart-up: #0d9488;
+  --chart-down: #c2410c;
+  --chart-muted: #c9c4da;
   --chart-grid: #ece9f4;
 }
 

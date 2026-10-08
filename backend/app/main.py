@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,15 +11,27 @@ from fastapi.responses import FileResponse
 
 from .config import ROOT
 from .db import get_db
-from .routers import auth, demo, meta, profiles
+from .routers import auth, creators, demo, meta, profiles
 from .seed.load import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 
+def _warm_models():
+    """Train the trust and price models in the background so the first page is fast."""
+    try:
+        from .engines import price_model, trust
+
+        trust.model()
+        price_model.model()
+    except Exception:  # warming is best-effort
+        logging.getLogger("jodidar").exception("Model warm-up failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     seed_all(get_db())
+    threading.Thread(target=_warm_models, daemon=True).start()
     yield
 
 
@@ -30,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (meta, auth, demo, profiles):
+for r in (meta, auth, demo, profiles, creators):
     app.include_router(r.router)
 
 # Single-port mode: serve the built web app when it exists (npm run build).

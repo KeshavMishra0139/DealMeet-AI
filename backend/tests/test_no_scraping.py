@@ -43,9 +43,8 @@ def test_no_direct_platform_fetches():
     assert not hits, "Direct platform fetches found:\n" + "\n".join(hits)
 
 
-def test_qa_screenshots_only_target_localhost():
-    qa = ROOT / "qa" / "screenshots.mjs"
-    if qa.exists():
+def test_qa_scripts_only_target_localhost():
+    for qa in (ROOT / "qa").glob("*.mjs"):
         text = qa.read_text(encoding="utf-8")
         urls = re.findall(r"https?://[^\s\"'`]+", text)
-        assert all(re.match(r"https?://(localhost|127\.0\.0\.1)", u) for u in urls), urls
+        assert all(re.match(r"https?://(localhost|127\.0\.0\.1)", u) for u in urls), (qa.name, urls)
