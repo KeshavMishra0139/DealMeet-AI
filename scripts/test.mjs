@@ -20,7 +20,9 @@ const steps = [
 let failed = false;
 for (const [name, cmd, args, cwd] of steps) {
   console.log(`\n== ${name}`);
-  const r = spawnSync(cmd, args, { cwd, stdio: "inherit", shell: isWin });
+  // npm is npm.cmd on Windows and needs cmd.exe; python.exe is started directly so
+  // a project path with spaces still works.
+  const r = spawnSync(cmd, args, { cwd, stdio: "inherit", shell: isWin && cmd === "npm" });
   if (r.status !== 0) {
     failed = true;
     console.error(`!! ${name} failed`);

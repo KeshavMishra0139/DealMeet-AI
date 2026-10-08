@@ -13,12 +13,27 @@ CACHE_DIR = BACKEND / ".cache"
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
-def _load_dotenv() -> None:
+def _read_text_any(path: Path) -> str:
+    """Text of a file saved as UTF-8 (with or without a BOM) or as UTF-16.
+
+    Windows PowerShell 5.1 writes UTF-16 for `echo X > .env`, and older Notepad
+    adds a UTF-8 BOM; both should just work.
+    """
+    data = path.read_bytes()
+    try:
+        if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+            return data.decode("utf-16")
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(f"{path} isn't UTF-8 or UTF-16 text. Open it in a text editor and save it as UTF-8.") from exc
+
+
+def _load_dotenv(path: Path | None = None) -> None:
     """Read KEY=VALUE pairs from the repo-root .env without overriding real env vars."""
-    path = ROOT / ".env"
+    path = path or ROOT / ".env"
     if not path.exists():
         return
-    for raw in path.read_text(encoding="utf-8").splitlines():
+    for raw in _read_text_any(path).splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

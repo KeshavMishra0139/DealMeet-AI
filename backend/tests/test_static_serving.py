@@ -40,11 +40,46 @@ def site(tmp_path):
         "linked.env",
         "a\x00b",
         "",
+        # Windows: drive letters, drive-relative paths, network (UNC) paths, backslashes, data streams
+        "C:/Windows/win.ini",
+        "C:\\Windows\\win.ini",
+        "C:secret.txt",
+        "\\\\attacker.example\\share\\x",
+        "//attacker.example/share/x",
+        "..\\..\\.env",
+        "robots.txt::$DATA",
     ],
 )
 def test_static_file_never_leaves_the_build(site, path):
     dist, _ = site
     assert static_file(dist, path) is None
+
+
+def test_unsafe_paths_are_refused_before_touching_the_disk(site, monkeypatch):
+    """On Windows, resolving a network path already connects to that host, so these
+    must be rejected as text, without any filesystem call."""
+    import pathlib
+
+    def no_disk(*_a, **_k):
+        raise AssertionError("filesystem touched")
+
+    dist, _ = site
+    monkeypatch.setattr(pathlib.Path, "resolve", no_disk)
+    monkeypatch.setattr(pathlib.Path, "is_file", no_disk)
+    for path in ["\\\\host\\share\\x", "//host/share/x", "C:/x", "../x", "a\\b", "/abs"]:
+        assert static_file(dist, path) is None
+
+
+def test_build_files_get_javascript_types_even_if_the_registry_says_text(site):
+    """Windows' registry can map .js to text/plain; browsers then refuse to run the app."""
+    import mimetypes
+
+    mimetypes.add_type("text/plain", ".js")  # what a bad registry entry does
+    dist, _ = site
+    app = FastAPI()
+    mount_spa(app, dist)
+    r = TestClient(app).get("/assets/app.js")
+    assert r.headers["content-type"].startswith("text/javascript")
 
 
 def test_static_file_finds_real_files(site):
@@ -72,6 +107,23 @@ def test_traversal_requests_get_the_app_not_the_file(site, url):
     assert r.status_code in (200, 404)
     if r.status_code == 200:
         assert "<title>app</title>" in r.text
+
+
+def test_assets_folder_refuses_traversal(site):
+    _, client = site
+    r = client.get("/assets/..%2F..%2F..%2F.env")
+    assert r.status_code == 404
+    assert SECRET not in r.text
+
+
+def test_absolute_path_to_a_real_file_gets_the_app(site):
+    from urllib.parse import quote
+
+    dist, client = site
+    secret = dist.parent / ".env"
+    r = client.get("/" + quote(str(secret), safe=""))
+    assert r.status_code == 200
+    assert SECRET not in r.text and "<title>app</title>" in r.text
 
 
 def test_files_and_client_routes_still_load(site):

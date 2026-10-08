@@ -10,7 +10,7 @@ A creator monetisation and brand opportunity engine, built by **Team TheVortex**
 
 ## Run it
 
-You need **Node 20+** and **Python 3.10+**. Nothing else: no keys, no database, and no internet after the first install.
+You need **Node 20+** and **Python 3.10 to 3.14** (3.13 recommended). Nothing else: no keys, no database, and no internet after the first install.
 
 ```bash
 make dev        # or: npm run dev   (works on Windows too)
@@ -32,6 +32,7 @@ make demo       # build the web app and serve everything from one port: http://l
 make test       # API tests, copy rules on UI strings, type check
 make e2e        # click through 14 key journeys in a real browser
 make shots      # every screen at 390 px and 1440 px, plus an accessibility audit
+                # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # restore the seeded demo data (the app also has a "Reset demo" button)
 ```
 
