@@ -30,7 +30,7 @@ Other commands (run `make dev` first for the browser ones):
 ```bash
 make demo       # build the web app and serve everything from one port: http://localhost:8000
 make test       # API tests, copy rules on UI strings, type check
-make e2e        # click through 13 key journeys in a real browser
+make e2e        # click through 14 key journeys in a real browser
 make shots      # every screen at 390 px and 1440 px, plus an accessibility audit
 make reset      # restore the seeded demo data (the app also has a "Reset demo" button)
 ```
@@ -126,6 +126,28 @@ These stay out of the way until they matter:
 - **"Why?" popovers** on every number.
 - **EN/हिंदी toggle**.
 
+### Motion and 3D
+
+Motion is there to explain, not decorate. Every effect checks reduced motion first and falls back to a still, fully readable layout.
+
+| Where | What it does |
+| --- | --- |
+| Landing (1280 px and wider) | A 3D "creator core" with brand cards and rupee coins in orbit, following the pointer and the scroll |
+| Creator Studio home | **Reach vs followers in 3D**: the last 6 reels rise as bars through a glass plane set at the follower count, so "reach is about 7x followers" is visible at a glance. Hover a bar for its views |
+| Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to UPI payout |
+| Brand Console campaign | **Match space**: matched creators placed by fair price, reach and trust, coloured and sized by fit. Drag to turn it, hover for details, click to open a profile |
+| Everywhere | Pages ease in; cards reveal and stagger as they scroll into view; move and KPI cards tilt toward the pointer; key numbers count up; a scroll-progress bar; the aurora background drifts with parallax |
+
+The 3D scenes:
+
+- Use three.js through React Three Fiber and drei.
+- Load lazily: screens without 3D never download three.js.
+- Pause when off screen.
+- Fall back to 2D when WebGL isn't available.
+- Use procedural lighting, so nothing is fetched from the network.
+- Carry a text description for screen readers, and the same numbers are always in the HTML next to them.
+- Leave the page scrolling normally: touch never rotates a scene.
+
 ### The deal rail
 
 Offer → Contract (both sides e-sign) → Escrow funded → Post live (official link) → Verified (mock official-API insights check) → Paid by UPI.
@@ -147,7 +169,8 @@ Before you start, click **Reset demo** (top of `/demo/compare`). Present on a la
 | 1:30 | Steps 6–7. Then press **P** for two phones. | "Matches are opt-in: brands see only what each creator shares. And this is what each creator actually sees each week: their next 3 moves." On A's phone, tap **हिं** to show the Hindi Studio. |
 | 1:55 | Click **Live deal demo**. On the phone tap **Counter at ₹17,362**, then **Send counter**. | "Senpai offered ₹7,300, 58% below fair. One tap counters with the reasons attached." |
 | 2:15 | In the console: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. On the phone: **Submit post link** (any `instagram.com/reel/...` link). In the console: **Confirm post and release payment**. | "Both sides sign. The brand funds escrow before the creator posts. Once the post is verified, the payout goes out by UPI and the invoice is marked paid. Each side updates live." |
-| 2:45 | Switch the scenario to **Collective**. On the phone, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. The pack updates in the Thalam Foods console. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
+| 2:35 | Open the Brand Console campaign (`/brand/campaigns/lst_senpai_hoodie?as=br_senpai`) and turn the **Match space**. | "Brands see every match by price, reach and trust. Up and to the left is more reach per rupee; hollow spheres are weak trust or unshared stats." |
+| 2:45 | Back on **Live deal demo**, switch the scenario to **Collective**. On the phone, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. The pack updates in the Thalam Foods console. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
 | 2:55 | Close. | "No guarantees, no scraping, and the reference creator stays anonymous. That's JodiDar AI." |
 
 Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **→** move between steps and **Esc** ends it. Any link takes `?phone=1` to open in phone view and `?lang=hi` to open the Studio in Hindi.
@@ -188,7 +211,7 @@ Sign in at `/login` with no password: pick a profile.
 | Command | What it checks |
 | --- | --- |
 | `make test` | 47 API tests (below), the copy rules on about 2,900 UI strings, and the TypeScript type check |
-| `make e2e` | 13 journeys in a real browser (below) |
+| `make e2e` | 14 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
@@ -217,6 +240,7 @@ The e2e journeys:
 - The guided compare.
 - Phone view.
 - Live sync.
+- The 3D scenes drawing with WebGL.
 
 ## Project layout
 
@@ -230,7 +254,7 @@ backend/
   tests/           pytest suite
 frontend/
   src/features/    creator (Studio), brand (Console), deals (shared deal view), demo (compare, live), public (landing, login, link-in-bio)
-  src/components/  ui primitives, shared pieces (Why?, Trust, estimates, kit), charts, demo frames
+  src/components/  ui primitives, shared pieces (Why?, Trust, estimates, kit), charts, demo frames, motion, three (3D scenes)
   src/i18n/        English and Hindi
 shared/            copy rules used by both test suites
 qa/                Playwright screenshots, accessibility audit and e2e journeys (localhost only)
@@ -239,6 +263,6 @@ scripts/           cross-platform dev, demo and test runners
 
 ## Stack
 
-- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, Recharts, Lucide, React Router, TanStack Query; Sora and Inter.
+- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, three.js with React Three Fiber and drei, Recharts, Lucide, React Router, TanStack Query; Sora and Inter.
 - **API**: FastAPI, Pydantic, scikit-learn, ReportLab, httpx.
 - **Data and services**: MongoDB or mongomock; optional Firebase Auth, Razorpay test mode and a language model.

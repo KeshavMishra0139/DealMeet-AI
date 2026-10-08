@@ -16,7 +16,9 @@ import type { Durable, Home as HomeData, Pipeline, Plan, RateGap, Stage } from "
 import { count, inr, inrRange, inrShort, shortDate } from "@/lib/format";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
+import { CountUp, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { MoveCard } from "./MoveCard";
+import { ReachCard } from "./ReachCard";
 
 export function useHome(id: string) {
   return useQuery({ queryKey: ["home", id], queryFn: () => api<HomeData>(`/creators/${id}/home`) });
@@ -85,15 +87,31 @@ export default function Home() {
         </div>
         <MovesCarousel label={t("home.carousel")}>
           {plan.moves.map((m, i) => (
-            <MoveCard key={m.id} move={m} creatorId={id} index={i} />
+            <TiltCard key={m.id} className="h-full rounded-[26px]" max={5}>
+              <MoveCard move={m} creatorId={id} index={i} />
+            </TiltCard>
           ))}
         </MovesCarousel>
       </section>
 
-      <section aria-label={t("home.glance")} className="mt-8 grid items-start gap-3 md:grid-cols-3">
-        <DurableCard durable={durable} label={t("home.durable")} />
-        <RateGapCard gap={rate_gap} label={t("home.rateGap")} />
-        <PipelineCard pipeline={pipeline} label={t("home.pipeline")} />
+      {context.has_reels && (
+        <Reveal className="mt-8">
+          <ReachCard context={context} />
+        </Reveal>
+      )}
+
+      <section aria-label={t("home.glance")} className={context.has_reels ? "mt-3" : "mt-8"}>
+        <Stagger className="grid items-start gap-3 md:grid-cols-3">
+          <StaggerItem>
+            <DurableCard durable={durable} label={t("home.durable")} />
+          </StaggerItem>
+          <StaggerItem>
+            <RateGapCard gap={rate_gap} label={t("home.rateGap")} />
+          </StaggerItem>
+          <StaggerItem>
+            <PipelineCard pipeline={pipeline} label={t("home.pipeline")} />
+          </StaggerItem>
+        </Stagger>
       </section>
 
       <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
@@ -233,7 +251,9 @@ function RateGapCard({ gap, label }: { gap: RateGap; label: string }) {
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-y-1">
           <dt className="text-fg-2">{t("rate.fairOnReach")}</dt>
-          <dd className="num font-medium">{inr(gap.per_reel)}</dd>
+          <dd className="num font-medium">
+            <CountUp value={gap.per_reel} format={inr} />
+          </dd>
           <dd className="col-span-2 h-1.5 rounded-full bg-surface-3" aria-hidden>
             <div className="h-full rounded-full bg-signature" style={{ width: bar(gap.per_reel) }} />
           </dd>

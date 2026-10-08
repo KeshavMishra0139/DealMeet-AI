@@ -150,10 +150,14 @@ def pipeline(c: dict) -> dict:
 
 
 def context_line(c: dict) -> dict:
+    # Oldest first, so a chart reads left to right in time.
+    recent = list(reversed(metrics.recent(c)))
     return {
         "followers": c.get("followers", 0),
         "median_views": metrics.median_views(c),
         "has_reels": metrics.has_reels(c),
         "reach_ratio": round(metrics.reach_ratio(c), 1) if metrics.has_reels(c) else None,
         "trust": trust_score(c),
+        "recent": [{"date": r["date"], "views": r["views"]} for r in recent],
+        "recent_provenance": {"views": metrics.prov(c, "reels.0.views"), "followers": metrics.prov(c, "followers")},
     }

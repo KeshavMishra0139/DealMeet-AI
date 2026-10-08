@@ -3,6 +3,10 @@ import { AlertTriangle, ArrowLeft, Check, Info, Lock, RefreshCw, Send, Users } f
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useReducedMotion } from "framer-motion";
+import { Stagger, StaggerItem } from "@/components/motion/Motion";
+import { hasWebGL, Stage3D } from "@/components/three/Stage3D";
+import { MatchMap3D } from "@/components/three/lazy";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { SafetyNote } from "@/components/shared/SafetyNote";
 import { TrustBadge } from "@/components/shared/TrustBadge";
@@ -14,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, post } from "@/lib/api";
 import { count, deliverable, inr, inrRange, pct, shortDate } from "@/lib/format";
 import type { BrandMatch, Collective, Listing, Matches } from "@/lib/market-types";
+import { useMediaQuery } from "@/lib/hooks";
 import { useBrandId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +96,7 @@ export default function Campaign() {
                 </p>
                 <p className="text-xs text-muted">Only creators who chose to be discoverable. Fields they haven't shared stay locked.</p>
               </div>
+              <MatchSpace items={matches.data.items} listingId={l.id} />
               <MatchList items={matches.data.items} compare={compare} onToggle={toggle} onOffer={setOfferTo} listingId={l.id} />
             </>
           )}
@@ -107,6 +113,60 @@ export default function Campaign() {
 
       {offerTo && <OfferDialog match={offerTo} brandId={brandId} listing={l} onClose={() => setOfferTo(null)} />}
     </div>
+  );
+}
+
+/** Matched creators in 3D: fit, reach and trust at a glance. The list below carries the same data. */
+function MatchSpace({ items, listingId }: { items: BrandMatch[]; listingId: string }) {
+  const navigate = useNavigate();
+  const reduce = useReducedMotion();
+  const wide = useMediaQuery("(min-width: 768px)");
+  const mouse = useMediaQuery("(pointer: fine)");
+  const [webgl] = useState(() => hasWebGL());
+  if (!wide || !webgl || items.length < 2) return null;
+  const points = items.map((m) => ({
+    id: m.id,
+    name: m.name,
+    fit: m.fit,
+    medianViews: m.median_views,
+    trust: m.trust?.score ?? null,
+    fair: m.fair.total,
+    fairLabel: inr(m.fair.total),
+    viewsLabel: m.median_views !== null ? count(m.median_views) : null,
+  }));
+  return (
+    <section aria-labelledby="space" className="card-surface relative mb-3 overflow-hidden rounded-xl">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+        <h2 id="space" className="text-sm font-semibold">
+          Match space <span className="font-normal text-muted">· price, reach and trust in 3D · up and left is more reach per rupee</span>
+        </h2>
+        <p className="text-xs text-muted">{mouse ? "Drag to turn · hover for details · click to open a profile" : "Tap a creator in the list to open a profile"}</p>
+      </div>
+      <div className="relative bg-[radial-gradient(ellipse_at_center,rgb(124_58_237/0.07),transparent_70%)]">
+        <Stage3D
+          className="h-[380px]"
+          label={`3D map of ${items.length} matched creators by fair price, reach and trust, coloured by audience fit. The list below has the same creators and numbers.`}
+        >
+          {(active) => (
+            <MatchMap3D
+              points={points}
+              onOpen={(cid) => navigate(`/brand/creators/${cid}?listing=${listingId}`)}
+              active={active}
+              still={!!reduce}
+              interactive={mouse && !reduce}
+            />
+          )}
+        </Stage3D>
+        <ul className="pointer-events-none absolute bottom-3 left-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-2">
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-8 rounded-full bg-signature" aria-hidden /> Colour and size: lower to higher fit
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full border border-[#9CA3AF]" aria-hidden /> Weak trust or stats not shared
+          </li>
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -149,9 +209,13 @@ function MatchList({
   listingId: string;
 }) {
   return (
-    <ul className="card-surface divide-y divide-line rounded-xl">
+    <Stagger as="ul" gap={0.04} className="card-surface divide-y divide-line rounded-xl">
       {items.map((m, i) => (
-        <li key={m.id} className={cn("grid gap-3 px-4 py-3.5 md:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,1.6fr)_auto] md:items-center", m.trust && m.trust.score < 50 && "bg-danger-soft/40")}>
+        <StaggerItem
+          as="li"
+          key={m.id}
+          className={cn("grid gap-3 px-4 py-3.5 md:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,1.6fr)_auto] md:items-center", m.trust && m.trust.score < 50 && "bg-danger-soft/40")}
+        >
           <div className="flex items-center gap-3 md:contents">
             <Checkbox checked={compare.includes(m.id)} onCheckedChange={() => onToggle(m.id)} aria-label={`Compare ${m.name}`} />
             <div className="flex min-w-0 items-center gap-3">
@@ -202,9 +266,9 @@ function MatchList({
               <Send aria-hidden /> {m.deal_stage ? "Sent" : "Offer"}
             </Button>
           </div>
-        </li>
+        </StaggerItem>
       ))}
-    </ul>
+    </Stagger>
   );
 }
 

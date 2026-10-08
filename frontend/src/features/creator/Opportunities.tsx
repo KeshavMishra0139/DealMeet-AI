@@ -3,6 +3,7 @@ import { BadgeCheck, CalendarDays, Check, EyeOff, Lock, Plus, Search, Users } fr
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
+import { Reveal } from "@/components/motion/Motion";
 import { RangeValue } from "@/components/shared/Estimate";
 import { ScopePicker } from "@/components/shared/ScopePicker";
 import { EstimateNote, WhyPopover } from "@/components/shared/Why";
@@ -94,8 +95,10 @@ export default function Opportunities() {
             <EmptyState icon={<Search className="size-5" />} title="Nothing matches that filter" body="Try another type, or clear the search. New listings arrive every week." />
           </div>
         )}
-        {items.map((o) => (
-          <OppCard key={o.id} o={o} onApply={() => setApplyTo(o)} />
+        {items.map((o, i) => (
+          <Reveal key={o.id} delay={Math.min(i, 6) * 0.05}>
+            <OppCard o={o} onApply={() => setApplyTo(o)} />
+          </Reveal>
         ))}
       </div>
 

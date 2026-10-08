@@ -88,6 +88,12 @@ export const en = {
   "period.a month": "a month",
   "common.simulated": "Simulated",
   "common.trust": "Trust",
+  "reach.title": "Reach vs followers",
+  "reach.ratio": "Your reels reach about {n}x your followers",
+  "reach.same": "Your reels reach about as many people as follow you",
+  "reach.caption": "Last 6 reels. Bars are views; the glass plane is your follower count.",
+  "reach.views": "Views",
+  "reach.followers": "Followers",
 };
 
 export type Dict = Record<keyof typeof en, string>;

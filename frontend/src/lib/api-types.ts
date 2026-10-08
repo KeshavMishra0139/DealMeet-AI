@@ -124,7 +124,15 @@ export interface Home {
   durable: Durable;
   rate_gap: RateGap;
   pipeline: Pipeline;
-  context: { followers: number; median_views: number; has_reels: boolean; reach_ratio: number | null; trust: TrustInfo | null };
+  context: {
+    followers: number;
+    median_views: number;
+    has_reels: boolean;
+    reach_ratio: number | null;
+    trust: TrustInfo | null;
+    recent?: { date: string; views: number }[];
+    recent_provenance?: { views: string; followers: string };
+  };
 }
 
 export interface PriceStep {
