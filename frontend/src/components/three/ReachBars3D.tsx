@@ -5,6 +5,7 @@ import { Html, RoundedBox } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { useAdaptiveQuality } from "./perf";
 
 export interface ReachBarsProps {
   reels: { date: string; views: number }[];
@@ -48,7 +49,7 @@ function Bar({ x, h, color, label, value, still, index }: { x: number; h: number
           }}
           onPointerOut={() => setHover(false)}
         >
-          <meshPhysicalMaterial color={color} roughness={0.3} metalness={0.1} clearcoat={0.7} emissive={color} emissiveIntensity={hover ? 0.5 : 0.18} />
+          <meshStandardMaterial color={color} roughness={0.3} metalness={0.1} emissive={color} emissiveIntensity={hover ? 0.5 : 0.18} />
         </RoundedBox>
       </group>
       <Html position={[0, -0.32, 0.3]} center className="pointer-events-none select-none">
@@ -99,7 +100,7 @@ function Scene({ reels, followers, formatCount, formatDate, still }: Omit<ReachB
       {/* Follower level: a glass plane the bars rise through */}
       <mesh position={[0, planeY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[width + 0.5, 1.3]} />
-        <meshPhysicalMaterial color="#c4b5fd" emissive="#a78bfa" emissiveIntensity={0.35} transparent opacity={0.3} roughness={0.1} side={THREE.DoubleSide} depthWrite={false} />
+        <meshStandardMaterial color="#c4b5fd" emissive="#a78bfa" emissiveIntensity={0.35} transparent opacity={0.3} roughness={0.1} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <lineSegments position={[0, planeY, 0]}>
         <edgesGeometry args={[new THREE.BoxGeometry(width + 0.5, 0.001, 1.3)]} />
@@ -132,15 +133,18 @@ function FitCamera({ halfWidth }: { halfWidth: number }) {
   return null;
 }
 
-export default function ReachBars3D({ active, still, ...props }: ReachBarsProps) {
+export default function ReachBars3D({ active, still: reduced, ...props }: ReachBarsProps) {
+  const { degraded, monitor } = useAdaptiveQuality();
+  const still = reduced || degraded;
   return (
     <Canvas
       frameloop={still ? "demand" : active ? "always" : "never"}
-      dpr={[1, 1.75]}
+      dpr={degraded ? 1 : [1, 1.25]}
       camera={{ position: [0, 1.25, 5.3], fov: 38 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}
     >
+      {!reduced && monitor([30, 60])}
       <ambientLight intensity={0.55} />
       <directionalLight position={[2, 5, 4]} intensity={1.4} />
       <pointLight position={[-3, 2, 3]} intensity={10} color="#DB2777" />

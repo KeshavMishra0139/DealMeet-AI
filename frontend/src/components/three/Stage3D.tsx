@@ -26,6 +26,42 @@ class SceneBoundary extends Component<{ fallback: ReactNode; children: ReactNode
   }
 }
 
+// Scenes animate while the viewer is doing something (moving the pointer,
+// scrolling, typing) and hold their last frame after a few idle seconds, so a
+// page left open doesn't keep the graphics chip busy.
+const IDLE_MS = 6000;
+let busy = true;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
+const activityListeners = new Set<() => void>();
+function setBusy(v: boolean) {
+  if (busy === v) return;
+  busy = v;
+  activityListeners.forEach((l) => l());
+}
+function poke() {
+  setBusy(true);
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => setBusy(false), IDLE_MS);
+}
+if (typeof window !== "undefined") {
+  for (const ev of ["pointermove", "pointerdown", "wheel", "scroll", "keydown", "touchstart"]) {
+    window.addEventListener(ev, poke, { passive: true, capture: true });
+  }
+  poke();
+}
+function useViewerBusy() {
+  const [v, setV] = useState(busy);
+  useEffect(() => {
+    const on = () => setV(busy);
+    activityListeners.add(on);
+    on();
+    return () => {
+      activityListeners.delete(on);
+    };
+  }, []);
+  return v;
+}
+
 /** True while the element is on screen; scenes stop rendering frames when it's false. */
 export function useOnScreen<T extends Element>(margin = "120px") {
   const ref = useRef<T>(null);
@@ -56,7 +92,9 @@ export function Stage3D({
   /** Only load the scene when this media query matches (e.g. wide screens). */
   media?: string;
 }) {
-  const [ref, active] = useOnScreen<HTMLDivElement>();
+  const [ref, onScreen] = useOnScreen<HTMLDivElement>();
+  const viewerBusy = useViewerBusy();
+  const active = onScreen && viewerBusy;
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const mq = media ? window.matchMedia(media) : null;

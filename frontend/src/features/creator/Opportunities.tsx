@@ -59,7 +59,7 @@ export default function Opportunities() {
         </Button>
       </div>
 
-      <div className="sticky top-14 z-10 -mx-4 mt-5 bg-[var(--bg)]/80 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:top-0 lg:mx-0 lg:px-0">
+      <div className="sticky top-14 z-10 -mx-4 mt-5 bg-[var(--bg)]/95 px-4 py-2 sm:-mx-6 sm:px-6 lg:top-0 lg:mx-0 lg:px-0">
         <div role="radiogroup" aria-label="Filter by type" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-none">
           {FILTERS.map((f) => {
             const n = f.value === "all" ? data.data?.items.length : data.data?.counts[f.value];
