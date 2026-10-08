@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 
 from .config import ROOT
 from .db import get_db
 from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles
 from .seed.load import seed_all
+from .static import mount_spa
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -49,13 +49,4 @@ for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit):
 # Single-port mode: serve the built web app when it exists (npm run build).
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
-    from fastapi.staticfiles import StaticFiles
-
-    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
-
-    @app.get("/{path:path}", include_in_schema=False)
-    def spa(path: str):
-        target = DIST / path
-        if path and target.is_file():
-            return FileResponse(target)
-        return FileResponse(DIST / "index.html")
+    mount_spa(app, DIST)
