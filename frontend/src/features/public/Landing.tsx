@@ -39,7 +39,7 @@ export default function Landing() {
       <main id="main" className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
         {/* 3D hero: creator core with brand cards and coins in orbit. Desktop only; follows the pointer and the scroll. */}
         <Stage3D media="(min-width: 1280px)" className="pointer-events-none absolute -right-36 -top-12 hidden h-[560px] w-[680px] xl:block">
-          {(active) => <HeroOrbit active={active} still={!!reduce} />}
+          {(active, onScreen) => <HeroOrbit active={active} onScreen={onScreen} still={!!reduce} />}
         </Stage3D>
         <section aria-labelledby="pitch" className="relative pt-4 sm:pt-12 lg:pt-16">
           <motion.p

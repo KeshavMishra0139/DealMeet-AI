@@ -5,7 +5,7 @@ import { Html, RoundedBox } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { useAdaptiveQuality } from "./perf";
+import { frameloopFor, SteadyClock, useAdaptiveQuality } from "./perf";
 
 export interface ReachBarsProps {
   reels: { date: string; views: number }[];
@@ -13,6 +13,7 @@ export interface ReachBarsProps {
   formatCount: (n: number) => string;
   formatDate: (iso: string) => string;
   active: boolean;
+  onScreen: boolean;
   still: boolean;
 }
 
@@ -34,6 +35,8 @@ function Bar({ x, h, color, label, value, still, index }: { x: number; h: number
     if (start.current === null) start.current = state.clock.elapsedTime;
     const p = Math.min(1, Math.max(0, (state.clock.elapsedTime - start.current - index * 0.12) / 0.9));
     mesh.current.scale.y = Math.max(0.001, 1 - Math.pow(1 - p, 3));
+    // Finish growing even if the scene mounted while paused (frameloop "demand").
+    if (p < 1) state.invalidate();
   });
   return (
     <group position={[x, 0, 0]}>
@@ -66,7 +69,7 @@ function Bar({ x, h, color, label, value, still, index }: { x: number; h: number
   );
 }
 
-function Scene({ reels, followers, formatCount, formatDate, still }: Omit<ReachBarsProps, "active">) {
+function Scene({ reels, followers, formatCount, formatDate, still }: Omit<ReachBarsProps, "active" | "onScreen">) {
   const rig = useRef<THREE.Group>(null);
   // Narrow canvases (phones) get day-only labels and leave the follower count to the card's legend.
   const compact = useThree((s) => s.size.width) < 560;
@@ -133,18 +136,19 @@ function FitCamera({ halfWidth }: { halfWidth: number }) {
   return null;
 }
 
-export default function ReachBars3D({ active, still: reduced, ...props }: ReachBarsProps) {
+export default function ReachBars3D({ active, onScreen, still: reduced, ...props }: ReachBarsProps) {
   const { degraded, monitor } = useAdaptiveQuality();
   const still = reduced || degraded;
   return (
     <Canvas
-      frameloop={still ? "demand" : active ? "always" : "never"}
+      frameloop={frameloopFor({ active, onScreen, still })}
       dpr={degraded ? 1 : [1, 1.25]}
       camera={{ position: [0, 1.25, 5.3], fov: 38 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}
     >
-      {!reduced && monitor([30, 60])}
+      <SteadyClock />
+      {!reduced && active && monitor([30, 60])}
       <ambientLight intensity={0.55} />
       <directionalLight position={[2, 5, 4]} intensity={1.4} />
       <pointLight position={[-3, 2, 3]} intensity={10} color="#DB2777" />
