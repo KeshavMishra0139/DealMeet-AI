@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from ..db import get_db
-from ..engines import durable_income, money_paths, next_step, roadmap, stage
+from ..engines import durable_income, hindi, money_paths, next_step, roadmap, stage
 from ..engines.common import inp, inr, inr_range, short, why
 from ..engines.fair_price import fair_price, follower_price
 from ..engines.matching import audience_fit
@@ -65,6 +65,7 @@ def rate_gap(c: dict, fair: dict) -> dict:
         "follower_price": fp,
         "gap": round(gap) if gap is not None else None,
         "line": line,
+        "line_hi": hindi.rate_gap_line(gap, rate),
         "brand": fair["lister_name"],
         "why": why(
             [
@@ -103,6 +104,7 @@ def pipeline(c: dict) -> dict:
                         "deal_id": d["_id"],
                         "text": f"{b.get('name', 'This')} offer is {round(below * 100)}% below your fair price",
                         "detail": f"{inr(d['amount'])} offered; fair is {inr(fp['total'])} for {fp['deliverables']}.",
+                        "hi": hindi.alert("low_offer", brand=b.get("name"), pct=round(below * 100), amount=d["amount"], fair=fp["total"], deliverables=fp["deliverables"]),
                     }
                 )
         elif d["stage"] in ("contract", "escrow_funded"):
@@ -122,6 +124,7 @@ def pipeline(c: dict) -> dict:
                         "deal_id": d["_id"],
                         "text": f"{b.get('name', 'The brand')} is {days} day{'s' if days != 1 else ''} late confirming your post",
                         "detail": f"{inr(d['amount'])} is safe in escrow. We've nudged them; it auto-releases to you in {left} day{'s' if left != 1 else ''}.",
+                        "hi": hindi.alert("verify_late", brand=b.get("name"), days=days, left=left, amount=d["amount"]),
                     }
                 )
     for inv in db.invoices.find({"creator_id": c["_id"], "status": "unpaid"}):
@@ -134,6 +137,7 @@ def pipeline(c: dict) -> dict:
                     "invoice_id": inv["_id"],
                     "text": f"{inr(inv['amount'])} invoice is {days} days late",
                     "detail": f"{inv['to']} was due to pay on {date.fromisoformat(inv['due']).strftime('%-d %b')}. Send a reminder with the invoice attached.",
+                    "hi": hindi.alert("invoice_late", amount=inv["amount"], days=days, to=inv["to"], due=date.fromisoformat(inv["due"]).strftime("%-d %b")),
                 }
             )
     return {

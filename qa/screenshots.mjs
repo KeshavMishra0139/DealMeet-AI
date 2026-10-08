@@ -43,8 +43,12 @@ const ROUTES = [
   ["brand-creator-locked", "/brand/creators/cr_b?as=br_senpai"],
   ["brand-deals", "/brand/deals?as=br_senpai"],
   ["brand-deal", "/brand/deals/dl_senpai_g11?as=br_senpai"],
-  ["demo-compare", "/demo/compare"],
-  ["demo-live", "/demo/live"],
+  ["demo-compare", "/demo/compare?phone=0"],
+  ["demo-compare-guide", "/demo/compare?guide=1&step=3"],
+  ["demo-compare-phones", "/demo/compare?phone=1"],
+  ["phone-view", "/creator?as=cr_b&phone=1"],
+  ["demo-live", "/demo/live?phone=0"],
+  ["creator-home-hi", "/creator?as=cr_a&lang=hi"],
   ["not-found", "/this-does-not-exist"],
 ];
 const VIEWPORTS = [

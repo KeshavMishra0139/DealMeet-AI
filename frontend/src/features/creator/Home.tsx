@@ -10,7 +10,7 @@ import { TrustBadge } from "@/components/shared/TrustBadge";
 import { WhyPopover } from "@/components/shared/Why";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/form";
-import { useI18n } from "@/i18n";
+import { useI18n, useTr } from "@/i18n";
 import { api, post } from "@/lib/api";
 import type { Durable, Home as HomeData, Pipeline, Plan, RateGap, Stage } from "@/lib/api-types";
 import { count, inr, inrRange, inrShort, shortDate } from "@/lib/format";
@@ -25,13 +25,14 @@ export function useHome(id: string) {
 export default function Home() {
   const id = useCreatorId();
   const { t } = useI18n();
+  const tr = useTr();
   const home = useHome(id);
   const qc = useQueryClient();
   const next = useMutation({
     mutationFn: () => post<Plan>(`/creators/${id}/plan/next`),
     onSuccess: async (plan) => {
       await qc.invalidateQueries({ queryKey: ["home", id] });
-      toast.success(`Week ${plan.week} planned`, { description: plan.changes[0] });
+      toast.success(t("home.planned", { n: plan.week }), { description: plan.changes[0] });
     },
   });
 
@@ -43,15 +44,15 @@ export default function Home() {
     <div>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
         <span className="inline-flex items-center gap-1.5">
-          <CalendarClock className="size-4" aria-hidden /> Week of {shortDate(plan.week_start)}
-          {plan.week > 1 && <span className="text-fg-2">· plan {plan.week}</span>}
+          <CalendarClock className="size-4" aria-hidden /> {t("home.weekOf", { date: shortDate(plan.week_start) })}
+          {plan.week > 1 && <span className="text-fg-2">· {t("home.planN", { n: plan.week })}</span>}
         </span>
         <StagePill stage={stage} />
       </header>
       <h1 className="mt-3 font-display text-[28px] font-semibold leading-tight tracking-tight sm:text-[34px]">
         {t("home.greeting")}
       </h1>
-      {creator.reference_note && creator.is_reference && <ReferenceNote text={creator.reference_note} className="mt-2" />}
+      {creator.reference_note && creator.is_reference && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
 
       {plan.changes.length > 0 && plan.week > 1 && (
         <motion.div
@@ -59,7 +60,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           className="mt-4 rounded-2xl border border-line bg-surface p-3.5 text-sm text-fg-2"
         >
-          <p className="font-medium text-fg">What changed since last week</p>
+          <p className="font-medium text-fg">{t("home.changed")}</p>
           <ul className="mt-1 space-y-0.5">
             {plan.changes.map((c) => (
               <li key={c}>{c}</li>
@@ -82,14 +83,14 @@ export default function Home() {
             {!next.isPending && <Wand2 aria-hidden />} {t("home.nextWeek")}
           </Button>
         </div>
-        <MovesCarousel>
+        <MovesCarousel label={t("home.carousel")}>
           {plan.moves.map((m, i) => (
             <MoveCard key={m.id} move={m} creatorId={id} index={i} />
           ))}
         </MovesCarousel>
       </section>
 
-      <section aria-label="Your money at a glance" className="mt-8 grid items-start gap-3 md:grid-cols-3">
+      <section aria-label={t("home.glance")} className="mt-8 grid items-start gap-3 md:grid-cols-3">
         <DurableCard durable={durable} label={t("home.durable")} />
         <RateGapCard gap={rate_gap} label={t("home.rateGap")} />
         <PipelineCard pipeline={pipeline} label={t("home.pipeline")} />
@@ -97,11 +98,11 @@ export default function Home() {
 
       <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <span>{t("home.context")}:</span>
-        <span className="num">{count(context.followers)} followers</span>
+        <span className="num">{t("home.followers", { n: count(context.followers) })}</span>
         {context.has_reels && (
           <>
             <span aria-hidden>·</span>
-            <span className="num">{count(context.median_views)} median views, last 6 reels</span>
+            <span className="num">{t("home.medianViews", { n: count(context.median_views) })}</span>
           </>
         )}
         {context.trust && (
@@ -116,15 +117,16 @@ export default function Home() {
 }
 
 export function StagePill({ stage }: { stage: Stage }) {
+  const { pick } = useI18n();
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface py-0.5 pl-2.5 pr-1 text-xs font-medium text-fg-2">
-      {stage.label}
+      {pick(stage.label, stage.hi?.label)}
       <WhyPopover why={stage.why} label="" subject={`Stage: ${stage.label}`} className="px-1 no-underline" />
     </span>
   );
 }
 
-function MovesCarousel({ children }: { children: React.ReactNode[] }) {
+function MovesCarousel({ children, label }: { children: React.ReactNode[]; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   useEffect(() => {
@@ -142,7 +144,7 @@ function MovesCarousel({ children }: { children: React.ReactNode[] }) {
       <div
         ref={ref}
         role="region"
-        aria-label="Your next 3 moves. Swipe or scroll sideways for more."
+        aria-label={label}
         tabIndex={0}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0"
       >
@@ -174,34 +176,34 @@ function CardShell({ title, why, children, className }: { title: string; why?: R
 }
 
 function DurableCard({ durable, label }: { durable: Durable; label: string }) {
+  const { t, pick } = useI18n();
+  const tr = useTr();
   return (
     <CardShell title={label} why={<WhyPopover why={durable.why} subject={label} />}>
       <div className="mt-3 flex items-center gap-4">
         {durable.score !== null ? (
-          <ScoreRing value={durable.score} size={96} stroke={9} sublabel="of 100" />
+          <ScoreRing value={durable.score} size={96} stroke={9} sublabel={t("durable.of100")} />
         ) : (
           <div className="grid size-24 shrink-0 place-items-center rounded-full border-[9px] border-surface-3 text-center text-[11px] leading-tight text-muted">
-            Not
-            <br />
-            scored
+            {t("durable.notScored")}
           </div>
         )}
         <div className="min-w-0">
-          <p className="font-display text-base font-semibold">{durable.headline}</p>
+          <p className="font-display text-base font-semibold">{tr(durable.headline)}</p>
           {durable.warning ? (
             <p className="mt-1 flex gap-1.5 text-[13px] leading-snug text-warn">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {durable.warning}
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {pick(durable.warning, durable.warning_hi)}
             </p>
           ) : (
             <p className="mt-1 text-[13px] leading-snug text-fg-2">
-              {durable.state === "no_income" ? "Your first income stream sets the base." : "Your income is spread across sources."}
+              {durable.state === "no_income" ? t("durable.firstSets") : t("durable.spread")}
             </p>
           )}
         </div>
       </div>
       {durable.next_stream && (
         <div className="mt-4 rounded-2xl bg-surface-2 p-3">
-          <p className="text-xs text-muted">{durable.state === "no_income" ? "Your first stream" : "Next stream to add"}</p>
+          <p className="text-xs text-muted">{durable.state === "no_income" ? t("durable.firstStream") : t("durable.nextStream")}</p>
           <p className="mt-0.5 text-sm font-semibold">{durable.next_stream.title}</p>
           <RangeValue estimate={durable.next_stream.estimate} size="md" className="mt-0.5 block" />
         </div>
@@ -211,32 +213,36 @@ function DurableCard({ durable, label }: { durable: Durable; label: string }) {
 }
 
 function RateGapCard({ gap, label }: { gap: RateGap; label: string }) {
+  const { t, pick } = useI18n();
   const max = Math.max(gap.fair.high, gap.current ?? 0, gap.follower_price);
   const bar = (v: number) => `${Math.max(4, (v / max) * 100)}%`;
   return (
     <CardShell title={label} why={<WhyPopover why={gap.why} subject={label} />}>
-      <p className="mt-3 text-xs text-muted">Fair rate per reel{gap.brand ? ` · for ${gap.brand}` : ""}</p>
+      <p className="mt-3 text-xs text-muted">
+        {t("rate.fairPerReel")}
+        {gap.brand ? ` · ${t("rate.forBrand", { brand: gap.brand })}` : ""}
+      </p>
       <p className="num font-display text-[28px] font-semibold leading-tight tracking-tight">{inrRange(gap.fair.low, gap.fair.high)}</p>
       <dl className="mt-3 space-y-2.5 text-[13px]">
         <div className="grid grid-cols-[1fr_auto] gap-y-1">
-          <dt className="text-fg-2">Your typical deal</dt>
-          <dd className="num font-medium">{gap.current ? inr(gap.current) : "Not set"}</dd>
+          <dt className="text-fg-2">{t("rate.typical")}</dt>
+          <dd className="num font-medium">{gap.current ? inr(gap.current) : t("rate.notSet")}</dd>
           <dd className="col-span-2 h-1.5 rounded-full bg-surface-3" aria-hidden>
             {gap.current && <div className="h-full rounded-full bg-[var(--chart-muted)]" style={{ width: bar(gap.current) }} />}
           </dd>
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-y-1">
-          <dt className="text-fg-2">Fair, on reach</dt>
+          <dt className="text-fg-2">{t("rate.fairOnReach")}</dt>
           <dd className="num font-medium">{inr(gap.per_reel)}</dd>
           <dd className="col-span-2 h-1.5 rounded-full bg-surface-3" aria-hidden>
             <div className="h-full rounded-full bg-signature" style={{ width: bar(gap.per_reel) }} />
           </dd>
         </div>
       </dl>
-      <p className="mt-3 text-[13px] text-fg-2">{gap.line}</p>
+      <p className="mt-3 text-[13px] text-fg-2">{pick(gap.line, gap.line_hi)}</p>
       <Button asChild variant="ghost" size="sm" className="-ml-2 mt-auto self-start pt-2">
         <Link to="/creator/money">
-          See the breakdown <ArrowRight aria-hidden />
+          {t("rate.breakdown")} <ArrowRight aria-hidden />
         </Link>
       </Button>
     </CardShell>
@@ -246,10 +252,11 @@ function RateGapCard({ gap, label }: { gap: RateGap; label: string }) {
 const ALERT_ICON = { low_offer: IndianRupee, verify_late: Clock, invoice_late: FileWarning };
 
 function PipelineCard({ pipeline, label }: { pipeline: Pipeline; label: string }) {
+  const { t, pick } = useI18n();
   const stats = [
-    { label: "Offers", value: String(pipeline.offers.length) },
-    { label: "In progress", value: String(pipeline.active.length) },
-    { label: "Awaiting pay", value: pipeline.awaiting_total ? inrShort(pipeline.awaiting_total) : "₹0" },
+    { label: t("pipe.offers"), value: String(pipeline.offers.length) },
+    { label: t("pipe.active"), value: String(pipeline.active.length) },
+    { label: t("pipe.awaiting"), value: pipeline.awaiting_total ? inrShort(pipeline.awaiting_total) : "₹0" },
   ];
   return (
     <CardShell title={label}>
@@ -269,8 +276,8 @@ function PipelineCard({ pipeline, label }: { pipeline: Pipeline; label: string }
               <li key={a.text} className="flex gap-2.5 rounded-xl border border-line p-2.5">
                 <Icon className={cn("mt-0.5 size-4 shrink-0", a.kind === "low_offer" ? "text-warn" : "text-muted")} aria-hidden />
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium leading-snug">{a.text}</p>
-                  <p className="mt-0.5 text-xs leading-snug text-muted">{a.detail}</p>
+                  <p className="text-[13px] font-medium leading-snug">{pick(a.text, a.hi?.text)}</p>
+                  <p className="mt-0.5 text-xs leading-snug text-muted">{pick(a.detail, a.hi?.detail)}</p>
                 </div>
               </li>
             );
@@ -283,11 +290,11 @@ function PipelineCard({ pipeline, label }: { pipeline: Pipeline; label: string }
               <Handshake className="size-4 shrink-0 text-success" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium leading-snug">
-                  {o.brand} offered {inr(o.amount)}
+                  {t("pipe.offered", { brand: o.brand, amount: inr(o.amount) })}
                 </p>
                 {o.fair_total !== undefined && (
                   <p className="mt-0.5 text-xs text-muted">
-                    {o.amount >= o.fair_total ? "At or above your fair price." : `Your fair price is ${inr(o.fair_total)}.`}
+                    {o.amount >= o.fair_total ? t("pipe.atFair") : t("pipe.fairIs", { amount: inr(o.fair_total) })}
                   </p>
                 )}
               </div>
@@ -296,12 +303,12 @@ function PipelineCard({ pipeline, label }: { pipeline: Pipeline; label: string }
         </ul>
       ) : (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-muted">
-          <Handshake className="size-4" aria-hidden /> No deals yet. Matched opportunities are waiting.
+          <Handshake className="size-4" aria-hidden /> {t("pipe.none")}
         </p>
       )}
       <Button asChild variant="ghost" size="sm" className="-ml-2 mt-auto self-start pt-2">
         <Link to={pipeline.alerts.length || pipeline.offers.length ? "/creator/deals" : "/creator/opportunities"}>
-          {pipeline.alerts.length || pipeline.offers.length ? "Open deals" : "See opportunities"} <ArrowRight aria-hidden />
+          {pipeline.alerts.length || pipeline.offers.length ? t("pipe.openDeals") : t("pipe.seeOpps")} <ArrowRight aria-hidden />
         </Link>
       </Button>
     </CardShell>

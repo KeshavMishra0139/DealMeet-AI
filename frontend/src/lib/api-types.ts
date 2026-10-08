@@ -26,6 +26,7 @@ export interface Stage {
   line: string;
   audience_stage: { id: string; label: string };
   why: Why;
+  hi?: { label: string; line: string };
 }
 
 export type Effort = "S" | "M" | "L";
@@ -47,6 +48,7 @@ export interface Move {
   carried_over?: boolean;
   follow_up_of?: string;
   order: number;
+  hi?: { title: string; reason: string };
 }
 
 export interface Plan {
@@ -64,6 +66,7 @@ export interface Durable {
   headline: string;
   sources: { source: string; label: string; amount: number; share: number }[];
   warning: string | null;
+  warning_hi?: string | null;
   next_stream: { type: string; title: string; estimate: Estimate; first_step: string } | null;
   monthly_avg?: number;
   why: Why;
@@ -76,6 +79,7 @@ export interface RateGap {
   follower_price: number;
   gap: number | null;
   line: string;
+  line_hi?: string;
   brand: string | null;
   why: Why;
 }
@@ -95,6 +99,7 @@ export interface Alert {
   detail: string;
   deal_id?: string;
   invoice_id?: string;
+  hi?: { text: string; detail: string };
 }
 
 export interface Pipeline {

@@ -19,7 +19,7 @@ def invalidate(prefix: str = "") -> None:
 
 
 # Models that don't depend on demo data survive a reset.
-KEEP = {"price_model"}
+KEEP = {"price_model", "trust_model"}
 
 
 def clear_runtime() -> None:

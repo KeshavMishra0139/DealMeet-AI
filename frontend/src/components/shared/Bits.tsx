@@ -158,9 +158,14 @@ export function SectionTitle({
   );
 }
 
-export function Kbd({ children }: { children: React.ReactNode }) {
+export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <kbd className="inline-grid h-5 min-w-5 place-items-center rounded-md border border-line-strong bg-surface-2 px-1 font-sans text-[11px] font-semibold text-fg-2">
+    <kbd
+      className={cn(
+        "inline-grid h-5 min-w-5 place-items-center rounded-md border border-line-strong bg-surface-2 px-1 font-sans text-[11px] font-semibold text-fg-2",
+        className,
+      )}
+    >
       {children}
     </kbd>
   );

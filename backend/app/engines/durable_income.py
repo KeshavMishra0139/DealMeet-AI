@@ -13,6 +13,10 @@ from .common import inp, inr, why
 
 WEIGHTS = {"diversification": 0.5, "recurring": 0.25, "reliability": 0.25}
 CONCENTRATION_LIMIT = 0.70
+SOURCE_HI = {
+    "brand": "ब्रैंड डील्स", "services": "सर्विसेज़", "digital": "डिजिटल प्रोडक्ट्स", "affiliate": "एफ़िलिएट",
+    "pr": "PR और इवेंट्स", "collective": "कलेक्टिव डील्स", "page": "पेज शाउटआउट्स",
+}
 MAX_SOURCES = 5
 
 
@@ -28,6 +32,7 @@ def compute(c: dict, next_stream: dict | None = None) -> dict:
             "headline": "No income yet",
             "sources": [],
             "warning": None,
+            "warning_hi": None,
             "next_stream": next_stream,
             "why": why(
                 [
@@ -47,16 +52,28 @@ def compute(c: dict, next_stream: dict | None = None) -> dict:
         WEIGHTS["diversification"] * diversification + WEIGHTS["recurring"] * recurring + WEIGHTS["reliability"] * reliability
     )
     top, top_share = max(shares.items(), key=lambda kv: kv[1])
-    warning = None
+    warning = warning_hi = None
     if top_share > CONCENTRATION_LIMIT:
-        warning = f"{round(top_share * 100)}% of your income comes from {INCOME_TYPES.get(top, top).lower()}."
+        pct = round(top_share * 100)
+        source = INCOME_TYPES.get(top, top).lower()
+        # "All of" rather than a 100 percent figure: the copy rules keep absolute claims out of the UI.
+        warning = f"All of your income comes from {source}." if pct >= 100 else f"{pct}% of your income comes from {source}."
+        warning_hi = f"आपकी सारी कमाई {SOURCE_HI.get(top, top)} से आती है।" if pct >= 100 else f"आपकी {pct}% कमाई {SOURCE_HI.get(top, top)} से आती है।"
     late = [h for h in hist if not h.get("paid_on_time")]
+    # Whole shares are said in words ("all", "every") so the UI never shows a 100 percent figure.
     reasons = [
-        f"Diversification {diversification * 100:.0f}/100: {len(shares)} income source{'s' if len(shares) != 1 else ''}, "
-        f"the largest is {round(top_share * 100)}% ({INCOME_TYPES.get(top, top).lower()}).",
-        f"Recurring income is {recurring * 100:.0f}% of the total.",
-        f"{reliability * 100:.0f}% of payments arrived on time"
-        + (f"; {len(late)} came {max(h['days_late'] for h in late)} days late at worst." if late else "."),
+        f"Diversification {diversification * 100:.0f}/100: "
+        + (
+            f"one income source ({INCOME_TYPES.get(top, top).lower()})."
+            if len(shares) == 1
+            else f"{len(shares)} income sources, the largest is {round(top_share * 100)}% ({INCOME_TYPES.get(top, top).lower()})."
+        ),
+        "All of your income is recurring." if recurring >= 0.995 else f"Recurring income is {recurring * 100:.0f}% of the total.",
+        (
+            "Every payment arrived on time."
+            if not late
+            else f"{reliability * 100:.0f}% of payments arrived on time; {len(late)} came {max(h['days_late'] for h in late)} days late at worst."
+        ),
     ]
     return {
         "score": int(round(score)),
@@ -74,6 +91,7 @@ def compute(c: dict, next_stream: dict | None = None) -> dict:
         },
         "monthly_avg": round(total / 6),
         "warning": warning,
+        "warning_hi": warning_hi,
         "next_stream": next_stream,
         "why": why(
             reasons,

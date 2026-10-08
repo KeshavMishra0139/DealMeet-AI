@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from ..config import now_iso, today
 from ..db import get_db
-from . import brand_safety, metrics
+from . import brand_safety, hindi, metrics
 from .common import estimate, inp, inr, inr_range, percentile, short, why
 
 EFFORT_HINT = {"S": "About 15 minutes", "M": "A few hours", "L": "A few days"}
@@ -40,6 +40,11 @@ def _move(kind, category, title, reason, impact, effort, why_, cta, priority, **
         "outcome": None,
         **extra,
     }
+
+
+def _top_share(ctx) -> int | None:
+    sources = (ctx.get("durable") or {}).get("sources") or []
+    return round(max(s["share"] for s in sources) * 100) if ctx["durable"].get("warning") and sources else None
 
 
 # ---------------------------------------------------------------- generators
@@ -86,6 +91,7 @@ def g_raise_rate(c, ctx):
         ),
         {"label": "See your price breakdown", "to": "/creator/money"},
         0.95,
+        hi=hindi.move("raise_rate", low=fair["range"]["low"], high=fair["range"]["high"], ratio=ratio),
     )
 
 
@@ -122,6 +128,7 @@ def g_double_down(c, ctx):
         ),
         {"label": "See what's working", "to": "/creator/roadmap"},
         0.8,
+        hi=hindi.move("double_down", topic=metrics.topic_plural(best["topic"]), most_saved=most_saved),
     )
 
 
@@ -142,6 +149,7 @@ def g_content_gap(c, ctx):
         gap["why"],
         {"label": "See topic ideas", "to": "/creator/roadmap"},
         0.9,
+        hi=hindi.move("content_gap", topic=gap["title"], lift=gap["lift"], supply=gap["supply"]),
     )
 
 
@@ -160,6 +168,7 @@ def g_voiceover(c, ctx):
         why(["Anime edits use show clips, which brands treat as a copyright risk.", "Commentary or voiceover makes the work yours."], title="Why add your voice"),
         {"label": "See the roadmap", "to": "/creator/roadmap"},
         0.65,
+        hi=hindi.move("voiceover"),
     )
 
 
@@ -182,6 +191,7 @@ def g_apply_matches(c, ctx):
         {"label": "View the matches", "to": "/creator/opportunities"},
         0.75,
         listing_ids=[o["id"] for o in picks],
+        hi=hindi.move("apply_matches", a=picks[0]["title"], b=picks[1]["title"], fa=picks[0]["fit"], fb=picks[1]["fit"]),
     )
 
 
@@ -204,6 +214,7 @@ def g_join_collective(c, ctx):
         {"label": "See the collective", "to": "/creator/opportunities"},
         0.85 if small else 0.6,
         listing_ids=[o["id"]],
+        hi=hindi.move("join_collective", brand=o["lister"]["name"], size=o["collective_size"]),
     )
 
 
@@ -221,6 +232,7 @@ def g_digital(c, ctx):
         p["why"],
         {"label": "See money paths", "to": "/creator/money"},
         0.7,
+        hi=hindi.move("digital", title=p["title"]),
     )
 
 
@@ -238,6 +250,7 @@ def g_affiliate(c, ctx):
         p["why"],
         {"label": "See money paths", "to": "/creator/money"},
         0.6,
+        hi=hindi.move("affiliate", share=_top_share(ctx)),
     )
 
 
@@ -248,7 +261,7 @@ def g_service(c, ctx):
     if not p:
         return None
     return _move("service", "money", f"Offer {p['title'].lower()} from your link-in-bio", p["why"]["reasons"][0], p["estimate"], "S", p["why"],
-                 {"label": "Set up your page", "to": "/creator/kit"}, 0.92)
+                 {"label": "Set up your page", "to": "/creator/kit"}, 0.92, hi=hindi.move("service"))
 
 
 def g_rate_card(c, ctx):
@@ -265,6 +278,7 @@ def g_rate_card(c, ctx):
         fair["why"],
         {"label": "See your media kit", "to": "/creator/kit"},
         0.5,
+        hi=hindi.move("rate_card", low=fair["range"]["low"], high=fair["range"]["high"]),
     )
 
 
@@ -283,6 +297,7 @@ def f_lock_rate(c, ctx, prev):
         {"label": "Open your media kit", "to": "/creator/kit"},
         0.93,
         follow_up_of="raise_rate",
+        hi=hindi.move("lock_rate", amount=amount),
     )
 
 
@@ -300,6 +315,7 @@ def f_bundle(c, ctx, prev):
         {"label": "See your price breakdown", "to": "/creator/money"},
         0.9,
         follow_up_of="raise_rate",
+        hi=hindi.move("bundle_offer", low=lo, high=hi),
     )
 
 
@@ -315,6 +331,7 @@ def f_series(c, ctx, prev):
         prev["cta"],
         0.86,
         follow_up_of=prev["kind"],
+        hi=hindi.move("series"),
     )
 
 
@@ -330,6 +347,7 @@ def f_new_hook(c, ctx, prev):
         prev["cta"],
         0.85,
         follow_up_of=prev["kind"],
+        hi=hindi.move("new_hook"),
     )
 
 

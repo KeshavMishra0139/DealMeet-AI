@@ -21,6 +21,11 @@ def _region(c: dict) -> str | None:
     return REGION_ALIASES.get(r, r)
 
 
+def pct_text(pct: int) -> str:
+    """'64%', or 'All' for a whole audience: the copy rules keep 100 percent figures out of the UI."""
+    return "All" if pct >= 100 else f"{pct}%"
+
+
 def possessive(name: str) -> str:
     return f"{name}'" if name.endswith("s") else f"{name}'s"
 
@@ -76,12 +81,12 @@ def audience_fit(c: dict, lister: dict) -> dict:
         cautions.append(f"{NICHES[c['niche']]['label']} is outside {possessive(lister['name'])} categories")
     if t_ages:
         pct = round(parts["age"] * 100)
-        (reasons if pct >= 60 else cautions).append(f"{pct}% of the audience is in the target ages ({', '.join(t_ages)})")
+        (reasons if pct >= 60 else cautions).append(f"{pct_text(pct)} of the audience is in the target ages ({', '.join(t_ages)})")
     if t_langs:
         pct = round(language * 100)
         shared = [k for k, v in sorted(a_langs.items(), key=lambda kv: -kv[1]) if k in t_langs and k in LANGS]
         if pct >= 60 and shared:
-            reasons.append(f"{pct}% of the audience speaks {' or '.join(LANGS[k]['label'] for k in shared[:2])}")
+            reasons.append(f"{pct_text(pct)} of the audience speaks {' or '.join(LANGS[k]['label'] for k in shared[:2])}")
         elif pct < 60:
             wanted = [LANGS[k]["label"] for k in sorted(t_langs) if k in LANGS and k != "hinglish"][:3]
             cautions.append(f"Only {pct}% of the audience speaks {' or '.join(wanted)}")
@@ -92,7 +97,7 @@ def audience_fit(c: dict, lister: dict) -> dict:
     elif t_regions:
         cautions.append(f"Audience is mostly outside {', '.join(sorted(t_regions))}")
     if target.get("gender") == "female" and gender >= 0.9:
-        reasons.append(f"{round((aud.get('gender') or {}).get('female', 0) * 100)}% women, matching the target")
+        reasons.append(f"{pct_text(round((aud.get('gender') or {}).get('female', 0) * 100))} women, matching the target")
 
     return {
         "fit": round(fit, 3),

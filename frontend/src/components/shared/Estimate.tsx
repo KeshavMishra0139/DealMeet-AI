@@ -1,3 +1,5 @@
+import { useI18n } from "@/i18n";
+import type { Dict } from "@/i18n/en";
 import type { Estimate } from "@/lib/types";
 import { count, inrRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -19,12 +21,18 @@ export function periodText(e: Estimate) {
 }
 
 export function RangeValue({ estimate, className, size = "lg" }: { estimate: Estimate; className?: string; size?: "md" | "lg" | "xl" }) {
+  const { t, lang } = useI18n();
   const sizes = { md: "text-lg", lg: "text-2xl", xl: "text-[34px] leading-none" };
+  const period = periodText(estimate);
+  let text = rangeText(estimate);
+  if (lang === "hi" && estimate.unit === "views") text = text.replace(/ views$/, ` ${t("unit.views")}`);
   return (
     <span className={cn("num font-display font-semibold tracking-tight", sizes[size], className)}>
-      {rangeText(estimate)}
-      {periodText(estimate) && (
-        <span className="ml-1.5 font-sans text-[13px] font-normal tracking-normal text-muted">{periodText(estimate)}</span>
+      {text}
+      {period && (
+        <span className="ml-1.5 whitespace-nowrap font-sans text-[13px] font-normal tracking-normal text-muted">
+          {lang === "hi" ? t(`period.${period}` as keyof Dict) : period}
+        </span>
       )}
     </span>
   );

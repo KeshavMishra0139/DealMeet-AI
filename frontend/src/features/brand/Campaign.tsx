@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
+import { SafetyNote } from "@/components/shared/SafetyNote";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -164,6 +165,7 @@ function MatchList({
                   {m.is_reference && <Badge size="sm" variant="warn">Reference profile</Badge>}
                   <TrustBadge trust={m.trust} />
                   {m.trust && m.trust.score < 50 && <Badge size="sm" variant="danger">Weak trust signals</Badge>}
+                  <SafetyNote safety={m.safety} compact />
                   <StatusBadge m={m} />
                 </p>
                 <p className="truncate text-xs text-muted">

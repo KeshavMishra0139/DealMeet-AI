@@ -37,3 +37,8 @@ def assess(c: dict) -> dict:
         "penalty": penalty,
         "flags": [{"id": f, **FLAGS[f]} for f in flags],
     }
+
+
+def public(c: dict) -> dict:
+    """What a brand sees: the flags and the fix already suggested to the creator, never the penalty maths."""
+    return {"flags": [{"id": f["id"], "label": f["label"], "fix": f["fix"]} for f in assess(c)["flags"]]}

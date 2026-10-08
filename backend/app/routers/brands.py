@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..config import now_iso, today
 from ..db import get_db, out
-from ..engines import brand_matching, collective, metrics
+from ..engines import brand_matching, brand_safety, collective, metrics
 from ..engines.common import inr
 from ..engines.fair_price import fair_price
 from ..engines.matching import listing_fit
@@ -277,6 +277,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
         "location": c.get("city") or c.get("region"),
         "audience_stage": audience_stage(c.get("followers", 0))["label"],
         "trust": trust_score(c),
+        "safety": brand_safety.public(c),
         "scopes": scopes,
         "scope_source": cs.source_for(creator_id, brand_id),
         "scope_labels": cs.SCOPE_LABELS,

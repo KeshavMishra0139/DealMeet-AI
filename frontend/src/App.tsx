@@ -1,5 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
+import { EmbedBridge, PhoneStage, PhoneToggle, usePhoneShortcut } from "@/components/demo/PhoneMode";
+import { LangScope } from "@/i18n";
+import { usePhoneMode } from "@/lib/phone";
+import { isEmbedFrame } from "@/lib/session";
 
 const Landing = lazy(() => import("@/features/public/Landing"));
 const Login = lazy(() => import("@/features/public/Login"));
@@ -25,20 +29,45 @@ const CreatorDeals = lazy(() => import("@/features/creator/Deals"));
 const CreatorKit = lazy(() => import("@/features/creator/Kit"));
 const DealView = lazy(() => import("@/features/deals/DealView"));
 const LinkInBio = lazy(() => import("@/features/public/LinkInBio"));
+const DemoCompare = lazy(() => import("@/features/demo/Compare"));
+const DemoLive = lazy(() => import("@/features/demo/Live"));
+
+const embedded = isEmbedFrame();
 
 function Fallback() {
   return <div className="min-h-dvh" aria-busy="true" aria-label="Loading" />;
 }
 
 export default function App() {
+  const phone = usePhoneMode();
+  const { pathname } = useLocation();
+  // /demo pages lay out their own phones; everywhere else P puts the app in a phone.
+  const demoPage = pathname.startsWith("/demo");
+  usePhoneShortcut(embedded, pathname !== "/demo/live");
+  if (phone && !embedded && !demoPage) {
+    return (
+      <>
+        <PhoneStage />
+        <PhoneToggle />
+      </>
+    );
+  }
   return (
     <Suspense fallback={<Fallback />}>
+      {embedded ? <EmbedBridge /> : pathname !== "/demo/live" && <PhoneToggle />}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
 
-        <Route path="/creator/onboarding" element={<CreatorOnboarding />} />
+        <Route
+          path="/creator/onboarding"
+          element={
+            <LangScope>
+              <CreatorOnboarding />
+            </LangScope>
+          }
+        />
         <Route path="/creator" element={<CreatorShell />}>
           <Route index element={<CreatorHome />} />
           <Route path="roadmap" element={<CreatorRoadmap />} />
@@ -62,6 +91,9 @@ export default function App() {
           <Route path="collectives/:id" element={<CollectiveDetail />} />
           <Route path="profile" element={<BrandProfile />} />
         </Route>
+
+        <Route path="/demo/compare" element={<DemoCompare />} />
+        <Route path="/demo/live" element={<DemoLive />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -24,6 +24,9 @@ import App from "./App";
 import { TooltipProvider } from "./components/ui/overlays";
 import { I18nProvider } from "./i18n";
 import { queryClient } from "./lib/api";
+import { startSync } from "./lib/sync";
+
+startSync(queryClient);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

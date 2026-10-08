@@ -18,7 +18,7 @@ import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
-import { useI18n } from "@/i18n";
+import { LangScope, useI18n } from "@/i18n";
 import type { Dict } from "@/i18n/en";
 import { api, post } from "@/lib/api";
 import { isEmbedFrame, useCreatorId } from "@/lib/session";
@@ -46,6 +46,14 @@ export function useCreator() {
 }
 
 export default function CreatorShell() {
+  return (
+    <LangScope>
+      <Studio />
+    </LangScope>
+  );
+}
+
+function Studio() {
   useTheme("creator");
   const { t } = useI18n();
   const creator = useCreator();

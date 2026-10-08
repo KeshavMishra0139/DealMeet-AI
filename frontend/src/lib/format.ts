@@ -83,3 +83,8 @@ export function deliverable(d: { kind: string; count: number }) {
   const [one, many] = DELIVERABLES[d.kind] ?? [d.kind, `${d.kind}s`];
   return `${d.count} ${d.count === 1 ? one : many}`;
 }
+
+/** "Creator A" -> "Creator A's", "Thalam Foods" -> "Thalam Foods'" */
+export function possessive(name: string) {
+  return name.endsWith("s") ? `${name}'` : `${name}'s`;
+}

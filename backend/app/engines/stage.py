@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..services.views import audience_stage
 from . import metrics
+from . import hindi
 from .common import inp, inr, inr_range, short, why
 
 STAGES = {
@@ -69,6 +70,7 @@ def detect(c: dict, fair: dict | None) -> dict:
         "id": key,
         "label": label,
         "line": line,
+        "hi": hindi.stage(key),
         "audience_stage": audience_stage(followers),
         "why": why(reasons, inputs, sim, title=f"Why '{label}'"),
     }

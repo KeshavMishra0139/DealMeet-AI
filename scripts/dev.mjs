@@ -13,6 +13,9 @@ const backend = join(root, "backend");
 const frontend = join(root, "frontend");
 const isWin = process.platform === "win32";
 const setupOnly = process.argv.includes("--setup-only");
+// --single-port: build the web app once and serve everything from the API on :8000
+// (closest to a deployed demo; no hot reload).
+const singlePort = process.argv.includes("--single-port");
 
 const c = (code) => (s) => (process.stdout.isTTY ? `\x1b[${code}m${s}\x1b[0m` : s);
 const magenta = c("35");
@@ -123,10 +126,25 @@ function shutdown(code) {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-start("api", magenta, venvPython, ["-m", "uvicorn", "app.main:app", "--port", "8000", "--reload"], backend);
-start("web", cyan, "npm", ["run", "dev"], frontend);
+if (singlePort) {
+  log("building the web app");
+  run("npm", ["run", "build"], { cwd: frontend });
+  start("api", magenta, venvPython, ["-m", "uvicorn", "app.main:app", "--port", "8000"], backend);
+} else {
+  start("api", magenta, venvPython, ["-m", "uvicorn", "app.main:app", "--port", "8000", "--reload"], backend);
+  start("web", cyan, "npm", ["run", "dev"], frontend);
+}
 
 setTimeout(() => {
+  if (singlePort) {
+    console.log(
+      `\n${bold("JodiDar AI is starting (single port)")}\n` +
+        `  App   ${cyan("http://localhost:8000")}\n` +
+        `  Demo  ${cyan("http://localhost:8000/demo/compare")}\n` +
+        dim("  Press Ctrl+C to stop.\n"),
+    );
+    return;
+  }
   console.log(
     `\n${bold("JodiDar AI is starting")}\n` +
       `  App   ${cyan("http://localhost:5173")}\n` +
