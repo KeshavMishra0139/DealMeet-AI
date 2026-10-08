@@ -4,10 +4,12 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import ROOT
 from .db import get_db
@@ -46,16 +48,25 @@ app.add_middleware(
 for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit):
     app.include_router(r.router)
 
-# Single-port mode: serve the built web app when it exists (npm run build).
-DIST = ROOT / "frontend" / "dist"
-if DIST.exists():
-    from fastapi.staticfiles import StaticFiles
 
-    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+def mount_spa(app: FastAPI, dist: Path) -> None:
+    """Single-port mode: serve the built web app from dist (npm run build)."""
+    root = dist.resolve()
+    app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
-        target = DIST / path
-        if path and target.is_file():
+        # path arrives percent-decoded, so "..%2F" (and "..%5C" on Windows) or an
+        # absolute path could reach outside dist. Only serve files that resolve inside it.
+        try:
+            target = (root / path).resolve()
+        except (OSError, ValueError):  # e.g. an embedded NUL byte
+            target = None
+        if path and target and target.is_file() and target.is_relative_to(root):
             return FileResponse(target)
-        return FileResponse(DIST / "index.html")
+        return FileResponse(root / "index.html")
+
+
+DIST = ROOT / "frontend" / "dist"
+if DIST.exists():
+    mount_spa(app, DIST)
