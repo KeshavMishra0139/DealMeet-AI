@@ -68,3 +68,18 @@ export function shortDate(iso: string, withYear = false) {
 export function timeOfDay(iso: string) {
   return timeFmt.format(new Date(iso));
 }
+
+const DELIVERABLES: Record<string, [string, string]> = {
+  reel: ["reel", "reels"],
+  short: ["short", "shorts"],
+  story: ["story", "stories"],
+  carousel: ["carousel", "carousels"],
+  link_in_bio: ["link in bio", "links in bio"],
+  live: ["live session", "live sessions"],
+};
+
+/** { kind: "story", count: 2 } -> "2 stories" */
+export function deliverable(d: { kind: string; count: number }) {
+  const [one, many] = DELIVERABLES[d.kind] ?? [d.kind, `${d.kind}s`];
+  return `${d.count} ${d.count === 1 ? one : many}`;
+}

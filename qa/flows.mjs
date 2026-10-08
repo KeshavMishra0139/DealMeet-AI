@@ -85,6 +85,34 @@ await step("Why? popovers open with reasons", async () => {
   await page.getByText(/Depends on simulated data/).waitFor();
 });
 
+await step("Creator B opts in to the Thalam collective; the brand sees her in the pack", async () => {
+  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await page.goto(`${BASE}/creator/opportunities?as=cr_b`);
+  await page.getByRole("radio", { name: /Collectives/ }).click();
+  await page.getByRole("button", { name: "Opt in" }).first().click();
+  await page.getByRole("button", { name: "Opt in and share" }).click();
+  await page.getByText("Opted in").first().waitFor();
+  await page.goto(`${BASE}/brand/campaigns/lst_thalam_collective?as=br_thalam`);
+  const row = page.getByRole("row", { name: /Creator B/ });
+  await row.getByText("Opted in").waitFor();
+});
+
+await step("Brand sends an offer from matches; it lands in the creator's pipeline", async () => {
+  await page.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
+  await page.getByRole("button", { name: "Offer" }).first().click();
+  await page.getByRole("button", { name: "Send offer" }).click();
+  await page.getByText(/Offer sent to/).waitFor();
+  const r = await fetch(`${API}/api/creators/cr_g01/home`).then((x) => x.json());
+  if (!r.pipeline) throw new Error("no pipeline");
+});
+
+await step("Privacy: revoking a brand logs it and hides the creator", async () => {
+  await page.goto(`${BASE}/creator/privacy?as=cr_a`);
+  await page.getByRole("button", { name: "Revoke" }).first().click();
+  await page.getByText("Revoked", { exact: true }).first().waitFor();
+  await page.getByText("access revoked").first().waitFor();
+});
+
 await browser.close();
 for (const r of results) console.log(r.join("  "));
 if (errors.length) console.log("Page errors:", errors);
