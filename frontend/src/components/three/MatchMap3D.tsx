@@ -8,6 +8,7 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { frameloopFor, SteadyClock } from "./perf";
 
 export interface MapPoint {
   id: string;
@@ -140,12 +141,14 @@ export default function MatchMap3D({
   points,
   onOpen,
   active,
+  onScreen,
   still,
   interactive,
 }: {
   points: MapPoint[];
   onOpen: (id: string) => void;
   active: boolean;
+  onScreen: boolean;
   still: boolean;
   interactive: boolean;
 }) {
@@ -164,12 +167,13 @@ export default function MatchMap3D({
   }, [points]);
   return (
     <Canvas
-      frameloop={still ? "demand" : active ? "always" : "never"}
+      frameloop={frameloopFor({ active, onScreen, still })}
       dpr={[1, 1.25]}
       camera={{ position: [3.4, 3.1, 5.6], fov: 42 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}
     >
+      <SteadyClock />
       <ambientLight intensity={0.75} />
       <directionalLight position={[3, 6, 4]} intensity={1.5} />
       <pointLight position={[-4, 3, 3]} intensity={12} color="#DB2777" />
@@ -191,7 +195,8 @@ export default function MatchMap3D({
         enabled={interactive}
         enableZoom={false}
         enablePan={false}
-        autoRotate={!still}
+        // Each auto-rotate step asks for another frame, so it only runs while the scene plays.
+        autoRotate={!still && active}
         autoRotateSpeed={0.45}
         minPolarAngle={Math.PI / 5}
         maxPolarAngle={Math.PI / 2.1}

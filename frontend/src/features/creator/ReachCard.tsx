@@ -45,8 +45,8 @@ export function ReachCard({ context }: { context: Home["context"] }) {
         label={`${t("reach.title")}. ${summary}. ${t("home.followers", { n: count(context.followers) })}.`}
         fallback={<Bars2D reels={reels} followers={context.followers} />}
       >
-        {(active) => (
-          <ReachBars3D reels={reels} followers={context.followers} formatCount={formatCount} formatDate={formatDate} active={active} still={!!reduce} />
+        {(active, onScreen) => (
+          <ReachBars3D reels={reels} followers={context.followers} formatCount={formatCount} formatDate={formatDate} active={active} onScreen={onScreen} still={!!reduce} />
         )}
       </Stage3D>
     </section>

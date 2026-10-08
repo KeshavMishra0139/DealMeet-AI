@@ -5,6 +5,7 @@ import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { frameloopFor, SteadyClock } from "./perf";
 
 export interface FlowStage {
   label: string;
@@ -129,15 +130,16 @@ function FitCamera() {
   return null;
 }
 
-export default function DealFlow3D({ stages, active, still }: { stages: FlowStage[]; active: boolean; still: boolean }) {
+export default function DealFlow3D({ stages, active, onScreen, still }: { stages: FlowStage[]; active: boolean; onScreen: boolean; still: boolean }) {
   return (
     <Canvas
-      frameloop={still ? "demand" : active ? "always" : "never"}
+      frameloop={frameloopFor({ active, onScreen, still })}
       dpr={[1, 1.25]}
       camera={{ position: [0, 0.4, 7], fov: 34 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}
     >
+      <SteadyClock />
       <FitCamera />
       <ambientLight intensity={0.8} />
       <directionalLight position={[2, 4, 5]} intensity={1.4} />

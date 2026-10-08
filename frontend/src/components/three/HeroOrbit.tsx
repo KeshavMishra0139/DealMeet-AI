@@ -4,7 +4,7 @@ import { Environment, Float, Lightformer, MeshDistortMaterial, RoundedBox } from
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { FrameCap, useAdaptiveQuality } from "./perf";
+import { FrameCap, SteadyClock, useAdaptiveQuality } from "./perf";
 
 const VIOLET = "#7C3AED";
 const MAGENTA = "#DB2777";
@@ -14,8 +14,9 @@ function Core({ still }: { still: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   useFrame((_, dt) => {
     if (still || !mesh.current) return;
-    mesh.current.rotation.y += dt * 0.25;
-    mesh.current.rotation.x += dt * 0.08;
+    const step = Math.min(dt, 0.1); // the first frame after a pause covers the whole pause
+    mesh.current.rotation.y += step * 0.25;
+    mesh.current.rotation.x += step * 0.08;
   });
   return (
     <Float speed={still ? 0 : 1.4} rotationIntensity={0.4} floatIntensity={0.8}>
@@ -40,7 +41,7 @@ function OrbitCard({ angle, radius, color, tilt, still }: { angle: number; radiu
   const phase = useRef(angle);
   useFrame((_, dt) => {
     if (!group.current) return;
-    if (!still) phase.current += dt * 0.32;
+    if (!still) phase.current += Math.min(dt, 0.1) * 0.32;
     const a = phase.current;
     group.current.position.set(Math.cos(a) * radius, Math.sin(a * 1.3) * 0.35 + tilt, Math.sin(a) * radius * 0.55);
     group.current.rotation.set(0.15, -a + Math.PI / 2, 0.05);
@@ -100,13 +101,14 @@ function Rig({ still, children }: { still: boolean; children: React.ReactNode })
   return <group ref={group}>{children}</group>;
 }
 
-export default function HeroOrbit({ active, still: reduced }: { active: boolean; still: boolean }) {
+export default function HeroOrbit({ active, onScreen, still: reduced }: { active: boolean; onScreen: boolean; still: boolean }) {
   // An ambient animation needs no more than 30 frames a second; a slow device gets a still frame.
+  // It stays in "demand" while on screen and FrameCap supplies the frames while the viewer is active.
   const { degraded, monitor } = useAdaptiveQuality();
   const still = reduced || degraded;
   return (
     <Canvas
-      frameloop={still ? "demand" : active ? "demand" : "never"}
+      frameloop={onScreen || still ? "demand" : "never"}
       dpr={degraded ? 1 : [1, 1.25]}
       camera={{ position: [0, 0.2, 8.6], fov: 36 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
@@ -115,8 +117,9 @@ export default function HeroOrbit({ active, still: reduced }: { active: boolean;
       eventSource={document.getElementById("root") ?? undefined}
       eventPrefix="client"
     >
+      <SteadyClock />
       <FrameCap fps={30} on={active && !still} />
-      {!reduced && monitor([20, 30])}
+      {!reduced && active && monitor([20, 30])}
       <ambientLight intensity={0.35} />
       <directionalLight position={[3, 4, 5]} intensity={1.3} />
       <pointLight position={[-4, -1, 2]} intensity={18} color={MAGENTA} />

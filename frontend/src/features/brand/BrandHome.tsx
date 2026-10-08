@@ -316,7 +316,7 @@ function DealFlow({ stages }: { stages: Console["stages"] }) {
       </div>
       <div className="bg-[linear-gradient(180deg,transparent,rgb(124_58_237/0.05))]">
         <Stage3D className="h-[230px]" label={`3D deal rail. ${summary}.`} fallback={<FlowFallback stages={flow} />}>
-          {(active) => <DealFlow3D stages={flow} active={active} still={!!reduce} />}
+          {(active, onScreen) => <DealFlow3D stages={flow} active={active} onScreen={onScreen} still={!!reduce} />}
         </Stage3D>
       </div>
     </Reveal>

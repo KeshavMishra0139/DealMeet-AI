@@ -28,7 +28,8 @@ class SceneBoundary extends Component<{ fallback: ReactNode; children: ReactNode
 
 // Scenes animate while the viewer is doing something (moving the pointer,
 // scrolling, typing) and hold their last frame after a few idle seconds, so a
-// page left open doesn't keep the graphics chip busy.
+// page left open doesn't keep the graphics chip busy. A held scene still
+// redraws when something changes, such as a window resize or new data.
 const IDLE_MS = 6000;
 let busy = true;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -83,8 +84,8 @@ export function Stage3D({
   label,
   media,
 }: {
-  /** Receives whether the stage is on screen. */
-  children: (active: boolean) => ReactNode;
+  /** Receives whether the scene should animate (on screen, viewer active) and whether it's on screen. */
+  children: (active: boolean, onScreen: boolean) => ReactNode;
   fallback?: ReactNode;
   className?: string;
   /** Describes the scene for screen readers; omit for decorative scenes. */
@@ -111,7 +112,7 @@ export function Stage3D({
     >
       {ready ? (
         <SceneBoundary fallback={fallback}>
-          <Suspense fallback={fallback}>{children(active)}</Suspense>
+          <Suspense fallback={fallback}>{children(active, onScreen)}</Suspense>
         </SceneBoundary>
       ) : (
         fallback

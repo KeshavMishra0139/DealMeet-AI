@@ -147,11 +147,12 @@ function MatchSpace({ items, listingId }: { items: BrandMatch[]; listingId: stri
           className="h-[380px]"
           label={`3D map of ${items.length} matched creators by fair price, reach and trust, coloured by audience fit. The list below has the same creators and numbers.`}
         >
-          {(active) => (
+          {(active, onScreen) => (
             <MatchMap3D
               points={points}
               onOpen={(cid) => navigate(`/brand/creators/${cid}?listing=${listingId}`)}
               active={active}
+              onScreen={onScreen}
               still={!!reduce}
               interactive={mouse && !reduce}
             />
