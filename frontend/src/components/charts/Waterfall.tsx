@@ -33,7 +33,9 @@ const SHORT: Record<string, string> = {
   terms: "Usage rights",
 };
 
-export function toRows(fp: FairPrice): Row[] {
+type WaterfallInput = Pick<FairPrice, "steps" | "total" | "base">;
+
+export function toRows(fp: WaterfallInput): Row[] {
   const rows: Row[] = [];
   let running = 0;
   for (const s of fp.steps) {
@@ -75,7 +77,7 @@ function TipContent({ active, payload }: { active?: boolean; payload?: { payload
   );
 }
 
-export function Waterfall({ fp, height }: { fp: FairPrice; height?: number }) {
+export function Waterfall({ fp, height }: { fp: WaterfallInput; height?: number }) {
   const rows = toRows(fp);
   const max = Math.max(...rows.map((r) => r.offset + r.value));
   const h = height ?? rows.length * 38 + 24;

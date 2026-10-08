@@ -55,7 +55,7 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
       className={cn(
         "card-surface relative flex h-full flex-col overflow-hidden rounded-[26px] p-5 sm:p-6",
-        done && "opacity-80",
+        done && "border-success/30",
       )}
     >
       {index === 0 && !done && (

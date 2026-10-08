@@ -11,6 +11,15 @@ const CreatorHome = lazy(() => import("@/features/creator/Home"));
 const CreatorRoadmap = lazy(() => import("@/features/creator/Roadmap"));
 const CreatorMoney = lazy(() => import("@/features/creator/Money"));
 const CreatorOnboarding = lazy(() => import("@/features/creator/Onboarding"));
+const CreatorOpportunities = lazy(() => import("@/features/creator/Opportunities"));
+const CreatorPrivacy = lazy(() => import("@/features/creator/Privacy"));
+const BrandHome = lazy(() => import("@/features/brand/BrandHome"));
+const BrandCampaigns = lazy(() => import("@/features/brand/Campaigns"));
+const BrandNewCampaign = lazy(() => import("@/features/brand/NewCampaign"));
+const BrandCampaign = lazy(() => import("@/features/brand/Campaign"));
+const BrandCreator = lazy(() => import("@/features/brand/BrandCreator"));
+const BrandOnboarding = lazy(() => import("@/features/brand/BrandOnboarding"));
+const BrandProfile = lazy(() => import("@/features/brand/BrandProfile"));
 
 const soon = (title: string, body: string): ReactNode => <Upcoming title={title} body={body} />;
 
@@ -30,18 +39,22 @@ export default function App() {
           <Route index element={<CreatorHome />} />
           <Route path="roadmap" element={<CreatorRoadmap />} />
           <Route path="money" element={<CreatorMoney />} />
-          <Route path="opportunities" element={soon("Opportunities", "The consent-based marketplace arrives in Phase 3.")} />
+          <Route path="opportunities" element={<CreatorOpportunities />} />
           <Route path="deals" element={soon("Deals", "The deal rail arrives in Phase 4.")} />
           <Route path="kit" element={soon("Media kit and link-in-bio", "Arrives in Phase 4.")} />
-          <Route path="privacy" element={soon("Privacy and consent", "The consent ledger arrives in Phase 3.")} />
+          <Route path="privacy" element={<CreatorPrivacy />} />
         </Route>
 
+        <Route path="/brand/onboarding" element={<BrandOnboarding />} />
         <Route path="/brand" element={<BrandShell />}>
-          <Route index element={soon("Overview", "Campaigns, escrow and deals by stage arrive in Phase 3.")} />
-          <Route path="campaigns" element={soon("Campaigns", "Arrives in Phase 3.")} />
-          <Route path="campaigns/new" element={soon("New campaign", "Arrives in Phase 3.")} />
-          <Route path="deals" element={soon("Deals", "Arrives in Phase 4.")} />
-          <Route path="profile" element={soon("Brand profile", "Arrives in Phase 3.")} />
+          <Route index element={<BrandHome />} />
+          <Route path="campaigns" element={<BrandCampaigns />} />
+          <Route path="campaigns/new" element={<BrandNewCampaign />} />
+          <Route path="campaigns/:id" element={<BrandCampaign />} />
+          <Route path="creators/:id" element={<BrandCreator />} />
+          <Route path="deals" element={soon("Deals", "The deal rail arrives in Phase 4.")} />
+          <Route path="deals/:id" element={soon("Deal", "The deal rail arrives in Phase 4.")} />
+          <Route path="profile" element={<BrandProfile />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

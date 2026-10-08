@@ -91,14 +91,24 @@ def terms_adjustment(terms: dict | None) -> tuple[float, float, list[str]]:
     return units, uplift, notes
 
 
+DELIVERABLE_NAMES = {
+    "reel": ("reel", "reels"),
+    "short": ("short", "shorts"),
+    "story": ("story", "stories"),
+    "carousel": ("carousel", "carousels"),
+    "link_in_bio": ("link in bio", "links in bio"),
+    "live": ("live session", "live sessions"),
+}
+
+
 def deliverables_label(terms: dict | None) -> str:
+    """[{reel, 1}, {story, 2}] -> '1 reel + 2 stories'"""
     ds = (terms or {}).get("deliverables") or [{"kind": "reel", "count": 1}]
-    names = {"reel": "reel", "story": "story", "carousel": "carousel", "link_in_bio": "link in bio", "short": "short", "live": "live"}
     parts = []
     for d in ds:
         n = d.get("count", 1)
-        name = names.get(d["kind"], d["kind"])
-        parts.append(f"{n} {name}{'' if n == 1 or d['kind'] == 'link_in_bio' else ('ies' if name.endswith('y') else 's')}".replace("storys", "stories"))
+        one, many = DELIVERABLE_NAMES.get(d["kind"], (d["kind"], d["kind"] + "s"))
+        parts.append(f"{n} {one if n == 1 else many}")
     return " + ".join(parts)
 
 

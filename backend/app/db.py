@@ -24,6 +24,7 @@ COLLECTIONS = [
     "deals",
     "plans",
     "invoices",
+    "applications",
     "notifications",
     "ai_cache",
 ]
