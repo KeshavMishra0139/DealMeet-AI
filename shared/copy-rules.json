@@ -1,0 +1,10 @@
+{
+  "description": "Words and phrases that must never appear in product copy. JodiDar AI gives estimates with assumptions, never promises.",
+  "banned": [
+    { "pattern": "\\bguarantee(s|d)?\\b", "why": "We never guarantee income, followers or results." },
+    { "pattern": "\\bgo(es|ing)?\\s+viral\\b", "why": "No virality promises." },
+    { "pattern": "\\bviral\\b", "why": "No virality promises." },
+    { "pattern": "\\bovernight\\b", "why": "No overnight-success framing." },
+    { "pattern": "100\\s?%", "why": "No absolute certainty claims." }
+  ]
+}

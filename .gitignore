@@ -1,0 +1,28 @@
+# deps
+node_modules/
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# build
+frontend/dist/
+frontend/tsconfig*.tsbuildinfo
+*.tsbuildinfo
+
+# env and local state
+.env
+.env.local
+backend/.cache/
+backend/.deps-stamp
+.deps-stamp
+
+# qa output (screenshots are regenerated on demand)
+qa/shots/
+qa/report/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
