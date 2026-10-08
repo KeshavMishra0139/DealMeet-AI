@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date
 from statistics import median
 from typing import Iterable, Literal
 
@@ -45,6 +46,12 @@ def short(v: float, digits: int = 1) -> str:
     if a >= 1e3:
         return f"{sign}{f(a / 1e3)}K"
     return f"{sign}{int(round(a))}"
+
+
+def day_month(d: date | str) -> str:
+    """'3 Oct'. Built by hand because strftime's '%-d' (no leading zero) is not supported on Windows."""
+    d = date.fromisoformat(d) if isinstance(d, str) else d
+    return f"{d.day} {d.strftime('%b')}"
 
 
 def inr(v: float) -> str:
