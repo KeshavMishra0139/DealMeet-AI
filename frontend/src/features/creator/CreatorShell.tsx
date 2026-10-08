@@ -74,7 +74,7 @@ function Studio() {
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-line bg-[var(--bg)]/60 px-3 py-5 backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-line bg-[var(--bg)]/85 px-3 py-5 lg:flex">
         <Link to="/" className="mx-2 rounded-lg" aria-label="JodiDar AI home">
           <Wordmark />
         </Link>
@@ -91,7 +91,7 @@ function Studio() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-[var(--bg)]/70 px-4 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-[var(--bg)]/92 px-4 lg:hidden">
         <Link to={embedded ? "/creator" : "/"} aria-label="JodiDar AI home" className="rounded-lg">
           <Wordmark />
         </Link>
@@ -121,7 +121,7 @@ function Studio() {
       {/* Mobile bottom tabs */}
       <nav
         aria-label="Creator Studio"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[var(--bg)]/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[var(--bg)]/95 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5">
           {PRIMARY.map((item) => (

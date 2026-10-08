@@ -4,6 +4,7 @@ import { Environment, Float, Lightformer, MeshDistortMaterial, RoundedBox } from
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { FrameCap, useAdaptiveQuality } from "./perf";
 
 const VIOLET = "#7C3AED";
 const MAGENTA = "#DB2777";
@@ -19,7 +20,7 @@ function Core({ still }: { still: boolean }) {
   return (
     <Float speed={still ? 0 : 1.4} rotationIntensity={0.4} floatIntensity={0.8}>
       <mesh ref={mesh}>
-        <sphereGeometry args={[1, 96, 96]} />
+        <sphereGeometry args={[1, 64, 64]} />
         <MeshDistortMaterial
           color={VIOLET}
           distort={still ? 0.25 : 0.32}
@@ -47,7 +48,7 @@ function OrbitCard({ angle, radius, color, tilt, still }: { angle: number; radiu
   return (
     <group ref={group}>
       <RoundedBox args={[0.84, 0.53, 0.05]} radius={0.07} smoothness={4}>
-        <meshPhysicalMaterial color={color} roughness={0.25} metalness={0.05} clearcoat={0.8} transparent opacity={0.92} />
+        <meshStandardMaterial color={color} roughness={0.25} metalness={0.05} transparent opacity={0.92} />
       </RoundedBox>
       {/* A "fit bar" printed on the card */}
       <mesh position={[-0.1, -0.1, 0.03]}>
@@ -99,11 +100,14 @@ function Rig({ still, children }: { still: boolean; children: React.ReactNode })
   return <group ref={group}>{children}</group>;
 }
 
-export default function HeroOrbit({ active, still }: { active: boolean; still: boolean }) {
+export default function HeroOrbit({ active, still: reduced }: { active: boolean; still: boolean }) {
+  // An ambient animation needs no more than 30 frames a second; a slow device gets a still frame.
+  const { degraded, monitor } = useAdaptiveQuality();
+  const still = reduced || degraded;
   return (
     <Canvas
-      frameloop={still ? "demand" : active ? "always" : "never"}
-      dpr={[1, 1.75]}
+      frameloop={still ? "demand" : active ? "demand" : "never"}
+      dpr={degraded ? 1 : [1, 1.25]}
       camera={{ position: [0, 0.2, 8.6], fov: 36 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent" }}
@@ -111,6 +115,8 @@ export default function HeroOrbit({ active, still }: { active: boolean; still: b
       eventSource={document.getElementById("root") ?? undefined}
       eventPrefix="client"
     >
+      <FrameCap fps={30} on={active && !still} />
+      {!reduced && monitor([20, 30])}
       <ambientLight intensity={0.35} />
       <directionalLight position={[3, 4, 5]} intensity={1.3} />
       <pointLight position={[-4, -1, 2]} intensity={18} color={MAGENTA} />
@@ -127,7 +133,7 @@ export default function HeroOrbit({ active, still }: { active: boolean; still: b
         <Coins still={still} />
       </Rig>
       {/* Studio reflections built from light panels: no downloaded HDR, works offline. */}
-      <Environment resolution={128}>
+      <Environment resolution={64}>
         <Lightformer form="rect" intensity={2.2} color="#ffffff" position={[0, 3, 4]} scale={[6, 2, 1]} />
         <Lightformer form="ring" intensity={3} color={MAGENTA} position={[-4, 0, 2]} scale={2.5} />
         <Lightformer form="rect" intensity={2} color={ORANGE} position={[4, -2, 1]} scale={[3, 3, 1]} />

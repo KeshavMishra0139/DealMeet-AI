@@ -85,7 +85,7 @@ export function DialogContent({
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className={cn(themeClass(), "fixed inset-0 z-50 bg-black/55 backdrop-blur-sm")} />
+      <DialogPrimitive.Overlay className={cn(themeClass(), "fixed inset-0 z-50 bg-black/65")} />
       <DialogPrimitive.Content
         className={cn(
           themeClass(),

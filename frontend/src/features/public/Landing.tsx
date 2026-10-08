@@ -44,7 +44,7 @@ export default function Landing() {
         <section aria-labelledby="pitch" className="relative pt-4 sm:pt-12 lg:pt-16">
           <motion.p
             {...rise(0)}
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2 backdrop-blur"
+            className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2"
           >
             <span className="size-1.5 rounded-full bg-signature" aria-hidden />
             Creator monetisation and brand opportunity engine
@@ -104,7 +104,7 @@ export default function Landing() {
                 body: "Brands fund escrow before a post goes live. Collective deals split payouts automatically over UPI.",
               },
             ].map((p) => (
-              <StaggerItem key={p.title} className="bg-[var(--bg)]/80 p-6 backdrop-blur">
+              <StaggerItem key={p.title} className="bg-[var(--bg)]/80 p-6">
                 <p.icon className="size-5 text-accent" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold">{p.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted">{p.body}</p>
@@ -132,7 +132,7 @@ function CreatorEntry() {
   return (
     <Link
       to="/login?role=creator"
-      className="group relative block h-full overflow-hidden rounded-[28px] border border-line-strong bg-surface p-5 backdrop-blur-xl transition-[transform,border-color] duration-300 ease-[var(--ease-soft)] hover:-translate-y-1 hover:border-accent/50 sm:p-7"
+      className="group relative block h-full overflow-hidden rounded-[28px] border border-line-strong bg-surface p-5 transition-[transform,border-color] duration-300 ease-[var(--ease-soft)] hover:-translate-y-1 hover:border-accent/50 sm:p-7"
     >
       <div
         aria-hidden

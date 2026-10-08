@@ -133,7 +133,7 @@ export default function DealFlow3D({ stages, active, still }: { stages: FlowStag
   return (
     <Canvas
       frameloop={still ? "demand" : active ? "always" : "never"}
-      dpr={[1, 1.75]}
+      dpr={[1, 1.25]}
       camera={{ position: [0, 0.4, 7], fov: 34 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}

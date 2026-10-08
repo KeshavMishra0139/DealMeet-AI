@@ -165,7 +165,7 @@ export default function MatchMap3D({
   return (
     <Canvas
       frameloop={still ? "demand" : active ? "always" : "never"}
-      dpr={[1, 1.75]}
+      dpr={[1, 1.25]}
       camera={{ position: [3.4, 3.1, 5.6], fov: 42 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       style={{ background: "transparent", touchAction: "pan-y" }}

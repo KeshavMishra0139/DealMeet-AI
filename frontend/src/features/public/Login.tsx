@@ -98,7 +98,7 @@ export default function Login() {
                   onClick={() => login.mutate(p)}
                   disabled={login.isPending}
                   className={cn(
-                    "group flex w-full items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 text-left backdrop-blur transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-accent/60 disabled:opacity-70",
+                    "group flex w-full items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-accent/60 disabled:opacity-70",
                     isNew && "border-dashed",
                   )}
                 >
