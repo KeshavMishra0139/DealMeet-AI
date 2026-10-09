@@ -76,6 +76,7 @@ export interface CollectiveView {
   funded: boolean;
   escrow: { mode: string; ref: string; funded_at: string } | null;
   paid_out: number;
+  refunded: number;
   members: {
     creator_id: string;
     name: string;

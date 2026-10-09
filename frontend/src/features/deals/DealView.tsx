@@ -391,7 +391,7 @@ function SignDialog({ deal, role, action, onClose, onSubmit, pending }: { deal: 
           <Label htmlFor="sig-name">Type your full name to sign</Label>
           <Input id="sig-name" value={name} onChange={(e) => setName(e.target.value)} className="font-display italic" />
         </div>
-        <p className="mt-2 text-xs text-muted">Your typed name, the time and this device are recorded with the contract.</p>
+        <p className="mt-2 text-xs text-muted">Your typed name and the time are recorded with the contract.</p>
         <Button variant="primary" size="lg" className="mt-5 w-full" disabled={name.trim().length < 2} loading={pending} onClick={() => onSubmit(name.trim())}>
           <FileSignature aria-hidden /> {action.label}
         </Button>

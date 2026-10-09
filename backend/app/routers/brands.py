@@ -17,6 +17,7 @@ from ..engines.trust import trust_score
 from ..seed.catalog import CITIES, LANGS, NICHES
 from ..services import cache
 from ..services import consent as cs
+from ..services.deals import auto_release_due
 from ..services.views import audience_stage
 
 router = APIRouter(prefix="/api", tags=["brands"])
@@ -94,7 +95,10 @@ def console(brand_id: str):
         if d["stage"] == "live":
             due = d.get("verify_due")
             late = due and due < today().isoformat()
-            needs.append({"deal_id": d["_id"], "kind": "confirm", "text": f"Confirm {who}'s post", "detail": f"{inr(d['amount'])} releases from escrow when you confirm." + (" Overdue; auto-releases in 2 days." if late else ""), "urgent": bool(late)})
+            release = auto_release_due(d)
+            left = (release - today()).days if release else 0
+            overdue = f" Overdue; auto-releases in {left} day{'s' if left != 1 else ''}." if late else ""
+            needs.append({"deal_id": d["_id"], "kind": "confirm", "text": f"Confirm {who}'s post", "detail": f"{inr(d['amount'])} releases from escrow when you confirm.{overdue}", "urgent": bool(late)})
         elif d["stage"] == "contract" and not (d.get("contract") or {}).get("signed_by_brand"):
             needs.append({"deal_id": d["_id"], "kind": "sign", "text": f"Sign {who}'s contract", "detail": inr(d["amount"]), "urgent": False})
         elif d["stage"] == "contract" and (d.get("contract") or {}).get("signed_by_creator") and d.get("escrow") is None:
@@ -243,7 +247,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
     cs.log_view(creator_id, brand_id, scopes)
     listing = db.listings.find_one({"_id": listing_id}) if listing_id else None
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else None
-    fp = fair_price(c, brand, terms)
+    fp = fair_price(c, brand, terms, scopes=scopes)
     fit = listing_fit(c, listing, brand) if listing else None
     stats = None
     if scopes["stats"]:
@@ -281,7 +285,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
         "scopes": scopes,
         "scope_source": cs.source_for(creator_id, brand_id),
         "scope_labels": cs.SCOPE_LABELS,
-        "fit": {"score": fit["score"], "reasons": reasons, "cautions": fit["cautions"]} if fit else None,
+        "fit": {"score": fit["score"], "reasons": reasons, "cautions": brand_matching.redact_cautions(fit["cautions"], scopes)} if fit else None,
         "fair": {
             "range": fp["range"],
             "total": fp["total"],

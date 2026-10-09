@@ -53,11 +53,12 @@ export default function CollectiveDetail() {
         {c.funded ? (
           <p className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="size-4 text-success" aria-hidden /> Escrow funded · {c.escrow?.ref}. Members move to posting as soon as they accept.
+            {c.refunded > 0 && <span className="text-fg-2">{inr(c.refunded)} from declined shares returned to you.</span>}
           </p>
         ) : (
           <>
             <p className="flex-1 text-sm">
-              <span className="font-semibold">Fund once for the whole pack.</span> <span className="text-fg-2">Unaccepted shares are refunded.</span>
+              <span className="font-semibold">Fund once for the whole pack.</span> <span className="text-fg-2">Any share a creator declines comes back to you.</span>
             </p>
             <Button variant="primary" onClick={() => setPay(true)}>
               <Lock aria-hidden /> Fund escrow {inr(c.total)}

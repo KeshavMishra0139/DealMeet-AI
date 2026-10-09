@@ -94,6 +94,7 @@ def by_topic(c: dict) -> list[dict]:
 def fields_simulated(c: dict, *paths: str) -> list[str]:
     """Human labels for any of the given fields that are simulated."""
     labels = {
+        "views": "views",
         "saves": "saves",
         "shares": "shares",
         "likes": "likes",

@@ -123,7 +123,7 @@ def pipeline(c: dict) -> dict:
                         "kind": "verify_late",
                         "deal_id": d["_id"],
                         "text": f"{b.get('name', 'The brand')} is {days} day{'s' if days != 1 else ''} late confirming your post",
-                        "detail": f"{inr(d['amount'])} is safe in escrow. We've nudged them; it auto-releases to you in {left} day{'s' if left != 1 else ''}.",
+                        "detail": f"{inr(d['amount'])} is safe in escrow. Their console flags your post as overdue, and it auto-releases to you in {left} day{'s' if left != 1 else ''}.",
                         "hi": hindi.alert("verify_late", brand=b.get("name"), days=days, left=left, amount=d["amount"]),
                     }
                 )

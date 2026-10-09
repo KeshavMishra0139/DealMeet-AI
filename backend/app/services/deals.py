@@ -450,6 +450,8 @@ def collective_view(collective_id: str) -> dict:
         "funded": bool(col.get("funded")),
         "escrow": col.get("escrow"),
         "paid_out": sum(m["price"] for m in members if m["paid"]),
+        # The whole pack is held in escrow; a member who declines has their share returned to the brand.
+        "refunded": sum(m["price"] for m in members if m["stage"] == "declined") if col.get("funded") else 0,
         "members": members,
         "stages": stages,
         "created_at": col.get("created_at"),

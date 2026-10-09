@@ -1,6 +1,8 @@
 """How well a creator's audience fits a brand (or other lister), with reasons."""
 from __future__ import annotations
 
+import re
+
 from ..seed.catalog import LANGS, NICHES
 from . import metrics
 from .common import clamp
@@ -19,6 +21,44 @@ REGION_ALIASES = {
 def _region(c: dict) -> str | None:
     r = c.get("region")
     return REGION_ALIASES.get(r, r)
+
+
+# Without the demographics scope a brand keeps the conclusion but not the numbers.
+# Reasons and cautions are rewritten separately: the same age sentence is a reason
+# at 60% or more and a caution below that.
+GENERIC_REASONS = [
+    (re.compile(r"of the audience is in the target ages"), "Audience ages match your target"),
+    (re.compile(r"of the audience speaks"), "Audience speaks your languages"),
+    (re.compile(r"^Audience concentrated in"), "Audience is in your target regions"),
+    (re.compile(r"women, matching the target"), "Audience matches your gender target"),
+]
+GENERIC_CAUTIONS = [
+    (re.compile(r"of the audience is in the target ages"), "Audience ages only partly match your target"),
+    (re.compile(r"of the audience speaks"), "Much of the audience speaks other languages"),
+]
+
+
+def _generic(texts: list[str], scopes: dict, rules: list) -> list[str]:
+    if scopes.get("demographics"):
+        return texts
+    out = []
+    for t in texts:
+        for rx, generic in rules:
+            if rx.search(t):
+                t = generic
+                break
+        out.append(t)
+    return out
+
+
+def redact(reasons: list[str], scopes: dict) -> list[str]:
+    """Fit reasons as a brand may see them under its consent scopes."""
+    return _generic(reasons, scopes, GENERIC_REASONS)
+
+
+def redact_cautions(cautions: list[str], scopes: dict) -> list[str]:
+    """Fit cautions as a brand may see them under its consent scopes."""
+    return _generic(cautions, scopes, GENERIC_CAUTIONS)
 
 
 def pct_text(pct: int) -> str:

@@ -171,7 +171,7 @@ def invoice_action(invoice_id: str, body: InvoiceAction):
     if not inv:
         raise HTTPException(404, "Invoice not found")
     if body.action == "remind":
-        db.invoices.update_one({"_id": invoice_id}, {"$push": {"reminders": {"at": now_iso(), "channel": "email with invoice PDF"}}})
+        db.invoices.update_one({"_id": invoice_id}, {"$push": {"reminders": {"at": now_iso(), "channel": "logged"}}})
     else:
         db.invoices.update_one({"_id": invoice_id}, {"$set": {"status": "paid", "paid_at": now_iso()}})
     return {"ok": True}
