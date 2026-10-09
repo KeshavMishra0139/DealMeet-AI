@@ -66,7 +66,7 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
   const [deliverable, setDeliverable] = useState<"reel" | "reel_stories" | "bundle">("reel");
   const [message, setMessage] = useState("");
   const book = useMutation({
-    mutationFn: () => post<{ message: string }>(`/public/${kit.handle}/book`, { brand_name: brand, email, budget: Number(budget.replace(/[^\d]/g, "")), deliverable, message: message || null }),
+    mutationFn: () => post<{ message: string; track: string }>(`/public/${kit.handle}/book`, { brand_name: brand, email, budget: Number(budget.replace(/[^\d]/g, "")), deliverable, message: message || null }),
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,9 +75,15 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
           <div className="text-center">
             <p className="font-display text-lg font-semibold">Request sent</p>
             <p className="mt-1 text-sm text-fg-2">{book.data.message}</p>
-            <Button className="mt-5" variant="outline" onClick={() => onOpenChange(false)}>
-              Done
-            </Button>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {/* A full page load, so the console opens as the guest brand (?as= is read on load). */}
+              <Button asChild variant="primary">
+                <a href={book.data.track}>Follow this booking</a>
+              </Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Done
+              </Button>
+            </div>
           </div>
         ) : (
           <form

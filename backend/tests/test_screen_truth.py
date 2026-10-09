@@ -117,3 +117,60 @@ def test_onboarding_sample_insights_are_labelled_simulated(client, db):
     typed = client.post("/api/creators", json={**body, "name": "Typed Creator", "followers": 4200, "connected": {}}).json()["id"]
     t = db.creators.find_one({"_id": typed})
     assert "followers" not in t["provenance"] and t["provenance"]["audience"] == "simulated"
+
+
+def test_trust_filter_reasons_and_tip_name_the_real_cause(db):
+    from app.engines.collective import build
+
+    listing = db.listings.find_one({"_id": "lst_senpai_collective"})
+    brand = db.brands.find_one({"_id": listing["owner_id"]})
+    strict = build(listing, brand, budget=80_000, trust_min=80)
+    by_trust = [e for e in strict["excluded"] if e["reason"].startswith("Trust")]
+    assert by_trust
+    for e in by_trust:
+        score = int(re.match(r"Trust (\d+)", e["reason"]).group(1))
+        # A decent score only misses the brand's higher bar: no warning sign is quoted.
+        assert (":" in e["reason"]) == (score < 60), e
+    if strict["size"] < 10:
+        assert any("lower the trust minimum" in n for n in strict["notes"])
+    default = build(listing, brand, budget=80_000)
+    assert not any("lower the trust minimum" in n for n in default["notes"])
+
+
+def test_new_brands_are_not_marked_verified(client, db):
+    body = {"name": "Test Brand", "category": "Snacks", "description": "", "niches": ["food"], "ages": ["18-24"], "gender": "any",
+            "languages": ["hi"], "cities": [], "budget_monthly": 50_000, "goal": "Sales"}
+    r = client.post("/api/brands", json=body)
+    assert r.status_code == 200, r.text
+    assert db.brands.find_one({"_id": r.json()["id"]})["verified"] is False
+
+
+def test_contract_text_names_no_policy_that_does_not_exist(client, db):
+    d = client.get("/api/deals/dl_a_pixelforge?role=creator").json()
+    terms = " ".join(d["contract"]["terms"])
+    assert "refund policy" not in terms and "until the post is verified or auto-released" in terms
+
+
+def test_link_in_bio_guest_can_sign_and_pay(client, db):
+    r = client.post("/api/public/creator.b/book", json={"brand_name": "Guest Co", "email": "a@b.co", "budget": 2000}).json()
+    deal_id = re.search(r"/brand/deals/(dl_\w+)\?as=(br_\w+)", r["track"]).group(1)
+    assert client.post(f"/api/deals/{deal_id}/action", json={"role": "creator", "action": "accept"}).status_code == 200
+    assert client.post(f"/api/deals/{deal_id}/action", json={"role": "brand", "action": "sign"}).status_code == 200
+    paid = client.post(f"/api/deals/{deal_id}/pay").json()
+    assert paid["deal"]["stage"] == "escrow_funded"
+
+
+def test_fictional_seed_data_is_never_high_confidence(client, db):
+    for cid in ("cr_a", "cr_b"):
+        fair = client.get(f"/api/creators/{cid}/money").json()["fair"]
+        assert fair["estimate"]["confidence"] != "high", cid
+
+
+def test_caption_safety_flags_become_brand_safety_notes(client, db):
+    body = {"name": "Caption Creator", "niche": "fitness", "audience_stage": "1k_10k", "income_goal": 10000,
+            "languages": ["en"], "city": "Pune", "connected": {"instagram": True},
+            "captions": ["This drink will cure your back pain, permanent results", "Morning workout, no excuses"]}
+    cid = client.post("/api/creators", json=body).json()["id"]
+    assert "health_claims" in db.creators.find_one({"_id": cid})["content_flags"]
+    steps = client.get(f"/api/creators/{cid}/money").json()["fair"]["steps"]
+    assert any(s["key"] == "safety" and "health claims" in s["reason"].lower() for s in steps)

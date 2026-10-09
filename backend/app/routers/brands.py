@@ -436,7 +436,7 @@ def create_brand(body: BrandIn):
             "target": {"ages": body.ages, "gender": body.gender, "regions": regions, "cities": body.cities, "languages": body.languages},
             "budget_monthly": body.budget_monthly,
             "goal": body.goal,
-            "verified": True,
+            "verified": False,  # nothing checks a self-registered brand in this demo
             "created_at": now_iso(),
         }
     )

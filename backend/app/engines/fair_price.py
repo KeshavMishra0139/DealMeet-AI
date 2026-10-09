@@ -260,7 +260,7 @@ def fair_price(
     lo, hi = round_to(total * 0.97, 500 if total >= 5_000 else 50), round_to(total * 1.03, 500 if total >= 5_000 else 50)
     simulated_fields = sorted({x for s in steps for x in s.get("simulated_fields", [])})
     confidence = "medium" if real_views else "low"
-    if real_views and not simulated_fields and len(metrics.recent(c)) >= 6:
+    if real_views and not simulated_fields and len(metrics.recent(c)) >= 6 and metrics.prov(c, "reels.0.views") == "real":
         confidence = "high"
     fp = follower_price(c)
 

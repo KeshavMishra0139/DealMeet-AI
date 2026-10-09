@@ -24,6 +24,8 @@ export interface Brand {
   budget_monthly?: number;
   goal?: string;
   verified: boolean;
+  created_at?: string;
+  guest?: boolean;
 }
 
 const NAV = [

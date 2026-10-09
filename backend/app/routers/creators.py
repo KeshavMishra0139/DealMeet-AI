@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ..ai.regional import tag_captions
 from ..config import now_iso
 from ..db import get_db
-from ..engines import money_paths, next_step, roadmap
+from ..engines import brand_safety, money_paths, next_step, roadmap
 from ..engines.fair_price import fair_price
 from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
@@ -164,6 +164,7 @@ def create_creator(body: OnboardingIn):
     city = body.city if body.city in CITIES else "Mumbai"
     connected = bool(body.connected.get("instagram") or body.connected.get("youtube"))
     langs = body.languages
+    caption_tags = tag_captions(body.captions) if body.captions else None
     doc = {
         "_id": cid,
         "handle": _handle(body.name),
@@ -195,12 +196,13 @@ def create_creator(body: OnboardingIn):
         "inbound_channels": [],
         "skills": [],
         "expertise": body.expertise or None,
-        "content_flags": [],
+        # Safety flags found in the creator's own captions become brand-safety notes, with the fix suggested.
+        "content_flags": [f for f in (caption_tags or {}).get("summary", {}).get("flags", []) if f in brand_safety.FLAGS],
         "discoverable": body.discoverable,
         "consent_defaults": body.consent_defaults,
         "insights_connected": {"instagram": bool(body.connected.get("instagram")), "youtube": bool(body.connected.get("youtube"))},
         "insights_source": "mock_official_api" if connected else "typed",
-        "caption_tags": tag_captions(body.captions) if body.captions else None,
+        "caption_tags": caption_tags,
         "onboarded": True,
         "created_by": "onboarding",
         "created_at": now_iso(),
