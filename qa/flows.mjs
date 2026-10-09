@@ -31,10 +31,13 @@ async function step(name, fn) {
 }
 
 async function launch() {
+  // PW_CHROMIUM_PATH points at a Chromium installed outside Playwright, if any.
+  const executablePath = process.env.PW_CHROMIUM_PATH;
   try {
-    return await chromium.launch();
-  } catch {
-    return await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+    return await chromium.launch(executablePath ? { executablePath } : {});
+  } catch (e) {
+    console.error("Could not start Chromium. Run this once: npx playwright install chromium");
+    throw e;
   }
 }
 

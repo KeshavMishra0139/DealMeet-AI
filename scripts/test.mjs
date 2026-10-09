@@ -2,6 +2,7 @@
 // Runs every check that guards the demo: API tests (engines, copy rules,
 // no-scraping), web copy rules, and the TypeScript build.
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,11 @@ const steps = [
   ["Type check (web)", "npm", ["run", "typecheck"], join(root, "frontend")],
 ];
 
+if (!existsSync(venvPython) || !existsSync(join(root, "frontend", "node_modules"))) {
+  console.error("Dependencies aren't installed yet. Run `npm run setup` (or `make setup`) first.");
+  process.exit(1);
+}
+
 let failed = false;
 for (const [name, cmd, args, cwd] of steps) {
   console.log(`\n== ${name}`);
@@ -25,7 +31,7 @@ for (const [name, cmd, args, cwd] of steps) {
   const r = spawnSync(cmd, args, { cwd, stdio: "inherit", shell: isWin && cmd === "npm" });
   if (r.status !== 0) {
     failed = true;
-    console.error(`!! ${name} failed`);
+    console.error(`!! ${name} failed${r.error ? `: ${r.error.message}` : ""}`);
   }
 }
 process.exit(failed ? 1 : 0);

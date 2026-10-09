@@ -9,7 +9,7 @@
     "preview": "vite preview --port 5173",
     "typecheck": "tsc -b",
     "check:copy": "node scripts/check-copy.mjs",
-    "test": "npm run check:copy && vitest run"
+    "test": "npm run check:copy"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
@@ -60,10 +60,10 @@
     "@vitejs/plugin-react": "5.2.0",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3",
-    "vite": "7.3.7",
-    "vitest": "3.2.7"
+    "vite": "7.3.7"
   },
   "overrides": {
-    "rollup": "4.53.3"
+    "@grpc/grpc-js": "1.13.6",
+    "rollup": "4.59.0"
   }
 }

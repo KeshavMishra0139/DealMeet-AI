@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One command to run JodiDar AI locally: installs what's missing on first run,
 // then starts the API (FastAPI, :8000) and the web app (Vite, :5173) together.
-// Works on macOS, Linux and Windows with only Node 20+ and Python 3.10+.
+// Works on macOS, Linux and Windows with only Node 22.12+ (or 20.19+) and Python 3.10 to 3.14.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -25,6 +25,14 @@ const bold = c("1");
 
 function log(msg) {
   console.log(`${magenta("jodidar")} ${msg}`);
+}
+
+// Vite (the web dev server) needs Node 20.19+ or 22.12+; older versions crash after
+// the install, so say so up front.
+const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
+if (!((nodeMajor === 20 && nodeMinor >= 19) || (nodeMajor === 22 && nodeMinor >= 12) || nodeMajor > 22)) {
+  console.error(`Node ${process.versions.node} is too old for the web app (it needs 20.19+ or 22.12+). Install Node 22 LTS from nodejs.org and run again.`);
+  process.exit(1);
 }
 
 // The pinned API packages ship ready-made builds for Python 3.10 to 3.14 on Windows,
