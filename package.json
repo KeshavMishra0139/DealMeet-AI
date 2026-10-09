@@ -9,6 +9,7 @@
     "e2e": "npm install --no-audit --no-fund --silent && node qa/flows.mjs",
     "setup": "node scripts/dev.mjs --setup-only",
     "test": "node scripts/test.mjs",
+    "reset": "node -e \"fetch('http://localhost:8000/api/demo/reset',{method:'POST'}).then(r=>r.text()).then(console.log)\"",
     "shots": "npm install --no-audit --no-fund --silent && node qa/screenshots.mjs"
   },
   "devDependencies": {

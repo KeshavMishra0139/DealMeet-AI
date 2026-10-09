@@ -13,6 +13,8 @@ frontend/tsconfig*.tsbuildinfo
 # env and local state
 .env
 .env.local
+.env.*
+!.env.example
 backend/.cache/
 backend/.deps-stamp
 .deps-stamp

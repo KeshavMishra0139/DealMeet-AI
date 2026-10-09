@@ -64,10 +64,13 @@ const rules = JSON.parse(readFileSync(join(root, "shared", "copy-rules.json"), "
 const axePath = require.resolve("axe-core/axe.min.js");
 
 async function launch() {
+  // PW_CHROMIUM_PATH points at a Chromium installed outside Playwright, if any.
+  const executablePath = process.env.PW_CHROMIUM_PATH;
   try {
-    return await chromium.launch();
-  } catch {
-    return await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+    return await chromium.launch(executablePath ? { executablePath } : {});
+  } catch (e) {
+    console.error("Could not start Chromium. Run this once: npx playwright install chromium");
+    throw e;
   }
 }
 
@@ -124,3 +127,4 @@ mkdirSync(join(here, "report"), { recursive: true });
 writeFileSync(join(here, "report", "qa.json"), JSON.stringify(report, null, 2));
 const bad = report.filter((r) => r.copy.length || r.hScroll || r.axe.some((a) => ["critical", "serious"].includes(a.impact)));
 console.log(`\n${report.length} screenshots in qa/shots. ${bad.length} screen(s) need attention. Details: qa/report/qa.json`);
+if (bad.length) process.exitCode = 1;

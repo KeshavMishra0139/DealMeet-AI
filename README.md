@@ -10,7 +10,9 @@ A creator monetisation and brand opportunity engine, built by **Team TheVortex**
 
 ## Run it
 
-You need **Node 20+** and **Python 3.10 to 3.14** (3.13 recommended). Nothing else: no keys, no database, and no internet after the first install.
+You need **Node 22.12+** (20.19+ also works) and **Python 3.10 to 3.14** (3.13 recommended). Nothing else: no keys, no database, and no internet after the first install.
+
+On Windows, clone or unzip the project into a short folder such as `C:\JodiDar-AI`: the Python packages have long file paths, and Windows limits a path to 260 characters unless long paths are turned on.
 
 ```bash
 make dev        # or: npm run dev   (works on Windows too)
@@ -25,15 +27,16 @@ The first run creates a Python virtual environment and installs dependencies (a 
 | Live deal demo (phone + console) | http://localhost:5173/demo/live |
 | API health | http://localhost:8000/api/health |
 
-Other commands (run `make dev` first for the browser ones):
+Other commands. Each `make` command has an `npm run` twin for Windows. Run `make setup` or `make dev` once first to install dependencies; `e2e`, `shots` and `reset` also need the app running.
 
 ```bash
-make demo       # build the web app and serve everything from one port: http://localhost:8000
-make test       # API tests, copy rules on UI strings, type check
-make e2e        # click through 14 key journeys in a real browser
-make shots      # every screen at 390 px and 1440 px, plus an accessibility audit
+make setup      # or: npm run setup   install dependencies only
+make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
+make test       # or: npm test        API tests, copy rules on UI strings, type check
+make e2e        # or: npm run e2e     click through 14 key journeys in a real browser
+make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
-make reset      # restore the seeded demo data (the app also has a "Reset demo" button)
+make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
 ```
 
 ## Environment variables
@@ -44,7 +47,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | --- | --- | --- |
 | `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas | In-memory database (mongomock), seeded on start |
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** escrow orders and signature checks (`rzp_test_` keys only) | Simulated escrow and simulated UPI payouts |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow: orders and signature checks (`rzp_test_` keys only). UPI payouts to creators stay simulated either way | Simulated escrow |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google sign-in before choosing a demo profile | Demo login with a profile picker |
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
 
@@ -123,7 +126,7 @@ These stay out of the way until they matter:
 - **Overlap de-dup** in collectives.
 - **Spam and duplicate listings** hidden from creators.
 - **Payment-delay nudges**, auto-release after the verification window, and auto-invoices.
-- **Media kit PDF** and a `/c/:handle` link-in-bio page with "Book me".
+- **Media kit PDF** and a `/c/:handle` link-in-bio page where brands can book the creator.
 - **"Why?" popovers** on every number.
 - **EN/हिंदी toggle**.
 
@@ -192,11 +195,10 @@ Sign in at `/login` with no password: pick a profile.
 ## Data rules
 
 - **No scraping**, and no unauthorised platform access. Data comes only from official login (mocked here), what a creator types or uploads, and seeded mock data. `backend/tests/test_no_scraping.py` enforces this, and the QA scripts only ever visit localhost.
-- **No promises.** Every forecast is a range with assumptions and a confidence level, labelled "Estimate, not a promise". `shared/copy-rules.json` bans words like "guaranteed", "viral", "overnight" and "100%", in English and Hindi. The build fails if they appear in:
-  - UI copy (`frontend/scripts/check-copy.mjs`, which runs before every build);
-  - backend source strings;
-  - API responses for a sample of creators and brands (`backend/tests/test_copy_rules.py`);
-  - rendered screens (`qa/screenshots.mjs`).
+- **No promises.** Every forecast is a range with assumptions and a confidence level, labelled "Estimate, not a promise". `shared/copy-rules.json` bans words like "guaranteed", "viral", "overnight" and "100%", in English and Hindi. A check fails if they appear in:
+  - UI copy (`frontend/scripts/check-copy.mjs`, run by `make test` and before every build);
+  - backend source strings and API responses for a sample of creators and brands (`backend/tests/test_copy_rules.py`, run by `make test`);
+  - rendered screens (`qa/screenshots.mjs`, run by `make shots`).
 - **The reference creator stays anonymous.** Creator A has no name, photo, handle or city. Real values (followers, following, posts, the last 6 reels' views and dates, average likes and comments, best deal) carry a `real` provenance flag; the rest are `simulated` and marked in the UI. Every other profile, brand and listing is fictional, and no real brand logos are used.
 
 ## Accessibility
@@ -211,7 +213,7 @@ Sign in at `/login` with no password: pick a profile.
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 47 API tests (below), the copy rules on about 2,900 UI strings, and the TypeScript type check |
+| `make test` | 82 API tests (below), the copy rules on about 3,100 UI strings, and the TypeScript type check |
 | `make e2e` | 14 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
@@ -225,6 +227,8 @@ The API tests cover:
 - Hindi copy.
 - Copy rules on source strings and live responses.
 - The no-scraping check.
+- Serving the built web app from the API: content types, and requests that try to reach files outside the build.
+- Windows portability: date formatting and `.env` files saved by Windows tools.
 
 The e2e journeys:
 
