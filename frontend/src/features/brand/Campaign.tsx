@@ -61,6 +61,7 @@ export default function Campaign() {
               </Badge>
             ))}
             {l.usage_rights_days > 0 && <Badge size="sm">{l.usage_rights_days} days usage</Badge>}
+            {l.exclusivity_days > 0 && <Badge size="sm">{l.exclusivity_days} days exclusivity</Badge>}
             <Badge size="sm">{l.language_labels.join(", ")}</Badge>
             <Badge size="sm">{l.regions.join(", ")}</Badge>
           </div>

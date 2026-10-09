@@ -195,6 +195,7 @@ def book(handle: str, body: BookIn):
             "verified": False,
             "guest": True,
             "contact": body.email,
+            "created_at": now_iso(),
         }
     )
     deliverables = {
@@ -224,4 +225,10 @@ def book(handle: str, body: BookIn):
             "created_at": at,
         }
     )
-    return {"ok": True, "fair": fp["total"], "message": f"Sent to {c['name']}. They'll reply in the JodiDar app; payment is held in escrow."}
+    return {
+        "ok": True,
+        "fair": fp["total"],
+        "message": f"Sent to {c['name']}. They'll reply in the JodiDar app; payment is held in escrow.",
+        # The guest has no login yet, so this link opens the deal as their brand to sign and pay.
+        "track": f"/brand/deals/{did}?as={bid}",
+    }

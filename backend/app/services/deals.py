@@ -364,7 +364,7 @@ def contract_terms(d: dict, creator: dict, brand: dict) -> list[str]:
         t.append(f"The brand may use the post in paid ads for {d['usage_rights_days']} days.")
     if d.get("exclusivity_days"):
         t.append(f"No competing brand in the same category for {d['exclusivity_days']} days.")
-    t.append("Either side may cancel before escrow is funded at no cost. After funding, cancellation follows JodiDar's refund policy.")
+    t.append("Either side may cancel before escrow is funded at no cost. Once funded, the fee stays in escrow until the post is verified or auto-released to the creator.")
     return t
 
 

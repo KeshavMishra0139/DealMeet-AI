@@ -20,6 +20,11 @@ from .matching import listing_fit
 from .trust import trust_score
 
 OVERLAP_WEIGHT = 0.7
+TRUST_MIN = 60  # below this the trust score itself is a warning sign
+
+
+def _either(ways: list[str]) -> str:
+    return ways[0] if len(ways) == 1 else ", ".join(ways[:-1]) + (", or " if len(ways) > 2 else " or ") + ways[-1]
 
 
 def audience_overlap(a: dict, b: dict) -> float:
@@ -41,7 +46,7 @@ def build(
     budget: float | None = None,
     size_min: int = 10,
     size_max: int = 50,
-    trust_min: int = 60,
+    trust_min: int = TRUST_MIN,
     target_reach: float | None = None,
     must_include: list[str] | None = None,
 ) -> dict:
@@ -71,7 +76,9 @@ def build(
         fit = listing_fit(c, listing, brand)
         row = {"creator": c, "trust": t, "fit": fit}
         if t and t["score"] < trust_min:
-            excluded.append({"id": c["_id"], "name": c["name"], "reason": f"Trust {t['score']} is below {trust_min}: {t['reasons'][0].lower()}"})
+            # A low score comes with its warning signs; a decent one only misses the brand's own higher bar.
+            why = f": {t['reasons'][0].lower()}" if t["score"] < TRUST_MIN else ""
+            excluded.append({"id": c["_id"], "name": c["name"], "reason": f"Trust {t['score']} is below {trust_min}{why}"})
             continue
         if fit["score"] < 55:
             excluded.append({"id": c["_id"], "name": c["name"], "reason": f"Audience fit {fit['score']} is too low for this brief"})
@@ -155,11 +162,17 @@ def build(
         )
     dedup = [m for m in members if m["overlap"] >= 0.15]
     notes = []
+    low_trust = [e for e in excluded if e["reason"].startswith("Trust")]
     if len(members) < size_min:
-        notes.append(f"Only {len(members)} creators fit this brief within {inr(budget)}. Widen languages or regions, or raise the budget.")
+        ways = []
+        if trust_min > TRUST_MIN and low_trust:
+            ways.append(f"lower the trust minimum ({len(low_trust)} left out below {trust_min})")
+        if any(e["reason"] == "Doesn't fit in the remaining budget" for e in excluded):
+            ways.append("raise the budget")
+        ways.append("widen languages or regions")
+        notes.append(f"Only {len(members)} creators fit this brief within {inr(budget)}. To add more, {_either(ways)}.")
     if dedup:
         notes.append(f"Audience overlap reduced counted reach for {len(dedup)} creator{'s' if len(dedup) != 1 else ''}.")
-    low_trust = [e for e in excluded if e["reason"].startswith("Trust")]
     if low_trust:
         notes.append(f"{len(low_trust)} profile{'s' if len(low_trust) != 1 else ''} left out on trust signals.")
     return {
