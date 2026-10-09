@@ -10,7 +10,7 @@ from __future__ import annotations
 from ..seed.catalog import NICHES
 from . import brand_safety, metrics
 from .common import clamp, estimate, inp, inr, inr_full, nice_round, round_to, short, why
-from .matching import audience_fit
+from .matching import audience_fit, redact, redact_cautions
 from .trust import trust_score
 
 # Each adjustment is capped so no single factor can swing the price wildly.
@@ -112,7 +112,25 @@ def deliverables_label(terms: dict | None) -> str:
     return " + ".join(parts)
 
 
-def fair_price(c: dict, lister: dict | None = None, terms: dict | None = None, with_model: bool = True) -> dict:
+def fit_reason(fit: dict, scopes: dict | None = None) -> str:
+    """Reason for the audience-fit step. With a brand's consent scopes, audience
+    numbers the creator hasn't shared with that brand are left out."""
+    if fit["reasons"]:
+        notes = fit["reasons"] if scopes is None else redact(fit["reasons"], scopes)
+    else:
+        notes = fit["cautions"] if scopes is None else redact_cautions(fit["cautions"], scopes)
+    return " ".join([f"Fit {fit['score']}/100."] + (["; ".join(notes[:2]) + "."] if notes else []))
+
+
+def fair_price(
+    c: dict,
+    lister: dict | None = None,
+    terms: dict | None = None,
+    with_model: bool = True,
+    scopes: dict | None = None,
+) -> dict:
+    """Fair price for one creator and lister. Pass `scopes` when the result goes
+    to that brand, so its step reasons respect what the creator shared."""
     niche = NICHES[c["niche"]]
     f = factors(c, lister)
     adj = adjustments(f)
@@ -122,6 +140,7 @@ def fair_price(c: dict, lister: dict | None = None, terms: dict | None = None, w
     sim_ss = metrics.fields_simulated(c, "reels.saves", "reels.shares")
     sim_aud = metrics.fields_simulated(c, "audience")
     sim_trust = metrics.fields_simulated(c, "follower_history", "comment_insights")
+    sim_views = metrics.fields_simulated(c, "reels.views") if real_views else []
 
     steps = [
         {
@@ -135,7 +154,8 @@ def fair_price(c: dict, lister: dict | None = None, terms: dict | None = None, w
                 if real_views
                 else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
             ),
-            "simulated": False,
+            "simulated": bool(sim_views),
+            "simulated_fields": sim_views,
             "estimated": not real_views,
         }
     ]
@@ -171,9 +191,7 @@ def fair_price(c: dict, lister: dict | None = None, terms: dict | None = None, w
         sim_ss,
     )
     if lister:
-        fit = audience_fit(c, lister)
-        top = fit["reasons"][:2] or fit["cautions"][:2]
-        add("fit", f"Audience fit to {lister['name']}", f"Fit {fit['score']}/100. " + "; ".join(top) + ".", sim_aud)
+        add("fit", f"Audience fit to {lister['name']}", fit_reason(audience_fit(c, lister), scopes), sim_aud)
     else:
         add("fit", "Audience fit", "Assumes a brand whose audience matches yours well (fit 85/100).", sim_aud)
     add(

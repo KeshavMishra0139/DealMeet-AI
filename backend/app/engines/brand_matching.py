@@ -4,7 +4,6 @@ and only the fields each creator has consented to share with this brand."""
 from __future__ import annotations
 
 import math
-import re
 
 from ..db import get_db
 from ..seed.catalog import LANGS, NICHES
@@ -13,29 +12,8 @@ from ..services.views import audience_stage
 from . import brand_safety, metrics
 from .common import clamp
 from .fair_price import fair_price
-from .matching import listing_fit
+from .matching import listing_fit, redact, redact_cautions
 from .trust import trust_score
-
-GENERIC = [
-    (re.compile(r"of the audience is in the target ages"), "Audience ages match your target"),
-    (re.compile(r"of the audience speaks"), "Audience speaks your languages"),
-    (re.compile(r"^Audience concentrated in"), "Audience is in your target regions"),
-    (re.compile(r"women, matching the target"), "Audience matches your gender target"),
-]
-
-
-def redact(reasons: list[str], scopes: dict) -> list[str]:
-    """Without the demographics scope, keep the conclusion but drop the numbers."""
-    if scopes.get("demographics"):
-        return reasons
-    out = []
-    for r in reasons:
-        for rx, generic in GENERIC:
-            if rx.search(r):
-                r = generic
-                break
-        out.append(r)
-    return out
 
 
 def rank_creator(c: dict, listing: dict, brand: dict, scopes: dict) -> dict:
@@ -69,7 +47,7 @@ def rank_creator(c: dict, listing: dict, brand: dict, scopes: dict) -> dict:
         "fit": fit["score"],
         "rank": round(rank, 4),
         "reasons": redact(fit["reasons"], scopes)[:3],
-        "cautions": fit["cautions"][:2],
+        "cautions": redact_cautions(fit["cautions"], scopes)[:2],
         "trust": t,
         "safety": brand_safety.public(c),
         "fair": {"range": fp["range"], "total": fp["total"], "per_reel": fp["per_reel"], "deliverables": fp["deliverables"]},

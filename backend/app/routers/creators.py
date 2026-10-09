@@ -170,7 +170,7 @@ def create_creator(body: OnboardingIn):
         "name": body.name.strip(),
         "avatar_hue": rng.randint(0, 359),
         "is_reference": False,
-        "reference_note": "Your profile. Insights come from the official login you connected (demo sandbox)." if connected else "Your profile, from what you typed in onboarding.",
+        "reference_note": "Your profile. The demo sandbox login filled in sample insights, marked simulated." if connected else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.",
         "bio": f"{NICHES[body.niche]['label']} from {city}.",
         "niche": body.niche,
         "sub_niches": [],
@@ -207,6 +207,15 @@ def create_creator(body: OnboardingIn):
         "provenance": {},
         "provenance_default": "real",
     }
+    # What the creator typed is theirs. Everything the demo generates (the sandbox
+    # login's sample insights, the audience mix, counts derived from the follower
+    # band) is marked simulated, so the app labels it like Creator A's simulated fields.
+    sample = ["audience", "following", "posts"]
+    if body.followers is None and followers:
+        sample.append("followers")  # estimated from the audience stage
+    if connected:
+        sample += ["reels", "follower_history", "comment_insights", "avg_likes", "avg_comments"]
+    doc["provenance"] = {k: "simulated" for k in sample}
     if doc["reels"]:
         doc["posts"] = len(doc["reels"]) * 3
         doc["avg_likes"] = int(sum(r["likes"] for r in doc["reels"]) / len(doc["reels"]))

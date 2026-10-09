@@ -31,7 +31,7 @@ export default function Deals() {
     mutationFn: ({ invoice, action }: { invoice: string; action: "remind" | "mark_paid" }) => post(`/invoices/${invoice}`, { action }),
     onSuccess: (_, v) => {
       qc.invalidateQueries();
-      toast.success(v.action === "remind" ? "Reminder sent with the invoice attached" : "Marked as paid");
+      toast.success(v.action === "remind" ? "Reminder logged. Email isn't connected in this demo, so download the invoice PDF to send it." : "Marked as paid");
     },
   });
 
@@ -70,7 +70,7 @@ export default function Deals() {
                   <p className="text-xs text-muted">
                     {i.number} · due {shortDate(i.due)}
                     {i.status === "paid" ? " · paid" : i.days_late ? ` · ${i.days_late} days late` : ""}
-                    {i.reminders.length > 0 && ` · ${i.reminders.length} reminder${i.reminders.length > 1 ? "s" : ""} sent`}
+                    {i.reminders.length > 0 && ` · ${i.reminders.length} reminder${i.reminders.length > 1 ? "s" : ""} logged`}
                   </p>
                 </div>
                 <Button asChild size="sm" variant="ghost">
