@@ -32,6 +32,8 @@ GENERIC_REASONS = [
     (re.compile(r"^Audience concentrated in"), "Audience is in your target regions"),
     (re.compile(r"women, matching the target"), "Audience matches your gender target"),
 ]
+# Built from reel views, so it needs the stats scope rather than demographics.
+STATS_REASONS = re.compile(r"^Reels reach about")
 GENERIC_CAUTIONS = [
     (re.compile(r"of the audience is in the target ages"), "Audience ages only partly match your target"),
     (re.compile(r"of the audience speaks"), "Much of the audience speaks other languages"),
@@ -53,7 +55,8 @@ def _generic(texts: list[str], scopes: dict, rules: list) -> list[str]:
 
 def redact(reasons: list[str], scopes: dict) -> list[str]:
     """Fit reasons as a brand may see them under its consent scopes."""
-    return _generic(reasons, scopes, GENERIC_REASONS)
+    out = _generic(reasons, scopes, GENERIC_REASONS)
+    return out if scopes.get("stats") else [r for r in out if not STATS_REASONS.search(r)]
 
 
 def redact_cautions(cautions: list[str], scopes: dict) -> list[str]:

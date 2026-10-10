@@ -72,7 +72,7 @@ export interface CollectiveView {
   brand: { id: string; name: string };
   listing: { id: string; title: string };
   total: number;
-  combined_reach: number;
+  combined_reach: number | null;
   funded: boolean;
   escrow: { mode: string; ref: string; funded_at: string } | null;
   paid_out: number;

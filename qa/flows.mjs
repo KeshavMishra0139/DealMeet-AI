@@ -229,8 +229,13 @@ await step("3D: the reach chart and the match space draw with WebGL", async () =
   await desk.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
   const space = desk.locator("section[aria-labelledby=space]");
   await space.locator("canvas").waitFor();
-  const box = await space.locator("canvas").boundingBox();
-  if (!box || box.height < 300) throw new Error("Match space canvas too small");
+  // A canvas starts at the browser's default 150 px and is sized on its first frame, so give it a moment.
+  let height = 0;
+  for (let i = 0; i < 20 && height < 300; i++) {
+    height = (await space.locator("canvas").boundingBox())?.height ?? 0;
+    if (height < 300) await desk.waitForTimeout(250);
+  }
+  if (height < 300) throw new Error(`Match space canvas too small (${Math.round(height)} px)`);
 });
 
 await browser.close();

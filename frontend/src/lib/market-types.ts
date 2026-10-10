@@ -105,16 +105,20 @@ export interface CollectiveMember {
   niche_label: string;
   language: string;
   city: string;
-  followers: number;
-  reach: number;
-  effective_reach: number;
-  overlap: number;
+  audience_stage: string;
+  /** Reach, followers and engagement are null when the creator doesn't share stats with this brand. */
+  followers: number | null;
+  reach: number | null;
+  effective_reach: number | null;
+  /** Exact overlap only when both creators share demographics; otherwise just the level. */
+  overlap: number | null;
+  overlap_level: "High" | "Low";
   overlap_with: string | null;
   price: number;
   split: number;
   fit: number;
   trust: TrustInfo | null;
-  engagement: number;
+  engagement: number | null;
   opted_in: boolean;
 }
 
@@ -125,10 +129,11 @@ export interface Collective {
   size_target: number | null;
   total: number;
   remaining: number;
-  combined_reach: number;
-  raw_reach: number;
-  dedup_saved: number;
-  avg_engagement: number;
+  /** Pack totals are null unless every member shares stats with this brand. */
+  combined_reach: number | null;
+  raw_reach: number | null;
+  dedup_saved: number | null;
+  avg_engagement: number | null;
   cost_per_1k: number | null;
   trust_min: number;
   members: CollectiveMember[];

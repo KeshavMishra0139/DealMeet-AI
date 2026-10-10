@@ -33,7 +33,7 @@ export default function BrandDeals() {
                     <Users className="size-4 text-accent" aria-hidden /> {c.listing.title}
                   </p>
                   <p className="mt-1 text-xs text-muted">
-                    {c.members.length} creators · {count(c.combined_reach)} combined reach · {inr(c.total)}
+                    {c.members.length} creators{c.combined_reach != null && ` · ${count(c.combined_reach)} combined reach`} · {inr(c.total)}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Badge size="sm" variant={c.funded ? "success" : "warn"}>

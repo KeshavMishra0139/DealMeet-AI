@@ -174,3 +174,47 @@ def test_caption_safety_flags_become_brand_safety_notes(client, db):
     assert "health_claims" in db.creators.find_one({"_id": cid})["content_flags"]
     steps = client.get(f"/api/creators/{cid}/money").json()["fair"]["steps"]
     assert any(s["key"] == "safety" and "health claims" in s["reason"].lower() for s in steps)
+
+
+def _share_nothing(db):
+    db.consents.delete_many({})
+    db.creators.update_many({}, {"$set": {"consent_defaults": {"stats": False, "demographics": False, "rate_card": False}}})
+
+
+def test_collective_builder_respects_stats_and_demographics(client, db):
+    # Seed defaults: stats shared, demographics not. Exact overlaps need demographics from both creators.
+    pack = client.post("/api/listings/lst_senpai_collective/collective", json={}).json()
+    assert pack["combined_reach"] is not None
+    for m in pack["members"]:
+        assert m["reach"] is not None and m["overlap_level"] in ("High", "Low")
+        assert m["overlap"] is None, m["name"]
+    # Nothing shared: no member numbers and no pack totals a brand could subtract from.
+    _share_nothing(db)
+    pack = client.post("/api/listings/lst_senpai_collective/collective", json={}).json()
+    assert pack["members"]
+    for m in pack["members"]:
+        assert m["followers"] is None and m["reach"] is None and m["effective_reach"] is None and m["engagement"] is None
+        assert m["overlap"] is None and m["audience_stage"]
+    for k in ("combined_reach", "raw_reach", "dedup_saved", "avg_engagement", "cost_per_1k"):
+        assert pack[k] is None, k
+    assert "combined reach" not in pack["summary"]
+
+
+def test_reach_ratio_reason_needs_the_stats_scope(client, db):
+    client.post("/api/creators/cr_a/consents/br_senpai", json={"scopes": {"stats": False, "demographics": False, "rate_card": False}})
+    r = client.get("/api/brands/br_senpai/creators/cr_a?listing_id=lst_senpai_hoodie").json()
+    assert r["scopes"]["stats"] is False
+    assert not any("Reels reach" in x for x in r["fit"]["reasons"])
+    rows = matches(db.listings.find_one({"_id": "lst_senpai_hoodie"}), db.brands.find_one({"_id": "br_senpai"}))["items"]
+    a = next(x for x in rows if x["id"] == "cr_a")
+    assert not any("Reels reach" in x for x in a["reasons"])
+
+
+def test_public_kit_follows_the_creators_public_switches(client, db):
+    client.post("/api/creators/cr_a/kit", json={"stats": False, "demographics": False, "rates": False})
+    k = client.get("/api/public/creator.a").json()
+    assert k["stats"] is None and k["rates"] is None and k["from_rate"] is None
+    text = k["copy"]["headline"] + " " + k["copy"]["bio"]
+    assert "the follower count" not in text and "median" not in text
+    booked = client.post("/api/public/creator.a/book", json={"brand_name": "Guest Co", "email": "a@b.co", "budget": 9000}).json()
+    assert booked["fair"] is None

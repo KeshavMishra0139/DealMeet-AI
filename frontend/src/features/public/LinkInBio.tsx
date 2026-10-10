@@ -62,7 +62,7 @@ export default function LinkInBio() {
 function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [brand, setBrand] = useState("");
   const [email, setEmail] = useState("");
-  const [budget, setBudget] = useState(String(kit.from_rate));
+  const [budget, setBudget] = useState(kit.from_rate != null ? String(kit.from_rate) : "");
   const [deliverable, setDeliverable] = useState<"reel" | "reel_stories" | "bundle">("reel");
   const [message, setMessage] = useState("");
   const book = useMutation({
@@ -119,7 +119,7 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
             <div>
               <Label htmlFor="bk-budget">Budget (₹)</Label>
               <Input id="bk-budget" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value)} />
-              <p className="mt-1 text-xs text-muted">Rates start at {inr(kit.from_rate)} for one reel.</p>
+              {kit.from_rate != null && <p className="mt-1 text-xs text-muted">Rates start at {inr(kit.from_rate)} for one reel.</p>}
             </div>
             <div>
               <Label htmlFor="bk-msg">Brief (optional)</Label>

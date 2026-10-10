@@ -40,7 +40,7 @@ export default function CollectiveDetail() {
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">{c.listing.title}</h1>
           <p className="mt-1 text-sm text-fg-2">
-            {c.members.length} creators · {count(c.combined_reach)} combined reach · one escrow payment, automatic split
+            {c.members.length} creators{c.combined_reach != null && ` · ${count(c.combined_reach)} combined reach`} · one escrow payment, automatic split
           </p>
         </div>
         <div className="text-right">
