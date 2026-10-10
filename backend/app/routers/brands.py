@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -17,8 +17,10 @@ from ..engines.trust import trust_score
 from ..seed.catalog import CITIES, LANGS, NICHES
 from ..services import cache
 from ..services import consent as cs
-from ..services.deals import auto_release_due
+from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
+
+Short = Annotated[str, Field(max_length=60)]
 
 router = APIRouter(prefix="/api", tags=["brands"])
 
@@ -78,7 +80,7 @@ def _campaign_row(x: dict, brand: dict, deals: list[dict]) -> dict:
 def console(brand_id: str):
     db = get_db()
     brand = _brand(brand_id)
-    deals = list(db.deals.find({"brand_id": brand_id}))
+    deals = [sweep(d) for d in db.deals.find({"brand_id": brand_id})]
     creators = {c["_id"]: c for c in db.creators.find({}, {"name": 1, "handle": 1, "avatar_hue": 1, "is_reference": 1})}
     campaigns = [_campaign_row(x, brand, deals) for x in db.listings.find({"owner_id": brand_id})]
     stages = {s: {"count": 0, "amount": 0} for s in STAGES}
@@ -151,9 +153,9 @@ def campaigns(brand_id: str):
 class CampaignIn(BaseModel):
     title: str = Field(min_length=4, max_length=90)
     summary: str = Field(min_length=10, max_length=400)
-    niches: list[str] = Field(min_length=1)
-    languages: list[str] = Field(min_length=1)
-    regions: list[str] = ["Pan-India"]
+    niches: list[Short] = Field(min_length=1, max_length=12)
+    languages: list[Short] = Field(min_length=1, max_length=10)
+    regions: list[Short] = Field(default=["Pan-India"], max_length=8)
     collective: bool = False
     collective_size: int = Field(default=20, ge=10, le=50)
     budget_min: int | None = Field(default=None, ge=0)
@@ -163,8 +165,8 @@ class CampaignIn(BaseModel):
     stories: int = Field(default=0, ge=0, le=10)
     usage_rights_days: int = Field(default=0, ge=0, le=365)
     exclusivity_days: int = Field(default=0, ge=0, le=365)
-    min_followers: int = Field(default=0, ge=0)
-    deadline: str | None = None
+    min_followers: int = Field(default=0, ge=0, le=50_000_000)
+    deadline: str | None = Field(default=None, max_length=10)
 
 
 @router.post("/brands/{brand_id}/campaigns")
@@ -172,6 +174,8 @@ def create_campaign(brand_id: str, body: CampaignIn):
     _brand(brand_id)
     if any(n not in NICHES for n in body.niches):
         raise HTTPException(422, "Unknown niche")
+    if get_db().listings.count_documents({"owner_id": brand_id}) >= 20:
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     lid = f"lst_{brand_id[3:]}_{uuid.uuid4().hex[:6]}"
     deliverables = [{"kind": "reel", "count": body.reels}] + ([{"kind": "story", "count": body.stories}] if body.stories else [])
     budget = {"total": body.budget_total or 100_000} if body.collective else {"per_creator_min": body.budget_min or 5_000, "per_creator_max": body.budget_max or 25_000}
@@ -291,7 +295,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
             "total": fp["total"],
             "deliverables": fp["deliverables"],
             "steps": fp["steps"] if scopes["stats"] else None,
-            "follower_price": fp["follower_price"],
+            "follower_price": fp["follower_price"] if scopes["stats"] else None,  # it would reveal the follower count
             "model_check": fp.get("model_check"),
         },
         "stats": stats,
@@ -330,6 +334,8 @@ def send_offer(body: OfferIn):
     c = db.creators.find_one({"_id": body.creator_id})
     if not c or cs.scopes_for(c, body.brand_id) is None:
         raise HTTPException(404, "Creator not available")
+    if db.deals.count_documents({"brand_id": body.brand_id}) >= 50:
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     listing = db.listings.find_one({"_id": body.listing_id}) if body.listing_id else None
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else {"deliverables": [{"kind": "reel", "count": 1}]}
     fp = fair_price(c, brand, terms, with_model=False)
@@ -358,7 +364,9 @@ def send_offer(body: OfferIn):
 
 
 class BookIn(BaseModel):
-    member_ids: list[str] = Field(min_length=2, max_length=50)
+    member_ids: list[Short] = Field(min_length=2, max_length=50)
+    # The de-duplicated reach the builder showed; booking re-prices the chosen members as a fixed pack.
+    combined_reach: int | None = Field(default=None, ge=0)
 
 
 @router.post("/listings/{listing_id}/collective/book")
@@ -369,6 +377,10 @@ def book_collective(listing_id: str, body: BookIn):
     pack = collective.build(x, brand, must_include=body.member_ids, size_max=len(body.member_ids))
     members = [m for m in pack["members"] if m["id"] in body.member_ids]
     total = sum(m["price"] for m in members)
+    # Pack reach only when the brand may see every member's stats; never more than the raw sum.
+    visible = all(m["effective_reach"] is not None for m in members)
+    raw = sum(m["reach"] for m in members) if visible else 0
+    reach = min(body.combined_reach or raw, raw) if visible else None
     cid = f"co_{uuid.uuid4().hex[:8]}"
     at = now_iso()
     db.collectives.insert_one(
@@ -378,7 +390,7 @@ def book_collective(listing_id: str, body: BookIn):
             "brand_id": brand["_id"],
             "members": [{"creator_id": m["id"], "price": m["price"], "split": round(m["price"] / total, 4)} for m in members],
             "total": total,
-            "combined_reach": sum(m["effective_reach"] for m in members) if all(m["effective_reach"] is not None for m in members) else None,
+            "combined_reach": reach,
             "status": "offered",
             "created_at": at,
         }
@@ -410,18 +422,20 @@ class BrandIn(BaseModel):
     name: str = Field(min_length=2, max_length=60)
     category: str = Field(min_length=2, max_length=60)
     description: str = Field(default="", max_length=200)
-    niches: list[str] = Field(min_length=1)
-    ages: list[str] = Field(min_length=1)
+    niches: list[Short] = Field(min_length=1, max_length=12)
+    ages: list[Short] = Field(min_length=1, max_length=12)
     gender: Literal["any", "female", "male"] = "any"
-    cities: list[str] = []
-    languages: list[str] = Field(min_length=1)
+    cities: list[Short] = Field(default=[], max_length=30)
+    languages: list[Short] = Field(min_length=1, max_length=12)
     budget_monthly: int = Field(ge=5_000, le=50_000_000)
-    goal: str = "Awareness"
+    goal: str = Field(default="Awareness", max_length=40)
 
 
 @router.post("/brands")
 def create_brand(body: BrandIn):
     db = get_db()
+    if db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50:
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     bid = f"br_new_{uuid.uuid4().hex[:6]}"
     regions = sorted({CITIES[c][1] for c in body.cities if c in CITIES}) or ["North", "South", "East", "West", "Central", "Northeast"]
     db.brands.insert_one(

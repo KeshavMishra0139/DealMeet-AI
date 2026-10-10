@@ -94,7 +94,7 @@ export default function Onboarding() {
         languages: f.languages,
         city: f.city,
         expertise: f.expertise.trim() || null,
-        captions: f.captions.split("\n").map((s) => s.trim()).filter(Boolean),
+        captions: f.captions.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 8),
         connected: f.connected,
         discoverable: f.discoverable,
         consent_defaults: f.scopes,
@@ -319,8 +319,8 @@ export default function Onboarding() {
                 {step === 4 && (
                   <div className="mt-6 space-y-6">
                     <p className="text-[15px] text-fg-2">
-                      Optional. Connecting through the official login gives us your real reach. We never read accounts that haven't connected,
-                      and we never scrape.
+                      Optional. In this demo the sandbox login fills in sample insights, marked simulated. We never read accounts that haven't
+                      connected, and we never scrape.
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {(["instagram", "youtube"] as const).map((p) => {

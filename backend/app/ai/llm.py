@@ -10,7 +10,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
+import threading
+import time
 from pathlib import Path
 from typing import Callable, TypeVar
 
@@ -36,6 +39,20 @@ _RULES = [
     for r in json.loads((_ROOT / "shared" / "copy-rules.json").read_text(encoding="utf-8"))["banned"]
 ]
 _client = None
+# Live calls allowed per hour across all visitors; beyond that, templates are used.
+MAX_CALLS_PER_HOUR = int(os.getenv("AI_MAX_CALLS_PER_HOUR", "100") or 100)
+_calls: list[float] = []
+_calls_lock = threading.Lock()
+
+
+def _allow_call() -> bool:
+    now = time.monotonic()
+    with _calls_lock:
+        _calls[:] = [t for t in _calls if now - t < 3600]
+        if len(_calls) >= MAX_CALLS_PER_HOUR:
+            return False
+        _calls.append(now)
+        return True
 
 
 def _get_client():
@@ -85,6 +102,9 @@ def generate(
             return schema.model_validate(hit["data"]), "cache"
         except ValidationError:
             db.ai_cache.delete_one({"_id": key})
+    if not _allow_call():
+        log.info("AI %s: hourly limit reached; using template", task)
+        return fallback(), "template"
 
     try:
         import anthropic

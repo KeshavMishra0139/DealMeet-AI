@@ -24,7 +24,7 @@ const SCENARIOS = {
     brand: { path: "/brand/deals/dl_a_senpai", as: "br_senpai", name: "Senpai Supply Co." },
     steps: [
       { who: "phone", text: "The offer is flagged as below fair price. Tap Counter: the fair price and its reasons are filled in." },
-      { who: "console", text: "The counter arrives with the price breakdown. Accept it; both e-signatures land on the contract." },
+      { who: "console", text: "The counter arrives at the creator's fair price. Accept it; both e-signatures land on the contract." },
       { who: "console", text: "Fund escrow. Test mode is simulated; no real money moves." },
       { who: "phone", text: "Escrow is funded, so it's safe to post. Paste the reel link once it's live." },
       { who: "console", text: "Confirm the post. The payout goes out by UPI and the invoice is marked paid." },

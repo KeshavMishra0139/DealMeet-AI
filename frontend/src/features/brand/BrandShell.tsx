@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
+import { useSharedDemo } from "@/lib/shared-demo";
 import { useBrandId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -148,6 +149,7 @@ function Controls({ onDone }: { onDone?: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
+  const shared = useSharedDemo();
   return (
     <div className="space-y-0.5">
       <Button
@@ -176,6 +178,7 @@ function Controls({ onDone }: { onDone?: () => void }) {
       >
         {!resetting && <RotateCcw aria-hidden />} Reset demo
       </Button>
+      {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.</p>}
     </div>
   );
 }

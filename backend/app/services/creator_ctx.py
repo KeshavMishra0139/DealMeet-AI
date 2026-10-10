@@ -85,7 +85,10 @@ def rate_gap(c: dict, fair: dict) -> dict:
 
 def pipeline(c: dict) -> dict:
     db = get_db()
-    deals = list(db.deals.find({"creator_id": c["_id"]}))
+    from . import deals as rail
+
+    # Sweep first, so a post past its auto-release date shows as paid, not "releases in -2 days".
+    deals = [rail.sweep(d) for d in db.deals.find({"creator_id": c["_id"]})]
     brands = {b["_id"]: b for b in db.brands.find({})}
     offers, active, awaiting, alerts = [], [], [], []
     for d in deals:
@@ -136,7 +139,7 @@ def pipeline(c: dict) -> dict:
                     "kind": "invoice_late",
                     "invoice_id": inv["_id"],
                     "text": f"{inr(inv['amount'])} invoice is {days} days late",
-                    "detail": f"{inv['to']} was due to pay on {day_month(inv['due'])}. Send a reminder with the invoice attached.",
+                    "detail": f"{inv['to']} was due to pay on {day_month(inv['due'])}. Download the invoice PDF from Deals and send it to them.",
                     "hi": hindi.alert("invoice_late", amount=inv["amount"], days=days, to=inv["to"], due=day_month(inv["due"])),
                 }
             )

@@ -146,6 +146,7 @@ export default function Login() {
             <span>AI: {health.data.modes.ai}</span>
             <span>Payments: {health.data.modes.payments}</span>
             <span>Auth: {health.data.modes.auth}</span>
+            {health.data.shared_demo && <span className="w-full">Shared live demo: everyone sees the same data, and it resets automatically when idle.</span>}
           </footer>
         )}
       </div>

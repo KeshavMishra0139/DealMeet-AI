@@ -65,6 +65,7 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
   const [budget, setBudget] = useState(kit.from_rate != null ? String(kit.from_rate) : "");
   const [deliverable, setDeliverable] = useState<"reel" | "reel_stories" | "bundle">("reel");
   const [message, setMessage] = useState("");
+  const [budgetErr, setBudgetErr] = useState("");
   const book = useMutation({
     mutationFn: () => post<{ message: string; track: string }>(`/public/${kit.handle}/book`, { brand_name: brand, email, budget: Number(budget.replace(/[^\d]/g, "")), deliverable, message: message || null }),
   });
@@ -90,6 +91,11 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
+              if (Number(budget.replace(/[^\d]/g, "")) < 500) {
+                setBudgetErr("Enter a budget of at least ₹500.");
+                return;
+              }
+              setBudgetErr("");
               book.mutate();
             }}
           >
@@ -101,6 +107,7 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
               <div>
                 <Label htmlFor="bk-email">Work email</Label>
                 <Input id="bk-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                <p className="mt-1 text-xs text-muted">Demo: this email isn't stored or sent anywhere.</p>
               </div>
             </div>
             <div>
@@ -118,7 +125,12 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
             </div>
             <div>
               <Label htmlFor="bk-budget">Budget (₹)</Label>
-              <Input id="bk-budget" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              <Input id="bk-budget" inputMode="numeric" required placeholder="e.g. 10,000" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              {budgetErr && (
+                <p role="alert" className="mt-1 text-xs text-danger">
+                  {budgetErr}
+                </p>
+              )}
               {kit.from_rate != null && <p className="mt-1 text-xs text-muted">Rates start at {inr(kit.from_rate)} for one reel.</p>}
             </div>
             <div>

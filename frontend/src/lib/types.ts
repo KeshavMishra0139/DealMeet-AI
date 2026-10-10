@@ -37,6 +37,8 @@ export interface Health {
   status: string;
   today: string;
   modes: { db: string; ai: string; payments: string; auth: string };
+  /** True on a shared URL where the demo resets itself on a timer. */
+  shared_demo?: boolean;
 }
 
 export interface Reel {

@@ -16,7 +16,7 @@ from __future__ import annotations
 import mimetypes
 from pathlib import Path, PurePosixPath
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 # Windows: Python reads MIME types from the registry, where some installers set
@@ -73,4 +73,6 @@ def mount_spa(app: FastAPI, dist: Path) -> None:
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404, "Not found")
         return FileResponse(static_file(dist, path) or index)

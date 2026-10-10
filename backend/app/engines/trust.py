@@ -110,6 +110,8 @@ def trust_score(c: dict) -> dict | None:
         "level": level,
         "reasons": reasons,
         "method": "Isolation Forest over insights this creator connected via the official API",
+        # Inputs that are sample data (Creator A's follower history, sandbox logins).
+        "simulated": metrics.fields_simulated(c, "follower_history", "comment_insights", "reels.likes", "reels.comments"),
     }
 
 

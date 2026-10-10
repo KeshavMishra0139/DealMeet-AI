@@ -20,6 +20,7 @@ def health():
             "payments": "razorpay-test" if s.has_razorpay else "simulated",
             "auth": "firebase" if s.has_firebase else "demo",
         },
+        "shared_demo": s.demo_reset_minutes > 0,
     }
 
 

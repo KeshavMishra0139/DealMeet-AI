@@ -203,10 +203,14 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         d["counter"]["declined_at"] = now_iso()
         d["stage"] = "declined"
         _event(d, "declined", f"{brand.get('name')} declined the counter")
-    elif role == "brand" and action == "withdraw":
-        need(stage in ("offer", "contract") and not d.get("escrow"))
+    elif action == "withdraw":
+        # Before escrow is funded either side may cancel at no cost (contract term); the brand
+        # may also withdraw an offer. A collective's funding is managed for the whole pack.
+        cancel = stage == "contract" and not d.get("escrow") and (role == "creator" or d.get("kind") != "collective")
+        need((stage == "offer" and role == "brand") or cancel)
+        who = creator if role == "creator" else brand
         d["stage"] = "declined"
-        _event(d, "declined", f"{brand.get('name')} withdrew the offer")
+        _event(d, "declined", f"{who.get('name')} cancelled before escrow was funded" if stage == "contract" else f"{who.get('name')} withdrew the offer")
     elif action == "sign":
         need(stage == "contract")
         _ensure_contract(d)
@@ -259,6 +263,8 @@ def actions_for(d: dict, role: str) -> list[dict]:
             out.append({"id": "decline", "label": "Decline", "kind": "ghost"})
         elif s == "contract" and not c.get("signed_by_creator"):
             out = [{"id": "sign", "label": "E-sign contract", "kind": "primary"}]
+        if s == "contract" and not d.get("escrow"):
+            out.append({"id": "withdraw", "label": "Cancel deal", "kind": "ghost"})
         elif s == "escrow_funded":
             out = [{"id": "submit_post", "label": "Submit post link", "kind": "primary", "needs": "url"}]
         elif s == "live":
@@ -275,6 +281,8 @@ def actions_for(d: dict, role: str) -> list[dict]:
             out = [{"id": "sign", "label": "E-sign contract", "kind": "primary"}]
         elif s == "contract" and c.get("signed_by_creator") and d.get("kind") != "collective":
             out = [{"id": "fund", "label": f"Fund escrow {inr(d['amount'])}", "kind": "primary", "needs": "payment"}]
+        if s == "contract" and not d.get("escrow") and d.get("kind") != "collective":
+            out.append({"id": "withdraw", "label": "Cancel deal", "kind": "ghost"})
         elif s == "live":
             out = [{"id": "confirm", "label": "Confirm post and release payment", "kind": "primary"}]
     return out
@@ -299,6 +307,8 @@ def view(d: dict, role: str) -> dict:
     fair_total = d.get("fair_at_offer")
     if not fair_total and creator:
         fair_total = fair_price(creator, brand or None, terms, with_model=False)["total"]
+    if role == "brand" and d.get("source") == "link_in_bio" and (creator.get("public_scopes") or {}).get("rates") is False:
+        fair_total = None  # the creator hides rates on their public page, so the guest brand doesn't see them here
     alerts = []
     if d["stage"] == "offer" and fair_total and d["amount"] < 0.7 * fair_total:
         alerts.append({"kind": "low_offer", "text": f"This offer is {round((1 - d['amount'] / fair_total) * 100)}% below the fair price", "fair": fair_total})

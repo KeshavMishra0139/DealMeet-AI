@@ -122,7 +122,7 @@ def alert(kind: str, **v) -> dict:
         ),
         "invoice_late": (
             f"{inr(v.get('amount', 0))} का इनवॉइस {v.get('days', 0)} दिन से बकाया है",
-            f"{v.get('to', '')} को {v.get('due', '')} तक भुगतान करना था। इनवॉइस के साथ रिमाइंडर भेजें।",
+            f"{v.get('to', '')} को {v.get('due', '')} तक भुगतान करना था। डील टैब से इनवॉइस PDF डाउनलोड करके उन्हें भेजें।",
         ),
     }[kind]
     return {"text": t[0], "detail": t[1]}

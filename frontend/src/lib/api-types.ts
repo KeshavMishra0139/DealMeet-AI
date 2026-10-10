@@ -115,6 +115,8 @@ export interface TrustInfo {
   level: "high" | "medium" | "low";
   reasons: string[];
   method: string;
+  /** Inputs that are sample data, e.g. ["follower history"]. */
+  simulated?: string[];
 }
 
 export interface Home {

@@ -24,7 +24,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
       body: json !== undefined ? JSON.stringify(json) : rest.body,
     });
   } catch {
-    throw new ApiError(0, "Can't reach the JodiDar API. Is it running on port 8000?");
+    throw new ApiError(0, "Can't reach JodiDar right now. Check your connection and try again.");
   }
   if (!res.ok) {
     let detail = res.statusText;

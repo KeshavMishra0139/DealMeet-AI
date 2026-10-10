@@ -22,6 +22,7 @@ import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { LangScope, useI18n } from "@/i18n";
 import type { Dict } from "@/i18n/en";
 import { api, post } from "@/lib/api";
+import { useSharedDemo } from "@/lib/shared-demo";
 import { isEmbedFrame, useCreatorId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { Creator } from "@/lib/types";
@@ -237,6 +238,7 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
+  const shared = useSharedDemo();
   return (
     <div className="space-y-1">
       <div className="hidden lg:block">
@@ -266,6 +268,7 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
       >
         {!resetting && <RotateCcw aria-hidden />} {t("common.resetDemo")}
       </Button>
+      {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">{t("common.sharedDemo")}</p>}
     </div>
   );
 }

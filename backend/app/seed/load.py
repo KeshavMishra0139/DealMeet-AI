@@ -35,7 +35,8 @@ def seed_all(db, force: bool = False) -> dict:
     if not force and db.creators.count_documents({}) > 0:
         return {"seeded": False}
     for name in COLLECTIONS:
-        db[name].delete_many({})
+        if name != "ai_cache":  # cached AI copy stays valid across resets and saves paid calls
+            db[name].delete_many({})
     creators = all_creators()
     db.creators.insert_many(copy.deepcopy(creators))
     db.brands.insert_many(copy.deepcopy(LISTERS))

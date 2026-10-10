@@ -56,6 +56,8 @@ class Settings:
     razorpay_key_secret: str | None
     firebase_project_id: str | None
     demo_today: date
+    # On a shared URL, put the demo data back to its seeded state every N minutes (0 = never).
+    demo_reset_minutes: int = 0
 
     @property
     def has_ai(self) -> bool:
@@ -86,6 +88,7 @@ def get_settings() -> Settings:
         razorpay_key_secret=_env("RAZORPAY_KEY_SECRET"),
         firebase_project_id=_env("VITE_FIREBASE_PROJECT_ID"),
         demo_today=date.fromisoformat(_env("DEMO_TODAY", "2026-10-08") or "2026-10-08"),
+        demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
     )
 
 
@@ -94,10 +97,14 @@ def today() -> date:
     return get_settings().demo_today
 
 
+_BOOT_DATE = datetime.now(IST).date()
+
+
 def now() -> datetime:
-    """Demo date combined with the real time of day (IST)."""
+    """Demo date combined with the real time of day (IST). Days that pass while the
+    server runs still count, so timestamps keep increasing after midnight."""
     real = datetime.now(IST)
-    d = today()
+    d = today() + (real.date() - _BOOT_DATE)
     return real.replace(year=d.year, month=d.month, day=d.day)
 
 
