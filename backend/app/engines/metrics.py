@@ -20,6 +20,31 @@ def recent(c: dict, n: int = RECENT_N) -> list[dict]:
     return reels_sorted(c)[:n]
 
 
+def _simulated_in(c: dict, subset: list[dict], fields: tuple[str, ...]) -> list[str]:
+    used = {id(r) for r in subset}
+    reels = c.get("reels") or []
+    return [
+        f for f in fields
+        if any(provenance_of(c, f"reels.{i}.{f}") == "simulated" for i, r in enumerate(reels) if id(r) in used)
+    ]
+
+
+def recent_simulated(c: dict, *fields: str) -> list[str]:
+    """Which of these reel fields are simulated in the recent reels the numbers are built
+    from (older reels don't count: Creator A's last six views are real, earlier ones aren't)."""
+    return _simulated_in(c, recent(c), fields)
+
+
+def window_reels(c: dict, days: int = 28) -> list[dict]:
+    cutoff = today() - timedelta(days=days)
+    return [r for r in c.get("reels") or [] if date.fromisoformat(r["date"]) >= cutoff]
+
+
+def window_simulated(c: dict, *fields: str, days: int = 28) -> list[str]:
+    """Like recent_simulated, for the reels inside the posting-pace window."""
+    return _simulated_in(c, window_reels(c, days), fields)
+
+
 def has_reels(c: dict) -> bool:
     return bool(c.get("reels"))
 
@@ -57,9 +82,7 @@ def like_rate(c: dict) -> float:
 
 
 def posts_per_week(c: dict, days: int = 28) -> float:
-    cutoff = today() - timedelta(days=days)
-    n = sum(1 for r in c.get("reels") or [] if date.fromisoformat(r["date"]) >= cutoff)
-    return n / (days / 7)
+    return len(window_reels(c, days)) / (days / 7)
 
 
 def views_cv(c: dict) -> float:

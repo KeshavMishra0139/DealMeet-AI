@@ -218,3 +218,12 @@ def test_public_kit_follows_the_creators_public_switches(client, db):
     assert "the follower count" not in text and "median" not in text
     booked = client.post("/api/public/creator.a/book", json={"brand_name": "Guest Co", "email": "a@b.co", "budget": 9000}).json()
     assert booked["fair"] is None
+
+
+def test_creator_as_real_views_are_not_labelled_simulated(client, db):
+    # The price uses the last six reels, whose views are real; older simulated reels don't count.
+    steps = client.get("/api/creators/cr_a/money").json()["fair"]["steps"]
+    base = next(s for s in steps if s["key"] == "base")
+    assert base["simulated"] is False and base["simulated_fields"] == []
+    # The posting pace counts a 4-week window that includes one simulated reel, so it says so.
+    assert next(s for s in steps if s["key"] == "consistency")["simulated_fields"] == ["reel dates"]
