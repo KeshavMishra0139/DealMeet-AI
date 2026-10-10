@@ -18,7 +18,11 @@ export function TrustBadge({ trust, className }: { trust: TrustInfo | null | und
               {r}
             </span>
           ))}
-          <span className="mt-1 block text-[10px] text-muted">From insights connected via the official API.</span>
+          <span className="mt-1 block text-[10px] text-muted">
+            {trust.simulated?.length
+              ? `Partly from sample data (${trust.simulated.join(", ")}), marked simulated.`
+              : "From insights connected via the official API."}
+          </span>
         </span>
       }
     >

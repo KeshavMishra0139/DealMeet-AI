@@ -54,7 +54,7 @@ export default function Home() {
       <h1 className="mt-3 font-display text-[28px] font-semibold leading-tight tracking-tight sm:text-[34px]">
         {t("home.greeting")}
       </h1>
-      {creator.reference_note && creator.is_reference && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
+      {creator.reference_note && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
 
       {plan.changes.length > 0 && plan.week > 1 && (
         <motion.div

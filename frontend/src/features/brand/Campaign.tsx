@@ -346,7 +346,7 @@ function CollectivePanel({ listing }: { listing: Listing }) {
     queryFn: () => post<Collective>(`/listings/${listing.id}/collective`, applied),
   });
   const book = useMutation({
-    mutationFn: () => post<{ members: number; total: number }>(`/listings/${listing.id}/collective/book`, { member_ids: q.data?.members.map((m) => m.id) ?? [] }),
+    mutationFn: () => post<{ members: number; total: number }>(`/listings/${listing.id}/collective/book`, { member_ids: q.data?.members.map((m) => m.id) ?? [], combined_reach: q.data?.combined_reach ?? null }),
     onSuccess: async (r) => {
       await qc.invalidateQueries();
       toast.success(`Offer sent to ${r.members} creators`, { description: `One escrow payment of ${inr(r.total)}, split automatically by UPI once posts are verified.` });
@@ -520,7 +520,7 @@ export function OfferDialog({
     mutationFn: () => post("/offers", { brand_id: brandId, creator_id: match.id, listing_id: listing?.id ?? null, amount: n, message: message || null }),
     onSuccess: async () => {
       await qc.invalidateQueries();
-      toast.success(`Offer sent to ${match.name}`, { description: `${inr(n)} for ${match.fair.deliverables}. Funds go to escrow once they accept.` });
+      toast.success(`Offer sent to ${match.name}`, { description: `${inr(n)} for ${match.fair.deliverables}. Once they accept, sign and fund escrow before they post.` });
       onClose();
     },
   });

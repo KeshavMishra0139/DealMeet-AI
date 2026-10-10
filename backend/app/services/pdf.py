@@ -243,7 +243,8 @@ def media_kit_pdf(kit: dict) -> bytes:
     trust = kit.get("trust")
     footer = [f"Book through {kit['link']} (escrow-protected, paid by UPI)."]
     if trust:
-        footer.insert(0, f"Trust {trust['score']}/100 from insights connected via the official API.")
+        source = "partly from sample data (simulated)" if trust.get("simulated") else "from insights connected via the official API"
+        footer.insert(0, f"Trust {trust['score']}/100 {source}.")
     if kit.get("safety_note"):
         footer.append(kit["safety_note"])
     if kit.get("reference_note"):

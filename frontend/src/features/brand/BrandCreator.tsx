@@ -37,7 +37,7 @@ interface CreatorView {
   scope_source: string;
   scope_labels: Record<keyof Scopes, string>;
   fit: { score: number; reasons: string[]; cautions: string[] } | null;
-  fair: { range: { low: number; high: number }; total: number; deliverables: string; steps: PriceStep[] | null; follower_price: number; model_check?: FairPrice["model_check"] };
+  fair: { range: { low: number; high: number }; total: number; deliverables: string; steps: PriceStep[] | null; follower_price: number | null; model_check?: FairPrice["model_check"] };
   stats: {
     followers: number;
     median_views: number;
@@ -129,7 +129,8 @@ export default function BrandCreator() {
           </h2>
           <p className="num mt-1 font-display text-3xl font-semibold">{inrRange(c.fair.range.low, c.fair.range.high)}</p>
           <p className="mt-1 text-xs text-muted">
-            Priced on reach and fit with your audience. Follower-count pricing would say {inr(c.fair.follower_price)}.
+            Priced on reach and fit with your audience.
+            {c.fair.follower_price != null && ` Follower-count pricing would say ${inr(c.fair.follower_price)}.`}
           </p>
           {c.fair.steps ? (
             <div className="mt-4">

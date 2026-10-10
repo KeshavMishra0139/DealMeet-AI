@@ -42,7 +42,7 @@ export default function BrandProfile() {
         ))}
       </dl>
       <p className="mt-4 text-xs text-muted">
-        Matching uses this target to score audience fit. Creators share data with you only by consent; every view is logged in their ledger.{" "}
+        Matching uses this target to score audience fit. Creators share data with you only by consent; every profile you open is logged in their ledger.{" "}
         {b.created_at || b.guest ? <Badge size="sm">Not verified</Badge> : <Badge size="sm">Fictional brand</Badge>}
       </p>
       <Button asChild variant="outline" size="sm" className="mt-4">

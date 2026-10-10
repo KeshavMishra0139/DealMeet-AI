@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -127,7 +127,7 @@ def build_kit(c: dict) -> dict:
         "audience": audience,
         "rates": rates,
         "from_rate": fp1["range"]["low"] if pub["rates"] else None,
-        "trust": {"score": t["score"], "level": t["level"], "reasons": t["reasons"]} if t else None,
+        "trust": {"score": t["score"], "level": t["level"], "reasons": t["reasons"], "simulated": t.get("simulated", [])} if t else None,
         "safety_note": f"Brand safety: {safety['flags'][0]['label'].lower()}; {safety['flags'][0]['fix'].lower()}" if safety["flags"] else "Brand safety: no concerns found.",
         "public": pub,
         "link": f"jodidar.ai/c/{c['handle']}",
@@ -156,8 +156,9 @@ def update_public(creator_id: str, body: PublicIn):
 
 
 @router.get("/creators/{creator_id}/kit.pdf")
-def kit_pdf(creator_id: str):
+def kit_pdf(creator_id: str, request: Request):
     k = build_kit(load_creator(creator_id))
+    k["link"] = request.url.netloc + k["path"]  # the address this demo is served from
     return Response(media_kit_pdf(k), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-{k["handle"]}.pdf"'})
 
 
@@ -184,6 +185,11 @@ def book(handle: str, body: BookIn):
     c = db.creators.find_one({"handle": handle.lstrip("@")})
     if not c:
         raise HTTPException(404, "Creator not found")
+    if (
+        db.deals.count_documents({"creator_id": c["_id"], "source": "link_in_bio"}) >= 30
+        or db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50
+    ):
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     bid = f"br_guest_{uuid.uuid4().hex[:6]}"
     db.brands.insert_one(
         {
@@ -197,7 +203,8 @@ def book(handle: str, body: BookIn):
             "target": {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []},
             "verified": False,
             "guest": True,
-            "contact": body.email,
+            # The email isn't stored: other visitors of this shared demo could read it.
+            "contact_given": True,
             "created_at": now_iso(),
         }
     )
@@ -231,7 +238,7 @@ def book(handle: str, body: BookIn):
     return {
         "ok": True,
         "fair": fp["total"] if _public(c)["rates"] else None,
-        "message": f"Sent to {c['name']}. They'll reply in the JodiDar app; payment is held in escrow.",
+        "message": f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow on this booking's page. Nothing is emailed in this demo, so use Follow this booking to get back to it.",
         # The guest has no login yet, so this link opens the deal as their brand to sign and pay.
         "track": f"/brand/deals/{did}?as={bid}",
     }

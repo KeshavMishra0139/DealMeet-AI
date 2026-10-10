@@ -1,0 +1,12 @@
+# Render Blueprint: New > Blueprint, pick this repository, then Apply.
+services:
+  - type: web
+    name: jodidar-ai
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DEMO_RESET_MINUTES
+        value: "30"

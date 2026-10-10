@@ -46,7 +46,7 @@ export default function Kit() {
             <SectionTitle id="share" eyebrow="Link-in-bio" title="Your JodiDar page" />
             <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm">
               <Link2 className="size-4 shrink-0 text-accent" aria-hidden />
-              <span className="truncate">{k.link}</span>
+              <span className="truncate">{`${window.location.host}${k.path}`}</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button

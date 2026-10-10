@@ -18,8 +18,8 @@ from ..services import cache
 PATTERNS = [
     (re.compile(r"\b(registration|joining|unlock)\b.*\b(fee|pay)|\bpay\b.*\b(registration|to (join|unlock))", re.I), "Asks creators to pay a fee"),
     (re.compile(r"whatsapp only|contact on whatsapp", re.I), "Moves the conversation off-platform"),
-    (re.compile(r"\b(buy|get)\b.*\bfollowers\b", re.I), "Sells followers"),
-    (re.compile(r"earn [\d,]+.*(a|per) (week|day)|from home", re.I), "Income claims typical of scams"),
+    (re.compile(r"\b(buy|get)\s+[\d,.]+\s*k?\s+(real\s+|instagram\s+)?followers\b|\bfollowers?\s+packages?\b", re.I), "Sells followers"),
+    (re.compile(r"\bearn [\d,]+.*(a|per) (week|day)|\bearn\b.*\bfrom home\b", re.I), "Income claims typical of scams"),
 ]
 
 

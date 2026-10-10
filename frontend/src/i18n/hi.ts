@@ -26,6 +26,7 @@ export const hi: Dict = {
   "common.impact": "असर",
   "common.switchProfile": "प्रोफ़ाइल बदलें",
   "common.resetDemo": "डेमो रीसेट करें",
+  "common.sharedDemo": "साझा डेमो: सभी लोग एक ही डेटा देखते हैं। रीसेट सिर्फ़ अपना डेमो शुरू करते समय करें।",
   "common.language": "भाषा",
   "roadmap.title": "ग्रोथ रोडमैप",
   "money.title": "कमाई के रास्ते",
@@ -100,6 +101,9 @@ export const hi: Dict = {
 
 /** Fixed phrases the API sends in English (CTA labels, headlines). */
 export const hiPhrases: Record<string, string> = {
+  "Your profile. The demo sandbox login filled in sample insights, marked simulated.": "आपकी प्रोफ़ाइल। डेमो सैंडबॉक्स लॉगिन ने सैंपल इनसाइट्स भरी हैं, जिन्हें सिम्युलेटेड दिखाया गया है।",
+  "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.": "आपकी प्रोफ़ाइल, ऑनबोर्डिंग में आपके भरे जवाबों से। ऑडियंस की जानकारी सैंपल डेटा है, जिसे सिम्युलेटेड दिखाया गया है।",
+  "Fictional demo profile.": "काल्पनिक डेमो प्रोफ़ाइल।",
   "See your price breakdown": "रेट का पूरा हिसाब देखें",
   "See what's working": "क्या चल रहा है, देखें",
   "See topic ideas": "टॉपिक आइडिया देखें",

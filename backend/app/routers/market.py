@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -72,12 +72,14 @@ def withdraw(creator_id: str, listing_id: str):
 class CollabIn(BaseModel):
     title: str = Field(min_length=4, max_length=90)
     summary: str = Field(min_length=10, max_length=300)
-    languages: list[str] = []
+    languages: list[Annotated[str, Field(max_length=40)]] = Field(default=[], max_length=10)
 
 
 @router.post("/collabs")
 def post_collab(creator_id: str, body: CollabIn):
     c = load_creator(creator_id)
+    if get_db().listings.count_documents({"owner_id": creator_id}) >= 20:
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     lid = f"lst_cc_{uuid.uuid4().hex[:8]}"
     get_db().listings.insert_one(
         {

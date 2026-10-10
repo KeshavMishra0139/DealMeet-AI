@@ -3,6 +3,7 @@ import { ArrowRight, BadgeIndianRupee, Lock, Play, Scale, ShieldCheck } from "lu
 import { Link } from "react-router-dom";
 import { ParallaxAurora, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Stage3D } from "@/components/three/Stage3D";
+import { useSharedDemo } from "@/lib/shared-demo";
 import { HeroOrbit } from "@/components/three/lazy";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { useTheme } from "@/lib/theme";
 const ease = [0.22, 1, 0.36, 1] as const;
 
 export default function Landing() {
+  const shared = useSharedDemo();
   useTheme("creator");
   const reduce = useReducedMotion();
   const rise = (delay: number) =>
@@ -80,6 +82,7 @@ export default function Landing() {
             </Link>
           </Button>
           <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
+          {shared && <p className="w-full text-xs text-muted">Shared live demo: everyone sees the same data, and it resets automatically when idle.</p>}
         </motion.div>
 
         <section aria-labelledby="principles" className="mt-28 pb-10 sm:mt-36">

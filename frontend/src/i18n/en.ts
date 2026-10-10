@@ -24,6 +24,7 @@ export const en = {
   "common.impact": "Impact",
   "common.switchProfile": "Switch profile",
   "common.resetDemo": "Reset demo",
+  "common.sharedDemo": "Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.",
   "common.language": "Language",
   "roadmap.title": "Growth roadmap",
   "money.title": "Money paths",

@@ -343,7 +343,7 @@ function CounterDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClo
               <li key={r}>{r}</li>
             ))}
           </ul>
-          <p className="mt-1.5 text-[11px] text-muted">These reasons go with your counter so the brand sees how it's priced.</p>
+          <p className="mt-1.5 text-[11px] text-muted">Your note is saved with the counter; the brand sees the new amount.</p>
         </div>
         <div className="mt-4">
           <Label htmlFor="counter-amt">Counter amount (₹)</Label>
@@ -352,6 +352,7 @@ function CounterDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClo
         <div className="mt-3">
           <Label htmlFor="counter-note">Note</Label>
           <Textarea id="counter-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder={defaultNote} className="min-h-20" />
+          <p className="mt-2 text-xs text-muted">If {deal.brand.name} accepts, the contract is e-signed in your name at this amount.</p>
         </div>
         <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(Number(amount.replace(/[^\d]/g, "")), note || defaultNote)}>
           Send counter
@@ -365,7 +366,7 @@ function PostDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSub
   const [url, setUrl] = useState("https://www.instagram.com/reel/");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent sheet title="Submit your post link" description="We check it through the official API before payment is released.">
+      <DialogContent sheet title="Submit your post link" description="Before payment is released, the post is checked. In this demo, a sandbox stands in for the official API.">
         <Label htmlFor="post-url">Instagram reel or YouTube Short link</Label>
         <Input id="post-url" type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} />
         <p className="mt-2 text-xs text-muted">The brand has 3 days to confirm. If they don't respond, payment releases to you automatically a few days later.</p>

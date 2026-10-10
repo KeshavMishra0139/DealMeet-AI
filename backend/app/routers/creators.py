@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import random
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -123,22 +123,26 @@ def get_fair_price(creator_id: str, lister_id: str | None = None, listing_id: st
 STAGE_FOLLOWERS = {"zero": 0, "under_1k": 450, "1k_10k": 3_200, "10k_100k": 24_000, "100k_plus": 140_000}
 
 
+Short = Annotated[str, Field(max_length=60)]
+Caption = Annotated[str, Field(max_length=2200)]  # Instagram's caption limit
+
+
 class OnboardingIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    niche: str
-    platforms: list[str] = ["instagram"]
-    formats: list[str] = ["reels"]
+    niche: str = Field(max_length=40)
+    platforms: list[Short] = Field(default=["instagram"], max_length=4)
+    formats: list[Short] = Field(default=["reels"], max_length=10)
     audience_stage: Literal["zero", "under_1k", "1k_10k", "10k_100k", "100k_plus"]
     followers: int | None = Field(default=None, ge=0, le=50_000_000)
     income_goal: int = Field(ge=0, le=10_000_000)
-    income_types: list[str] = []
-    languages: list[str] = Field(min_length=1)
-    city: str
+    income_types: list[Short] = Field(default=[], max_length=10)
+    languages: list[Short] = Field(min_length=1, max_length=10)
+    city: str = Field(max_length=60)
     expertise: str | None = Field(default=None, max_length=80)
-    captions: list[str] = []
-    connected: dict[str, bool] = {}
+    captions: list[Caption] = Field(default=[], max_length=8)
+    connected: dict[Literal["instagram", "youtube"], bool] = {}
     discoverable: bool = True
-    consent_defaults: dict[str, bool] = {"stats": True, "demographics": False, "rate_card": False}
+    consent_defaults: dict[Literal["stats", "demographics", "rate_card"], bool] = {"stats": True, "demographics": False, "rate_card": False}
 
 
 def _handle(name: str) -> str:
@@ -156,6 +160,8 @@ def create_creator(body: OnboardingIn):
     if body.niche not in NICHES:
         raise HTTPException(422, "Unknown niche")
     db = get_db()
+    if db.creators.count_documents({"created_by": "onboarding"}) >= 100:
+        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     followers = body.followers if body.followers is not None else STAGE_FOLLOWERS[body.audience_stage]
     cid = f"cr_new_{db.creators.count_documents({'created_by': 'onboarding'}) + 1}"
     while db.creators.count_documents({"_id": cid}):
@@ -164,7 +170,8 @@ def create_creator(body: OnboardingIn):
     city = body.city if body.city in CITIES else "Mumbai"
     connected = bool(body.connected.get("instagram") or body.connected.get("youtube"))
     langs = body.languages
-    caption_tags = tag_captions(body.captions) if body.captions else None
+    captions = [x.strip() for x in body.captions if x.strip()]
+    caption_tags = tag_captions(captions) if captions else None
     doc = {
         "_id": cid,
         "handle": _handle(body.name),
@@ -197,7 +204,7 @@ def create_creator(body: OnboardingIn):
         "skills": [],
         "expertise": body.expertise or None,
         # Safety flags found in the creator's own captions become brand-safety notes, with the fix suggested.
-        "content_flags": [f for f in (caption_tags or {}).get("summary", {}).get("flags", []) if f in brand_safety.FLAGS],
+        "content_flags": [f for f in ((caption_tags or {}).get("summary") or {}).get("flags", []) if f in brand_safety.FLAGS],
         "discoverable": body.discoverable,
         "consent_defaults": body.consent_defaults,
         "insights_connected": {"instagram": bool(body.connected.get("instagram")), "youtube": bool(body.connected.get("youtube"))},
@@ -225,13 +232,13 @@ def create_creator(body: OnboardingIn):
     if AGE_PROFILES.get(body.niche) is None:
         raise HTTPException(422, "Unknown niche")
     db.creators.insert_one(doc)
-    cache.invalidate("trust")
+    cache.invalidate("trust:")  # per-creator scores; the trained model stays
     cache.invalidate("spam")
     return {"id": cid, "handle": doc["handle"]}
 
 
 class TagIn(BaseModel):
-    captions: list[str] = Field(min_length=1, max_length=8)
+    captions: list[Caption] = Field(min_length=1, max_length=8)
 
 
 @router.post("/ai/tag")
