@@ -34,16 +34,19 @@ def _public(c: dict) -> dict:
     return p
 
 
-def _copy(c: dict) -> tuple[KitCopy, str]:
+def _copy(c: dict, pub: dict) -> tuple[KitCopy, str]:
+    """Headline and bio for the public kit. They quote reach numbers only when the
+    creator shows stats publicly."""
     niche = NICHES[c["niche"]]["label"]
     langs = " and ".join(LANGS[x]["label"] for x in c.get("languages") or [] if x in LANGS)
-    has = metrics.has_reels(c)
+    has = pub["stats"] and metrics.has_reels(c)
     ratio = metrics.reach_ratio(c) if has else 0
     # Only cite the best format when its label is real data, not simulated.
     best = metrics.by_topic(c)[0]["topic"] if has and metrics.by_topic(c) and metrics.prov(c, "reels.0.topic") != "simulated" else None
     noun = niche if niche.lower().endswith("edits") else f"{niche} reels"
     facts = (
-        f"Niche: {niche}. Languages: {langs}. Followers: {short(c.get('followers', 0))}. "
+        f"Niche: {niche}. Languages: {langs}. "
+        + (f"Followers: {short(c.get('followers', 0))}. " if pub["stats"] else "")
         + (f"Median views of last 6 reels: {short(metrics.median_views(c))}. Reach ratio: about {ratio:.0f}x followers. Best format: {best}. " if has else "")
         + (f"City: {c.get('city')}." if c.get("city") else f"Region: {c.get('region')}.")
     )
@@ -73,13 +76,13 @@ def build_kit(c: dict) -> dict:
     fp1 = fair_price(c, brand, None, with_model=False)
     fp2 = fair_price(c, brand, {"deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}]}, with_model=False)
     fp3 = fair_price(c, brand, {"deliverables": [{"kind": "reel", "count": 2}]}, with_model=False)
-    copy, source = _copy(c)
+    copy, source = _copy(c, pub)
     sim_views = metrics.prov(c, "reels.0.views") == "simulated"
     sim_saves = metrics.prov(c, "reels.0.saves") == "simulated"
     stats = None
     if pub["stats"] and metrics.has_reels(c):
         stats = [
-            {"label": "Followers", "value": short(c.get("followers", 0)), "simulated": False},
+            {"label": "Followers", "value": short(c.get("followers", 0)), "simulated": metrics.prov(c, "followers") == "simulated"},
             {"label": "Median views, last 6", "value": short(metrics.median_views(c)), "simulated": sim_views},
             {"label": "Reach vs followers", "value": f"{metrics.reach_ratio(c):.1f}x", "simulated": sim_views},
             {"label": "Saves + shares / view", "value": f"{metrics.ss_rate(c) * 100:.1f}%", "simulated": sim_saves},
@@ -123,7 +126,7 @@ def build_kit(c: dict) -> dict:
         "formats": formats,
         "audience": audience,
         "rates": rates,
-        "from_rate": fp1["range"]["low"],
+        "from_rate": fp1["range"]["low"] if pub["rates"] else None,
         "trust": {"score": t["score"], "level": t["level"], "reasons": t["reasons"]} if t else None,
         "safety_note": f"Brand safety: {safety['flags'][0]['label'].lower()}; {safety['flags'][0]['fix'].lower()}" if safety["flags"] else "Brand safety: no concerns found.",
         "public": pub,
@@ -227,7 +230,7 @@ def book(handle: str, body: BookIn):
     )
     return {
         "ok": True,
-        "fair": fp["total"],
+        "fair": fp["total"] if _public(c)["rates"] else None,
         "message": f"Sent to {c['name']}. They'll reply in the JodiDar app; payment is held in escrow.",
         # The guest has no login yet, so this link opens the deal as their brand to sign and pay.
         "track": f"/brand/deals/{did}?as={bid}",

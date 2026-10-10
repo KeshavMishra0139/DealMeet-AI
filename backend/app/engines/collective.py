@@ -13,6 +13,7 @@ from __future__ import annotations
 from ..db import get_db
 from ..seed.catalog import LANGS, NICHES
 from ..services.consent import scopes_for
+from ..services.views import audience_stage
 from . import metrics
 from .common import clamp, inr, short
 from .fair_price import fair_price
@@ -70,18 +71,20 @@ def build(
         regions = set(listing.get("regions") or [])
         if regions and "Pan-India" not in regions and c.get("region") not in regions:
             continue
-        if scopes_for(c, brand["_id"]) is None:
+        scopes = scopes_for(c, brand["_id"])
+        if scopes is None:
             continue  # hidden or revoked: never shown, never counted
         t = trust_score(c)
         fit = listing_fit(c, listing, brand)
-        row = {"creator": c, "trust": t, "fit": fit}
+        row = {"creator": c, "trust": t, "fit": fit, "scopes": scopes}
         if t and t["score"] < trust_min:
             # A low score comes with its warning signs; a decent one only misses the brand's own higher bar.
             why = f": {t['reasons'][0].lower()}" if t["score"] < TRUST_MIN else ""
-            excluded.append({"id": c["_id"], "name": c["name"], "reason": f"Trust {t['score']} is below {trust_min}{why}"})
+            kind = "trust_warning" if t["score"] < TRUST_MIN else "trust_minimum"
+            excluded.append({"id": c["_id"], "name": c["name"], "kind": kind, "reason": f"Trust {t['score']} is below {trust_min}{why}"})
             continue
         if fit["score"] < 55:
-            excluded.append({"id": c["_id"], "name": c["name"], "reason": f"Audience fit {fit['score']} is too low for this brief"})
+            excluded.append({"id": c["_id"], "name": c["name"], "kind": "fit", "reason": f"Audience fit {fit['score']} is too low for this brief"})
             continue
         fp = fair_price(c, brand, terms, with_model=False)
         row.update({"price": fp["total"], "reach": metrics.median_views(c), "ss": metrics.ss_rate(c)})
@@ -97,12 +100,12 @@ def build(
         remaining -= r["price"]
         pool.remove(r)
 
-    def effective(r: dict) -> tuple[float, float, str | None]:
+    def effective(r: dict) -> tuple[float, float, dict | None]:
         worst, with_ = 0.0, None
         for s in selected:
             o = audience_overlap(r["creator"], s["creator"])
             if o > worst:
-                worst, with_ = o, s["creator"]["name"]
+                worst, with_ = o, s
         return r["reach"] * (1 - OVERLAP_WEIGHT * worst), worst, with_
 
     while pool and len(selected) < size_max:
@@ -129,14 +132,22 @@ def build(
 
     for r in pool:
         if r["price"] > remaining:
-            excluded.append({"id": r["creator"]["_id"], "name": r["creator"]["name"], "reason": "Doesn't fit in the remaining budget"})
+            excluded.append({"id": r["creator"]["_id"], "name": r["creator"]["name"], "kind": "budget", "reason": "Doesn't fit in the remaining budget"})
 
     total = sum(r["price"] for r in selected)
     combined = sum(r.get("effective_reach", r["reach"]) for r in selected)
     raw = sum(r["reach"] for r in selected)
+    # Consent: a member's reach, followers and engagement go to the brand only with the stats
+    # scope; an exact overlap (built from audience cities and languages) only when both
+    # creators share demographics with this brand. Pack totals would let a brand work out
+    # one member's numbers, so they're shown only when every member shares stats.
+    all_stats = all(r["scopes"]["stats"] for r in selected)
     members = []
     for r in sorted(selected, key=lambda x: -x["price"]):
         c = r["creator"]
+        stats = r["scopes"]["stats"]
+        other = r.get("overlap_with")
+        exact_overlap = r["scopes"]["demographics"] and (other is None or other["scopes"]["demographics"])
         members.append(
             {
                 "id": c["_id"],
@@ -147,34 +158,41 @@ def build(
                 "niche_label": NICHES[c["niche"]]["label"],
                 "language": LANGS.get((c.get("languages") or ["en"])[0], {}).get("label"),
                 "city": c.get("city") or c.get("region"),
-                "followers": c.get("followers", 0),
-                "reach": round(r["reach"]),
-                "effective_reach": round(r.get("effective_reach", r["reach"])),
-                "overlap": round(r.get("overlap", 0), 2),
-                "overlap_with": r.get("overlap_with"),
+                "audience_stage": audience_stage(c.get("followers", 0))["label"],
+                "followers": c.get("followers", 0) if stats else None,
+                "reach": round(r["reach"]) if stats else None,
+                "effective_reach": round(r.get("effective_reach", r["reach"])) if stats else None,
+                "overlap": round(r.get("overlap", 0), 2) if exact_overlap else None,
+                "overlap_level": "High" if r.get("overlap", 0) >= 0.15 else "Low",
+                "overlap_with": other["creator"]["name"] if other else None,
                 "price": r["price"],
                 "split": round(r["price"] / total, 4) if total else 0,
                 "fit": r["fit"]["score"],
                 "trust": r["trust"],
-                "engagement": round(r["ss"], 4),
+                "engagement": round(r["ss"], 4) if stats else None,
                 "opted_in": c["_id"] in must_include,
             }
         )
-    dedup = [m for m in members if m["overlap"] >= 0.15]
+    dedup = [r for r in selected if r.get("overlap", 0) >= 0.15]
     notes = []
-    low_trust = [e for e in excluded if e["reason"].startswith("Trust")]
+    warning = [e for e in excluded if e["kind"] == "trust_warning"]
+    below_bar = [e for e in excluded if e["kind"] == "trust_minimum"]
     if len(members) < size_min:
         ways = []
-        if trust_min > TRUST_MIN and low_trust:
-            ways.append(f"lower the trust minimum ({len(low_trust)} left out below {trust_min})")
-        if any(e["reason"] == "Doesn't fit in the remaining budget" for e in excluded):
+        if below_bar:
+            ways.append(f"lower the trust minimum ({len(below_bar)} left out below {trust_min})")
+        if any(e["kind"] == "budget" for e in excluded):
             ways.append("raise the budget")
         ways.append("widen languages or regions")
         notes.append(f"Only {len(members)} creators fit this brief within {inr(budget)}. To add more, {_either(ways)}.")
     if dedup:
         notes.append(f"Audience overlap reduced counted reach for {len(dedup)} creator{'s' if len(dedup) != 1 else ''}.")
-    if low_trust:
-        notes.append(f"{len(low_trust)} profile{'s' if len(low_trust) != 1 else ''} left out on trust signals.")
+    if warning:
+        notes.append(f"{len(warning)} profile{'s' if len(warning) != 1 else ''} left out on trust warning signs.")
+    if below_bar and len(members) >= size_min:
+        notes.append(f"{len(below_bar)} more left out by your trust minimum of {trust_min}.")
+    if not all_stats:
+        notes.append("Some members don't share stats with you, so pack reach and engagement aren't shown.")
     return {
         "listing_id": listing["_id"],
         "brand_id": brand["_id"],
@@ -183,17 +201,19 @@ def build(
         "size_target": target,
         "total": round(total),
         "remaining": round(budget - total),
-        "combined_reach": round(combined),
-        "raw_reach": round(raw),
-        "dedup_saved": round(raw - combined),
-        "avg_engagement": round(sum(m["engagement"] for m in members) / len(members), 4) if members else 0,
-        "cost_per_1k": round(total / combined * 1000) if combined else None,
+        "combined_reach": round(combined) if all_stats else None,
+        "raw_reach": round(raw) if all_stats else None,
+        "dedup_saved": round(raw - combined) if all_stats else None,
+        "avg_engagement": (round(sum(r["ss"] for r in selected) / len(selected), 4) if selected else 0) if all_stats else None,
+        "cost_per_1k": (round(total / combined * 1000) if combined else None) if all_stats else None,
         "trust_min": trust_min,
         "members": members,
         "excluded": excluded,
         "notes": notes,
         "summary": (
-            f"{len(members)} creators, {short(combined)} combined reach after de-duplication, {inr(total)} total"
+            f"{len(members)} creators, "
+            + (f"{short(combined)} combined reach after de-duplication, " if all_stats else "")
+            + f"{inr(total)} total"
             f"{f' ({inr(budget - total)} under budget)' if budget - total > 500 else ''}."
         ),
     }

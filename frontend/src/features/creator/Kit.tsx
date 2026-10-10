@@ -74,7 +74,7 @@ export default function Kit() {
                 </a>
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted">Brands book you from this page. Their payment is held in escrow before you post. Rates start at {inr(k.from_rate)}.</p>
+            <p className="mt-3 text-xs text-muted">Brands book you from this page. Their payment is held in escrow before you post.{k.from_rate != null && ` Rates start at ${inr(k.from_rate)}.`}</p>
           </section>
 
           <section aria-labelledby="pub" className="card-surface rounded-[var(--radius-card)] p-5">

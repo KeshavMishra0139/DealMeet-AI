@@ -14,7 +14,8 @@ export interface Kit {
   formats: { topic: string; views: string; simulated: boolean }[] | null;
   audience: { line: string; simulated: boolean } | null;
   rates: { label: string; value: string }[] | null;
-  from_rate: number;
+  /** Null when the creator hides rates on the public page. */
+  from_rate: number | null;
   trust: { score: number; level: "high" | "medium" | "low"; reasons: string[] } | null;
   safety_note: string;
   public?: { stats: boolean; demographics: boolean; rates: boolean };

@@ -382,9 +382,9 @@ function CollectivePanel({ listing }: { listing: Listing }) {
           <dl className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
             {[
               ["Creators", String(c.size)],
-              ["Combined reach", count(c.combined_reach)],
+              ["Combined reach", c.combined_reach != null ? count(c.combined_reach) : "—"],
               ["Total price", inr(c.total)],
-              ["Saves + shares per view", pct(c.avg_engagement, 1)],
+              ["Saves + shares per view", c.avg_engagement != null ? pct(c.avg_engagement, 1) : "—"],
               ["Cost per 1,000 views", c.cost_per_1k ? inr(c.cost_per_1k) : "—"],
             ].map(([k, v]) => (
               <div key={k} className="card-surface rounded-xl px-3.5 py-3">
@@ -433,10 +433,25 @@ function CollectivePanel({ listing }: { listing: Listing }) {
                       </span>
                     </td>
                     <td className="num px-3 py-2 text-right">
-                      {count(m.effective_reach)}
-                      {m.effective_reach < m.reach && <span className="block text-[11px] text-muted">of {count(m.reach)}</span>}
+                      {m.effective_reach != null && m.reach != null ? (
+                        <>
+                          {count(m.effective_reach)}
+                          {m.effective_reach < m.reach && <span className="block text-[11px] text-muted">of {count(m.reach)}</span>}
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted">
+                          Not shared
+                          <span className="block text-[11px]">{m.audience_stage}</span>
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted">{m.overlap >= 0.15 && m.overlap_with ? `${Math.round(m.overlap * 100)}% with ${m.overlap_with}` : "Low"}</td>
+                    <td className="px-3 py-2 text-xs text-muted">
+                      {m.overlap_level === "High" && m.overlap_with
+                        ? m.overlap != null
+                          ? `${Math.round(m.overlap * 100)}% with ${m.overlap_with}`
+                          : `High with ${m.overlap_with}`
+                        : "Low"}
+                    </td>
                     <td className="num px-3 py-2 text-right font-medium">{inr(m.price)}</td>
                     <td className="px-4 py-2">
                       <span className="flex items-center gap-2">

@@ -378,7 +378,7 @@ def book_collective(listing_id: str, body: BookIn):
             "brand_id": brand["_id"],
             "members": [{"creator_id": m["id"], "price": m["price"], "split": round(m["price"] / total, 4)} for m in members],
             "total": total,
-            "combined_reach": sum(m["effective_reach"] for m in members),
+            "combined_reach": sum(m["effective_reach"] for m in members) if all(m["effective_reach"] is not None for m in members) else None,
             "status": "offered",
             "created_at": at,
         }
