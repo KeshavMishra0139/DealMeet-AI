@@ -140,7 +140,8 @@ def fair_price(
     sim_ss = metrics.fields_simulated(c, "reels.saves", "reels.shares")
     sim_aud = metrics.fields_simulated(c, "audience")
     sim_trust = metrics.fields_simulated(c, "follower_history", "comment_insights")
-    sim_views = metrics.fields_simulated(c, "reels.views") if real_views else []
+    sim_views = metrics.recent_simulated(c, "views") if real_views else []
+    sim_dates = ["reel dates"] if real_views and metrics.window_simulated(c, "date") else []
 
     steps = [
         {
@@ -198,6 +199,7 @@ def fair_price(
         "consistency",
         "Consistency",
         f"{metrics.posts_per_week(c):.1f} reels a week over the last 4 weeks; views vary by {metrics.views_cv(c) * 100:.0f}% reel to reel.",
+        sim_views + sim_dates,
     )
     safety = f["safety"]
     add(
