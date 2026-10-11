@@ -53,6 +53,8 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google and phone (OTP) sign-in in the browser, through Firebase | Email and password only; the page says Google and phone sign-in aren't configured |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_PROJECT_ID` | Server-side check of every Firebase ID token (Admin SDK): signature, expiry, this project, not revoked | `POST /api/auth/firebase` answers 503 |
 | `YOUTUBE_API_KEY` | Real YouTube channel numbers: the public "What am I worth?" page (`/worth`) and linking a channel by @handle | Both say YouTube data isn't connected |
+| `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI`, `FRONTEND_URL`, `TOKEN_ENC_KEY` | Connecting Instagram with its official login (read-only), real post checks on deals | Instagram shows "not available"; post checks read "not checked" |
+| `IG_GRAPH_VERSION`, `IG_DEMOGRAPHICS_TIMEFRAME` | Meta Graph API version and the audience-demographics window | `v25.0`, `this_month` |
 | `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
 | `SESSION_HOURS` | How long a sign-in lasts | 72 |
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
@@ -244,6 +246,31 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
 
+## Connecting Instagram
+
+Creators connect Instagram from **Connections** with the Instagram API with Instagram Login (Business Login). Before the login opens they see: "We can see: your profile, posts, reach and audience age/gender/city. We can't: post, read your DMs or see your password. You can disconnect anytime."
+
+- **Scopes**: `instagram_business_basic` and `instagram_business_manage_insights` only. No passwords, no posting, no scraping.
+- **OAuth state**: random, HMAC-signed, valid for 10 minutes, single-use, and tied to the account that started it. A forged, expired, reused or someone else's state is refused.
+- **Tokens**: the code is exchanged for a short-lived token and then a long-lived one (about 60 days), encrypted at rest with Fernet (`TOKEN_ENC_KEY`) in `connections`, with its expiry and granted scopes. Tokens are never logged and never reach the browser.
+- **Sync** (on connect and **Sync now**, 6 an hour): `/me` (username, account type, followers, media count, picture), `/me/media` (latest 50 posts), per-reel insights for the latest 12 reels (views, reach, saves, shares), account `reach` and `views` over 28 days, and `follower_demographics` and `engaged_audience_demographics` by age, gender, city and country (`metric_type=total_value`, `timeframe` from `IG_DEMOGRAPHICS_TIMEFRAME`). Stored with `source: "instagram_api"` and `fetched_at` in `creators.channels.instagram`, `posts` and a daily `metric_snapshots` row.
+- **The price runs on it**: connected reels replace the profile's sample reels, so the fair price uses real views, saves and shares, and its label changes from "Estimate from sample data" to "Estimate from Instagram data". It's still an estimate, never "verified".
+- **Refresh**: an in-process daily job refreshes tokens older than 24 hours that expire within 10 days (`refresh_access_token`); each sync also refreshes first, for hosts that sleep. A Render Cron Job isn't needed.
+- **Disconnect** deletes the token and every Instagram post, snapshot and audience number, and puts back the profile's previous numbers.
+- Expired or revoked tokens ("Reconnect Instagram"), rate limits, personal accounts ("switch to a Creator or Business account") and accounts under 100 followers (no demographics) each get a clear message.
+- **Deal post checks**: when a creator submits an Instagram link on a deal, it's checked against the connected account: the post is on that account, it was published after the contract was signed, and the caption mentions the brand. Results are stored with when they were checked. The paid-partnership label isn't in the API, so it reads "not checked". The brand still approves before payment.
+
+**Meta dashboard steps** (one time):
+
+1. developers.facebook.com → My Apps → Create app → use case **Other** → type **Business**.
+2. Add the **Instagram** product → **API setup with Instagram login**.
+3. Under **Business login settings**, add the OAuth redirect URI exactly as in `IG_REDIRECT_URI` (HTTPS: your Render URL plus `/api/connect/instagram/callback`, or an ngrok URL when running locally).
+4. Copy the **Instagram app ID** and **Instagram app secret** into `IG_APP_ID` and `IG_APP_SECRET` (secrets on Render, never committed).
+5. Permissions: `instagram_business_basic` and `instagram_business_manage_insights`.
+6. While the app is in **development mode**, only Instagram accounts added as **Instagram Testers** can connect (App roles → Roles → Instagram Testers; each tester accepts the invite in Instagram → Settings → Website permissions → Apps and websites → Tester invites). Each tester's account must be a **Creator or Business** account.
+7. Generate `TOKEN_ENC_KEY` once (command in `.env.example`) and set it on the server.
+8. Check the current Graph API version and the valid demographics `timeframe` values in Meta's changelog and the Instagram User Insights reference, and set `IG_GRAPH_VERSION` and `IG_DEMOGRAPHICS_TIMEFRAME` if they differ. The defaults (`v25.0`, `this_month`) were checked against secondary sources; Meta's own docs couldn't be opened from the environment this was built in.
+
 ## Accounts and permissions
 
 Every private API route checks the signed-in account on the server, and that the account owns the creator profile, brand, campaign, deal, collective or invoice it touches. Nothing trusts a role or an owner id sent from the browser: a deal action's side (creator or brand) comes from the session.
@@ -300,13 +327,14 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 189 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make test` | 201 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
 | `make e2e` | 17 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
+- Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
 - YouTube data (against a fake Data API): median-views pricing per format, no `search.list`, the 12-hour cache, the per-IP limit, unknown handle, used-up quota, network failure, hidden subscribers, too few videos, linking with posts and a daily snapshot, unlinking, and owner-only access.
 - Firebase sign-in: a forged token, an expired or revoked token, a token from another Firebase project (checked by the real Admin SDK, offline), a first sign-in, a role that can't change, and linking a verified email.
 - Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.

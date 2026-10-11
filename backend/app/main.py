@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from .config import ROOT, get_settings
 from .db import get_db
-from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles, youtube
+from .routers import auth, brands, connect, creators, deals, demo, kit, market, meta, profiles, youtube
 from .seed.load import seed_all
 from .services.auth import audit
 from .static import mount_spa
@@ -51,6 +51,20 @@ def _auto_reset(minutes: int) -> None:
         log.info("Shared demo reset to its seeded state")
 
 
+def _refresh_tokens():
+    from .services import instagram
+
+    time.sleep(60)
+    while True:
+        try:
+            n = instagram.refresh_due()
+            if n:
+                log.info("Refreshed %d Instagram token(s)", n)
+        except Exception:
+            log.exception("Instagram token refresh failed")
+        time.sleep(24 * 3600)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
@@ -60,6 +74,12 @@ async def lifespan(_: FastAPI):
     if settings.demo_mode:
         seed_all(db)
     _warm_models()
+    # Instagram long-lived tokens: an in-process daily job refreshes those that expire within
+    # 10 days (each sync also refreshes first, for hosts that sleep).
+    from .services import instagram
+
+    if instagram.configured():
+        threading.Thread(target=_refresh_tokens, daemon=True).start()
     # The shared demo's timed reset never runs outside demo mode, so it can't touch real accounts.
     if settings.demo_mode and settings.demo_reset_minutes > 0:
         threading.Thread(target=_auto_reset, args=(settings.demo_reset_minutes,), daemon=True).start()
@@ -119,7 +139,7 @@ async def guard(request: Request, call_next):
     return response
 
 
-for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit, youtube):
+for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit, youtube, connect):
     app.include_router(r.router)
 
 # Single-port mode: serve the built web app when it exists (npm run build).

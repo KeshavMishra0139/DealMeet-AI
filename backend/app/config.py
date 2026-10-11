@@ -71,6 +71,15 @@ class Settings:
     firebase_service_account_json: str | None = None
     google_application_credentials: str | None = None
     youtube_api_key: str | None = None
+    token_enc_key: str | None = None
+    ig_app_id: str | None = None
+    ig_app_secret: str | None = None
+    ig_redirect_uri: str | None = None
+    frontend_url: str | None = None
+    # Meta Graph API version for graph.instagram.com calls, and the window for audience
+    # demographics. Check both against Meta's changelog; they're settings for that reason.
+    ig_graph_version: str = "v25.0"
+    ig_demographics_timeframe: str = "this_month"
 
     @property
     def has_ai(self) -> bool:
@@ -110,6 +119,13 @@ def get_settings() -> Settings:
         firebase_service_account_json=_env("FIREBASE_SERVICE_ACCOUNT_JSON"),
         google_application_credentials=_env("GOOGLE_APPLICATION_CREDENTIALS"),
         youtube_api_key=_env("YOUTUBE_API_KEY"),
+        token_enc_key=_env("TOKEN_ENC_KEY"),
+        ig_app_id=_env("IG_APP_ID"),
+        ig_app_secret=_env("IG_APP_SECRET"),
+        ig_redirect_uri=_env("IG_REDIRECT_URI"),
+        frontend_url=(_env("FRONTEND_URL") or "").rstrip("/") or None,
+        ig_graph_version=_env("IG_GRAPH_VERSION", "v25.0") or "v25.0",
+        ig_demographics_timeframe=_env("IG_DEMOGRAPHICS_TIMEFRAME", "this_month") or "this_month",
     )
 
 
