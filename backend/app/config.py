@@ -68,6 +68,8 @@ class Settings:
     razorpay_webhook_secret: str | None = None
     # In-memory mongomock instead of MONGODB_URI (tests and the local demo). Never a silent fallback.
     use_mock_db: bool = False
+    firebase_service_account_json: str | None = None
+    google_application_credentials: str | None = None
 
     @property
     def has_ai(self) -> bool:
@@ -83,7 +85,8 @@ class Settings:
 
     @property
     def has_firebase(self) -> bool:
-        return bool(self.firebase_project_id)
+        """Server-side Firebase token checks need a service account."""
+        return bool(self.firebase_service_account_json or self.google_application_credentials)
 
 
 @lru_cache
@@ -96,13 +99,15 @@ def get_settings() -> Settings:
         ai_model=_env("AI_MODEL"),
         razorpay_key_id=_env("RAZORPAY_KEY_ID"),
         razorpay_key_secret=_env("RAZORPAY_KEY_SECRET"),
-        firebase_project_id=_env("VITE_FIREBASE_PROJECT_ID"),
+        firebase_project_id=_env("FIREBASE_PROJECT_ID") or _env("VITE_FIREBASE_PROJECT_ID"),
         demo_today=date.fromisoformat(_env("DEMO_TODAY", "2026-10-08") or "2026-10-08"),
         demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
         demo_mode=_flag("DEMO_MODE"),
         session_hours=int(_env("SESSION_HOURS", "72") or 72),
         razorpay_webhook_secret=_env("RAZORPAY_WEBHOOK_SECRET"),
         use_mock_db=_flag("USE_MOCK_DB"),
+        firebase_service_account_json=_env("FIREBASE_SERVICE_ACCOUNT_JSON"),
+        google_application_credentials=_env("GOOGLE_APPLICATION_CREDENTIALS"),
     )
 
 

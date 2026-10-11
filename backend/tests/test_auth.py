@@ -17,6 +17,7 @@ PUBLIC = {
     ("GET", "/api/meta"),
     ("POST", "/api/auth/signup"),
     ("POST", "/api/auth/login"),
+    ("POST", "/api/auth/firebase"),
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/personas"),
     ("POST", "/api/auth/demo"),
