@@ -86,7 +86,9 @@ export default function Campaign() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="matches" className="pt-4">
+        {/* Kept mounted while another tab is open: unmounting the 3D match space mid-update made
+            React Three Fiber attach its pointer listeners to a removed element. */}
+        <TabsContent value="matches" forceMount className="pt-4 data-[state=inactive]:hidden">
           {matches.isError && <ErrorState error={matches.error} onRetry={() => matches.refetch()} />}
           {!matches.data && !matches.isError && <Skeleton className="h-80 rounded-xl" />}
           {matches.data && (

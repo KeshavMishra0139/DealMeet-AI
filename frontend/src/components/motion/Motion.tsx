@@ -47,7 +47,9 @@ export function Reveal({
       className={className}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, amount: 0.15, margin: "0px 0px -40px 0px" }}
+      // No inset on the bottom edge: content in the last few pixels of a page (the landing
+      // footer) could never cross an inset line, so it stayed invisible.
+      viewport={{ once: true, amount: 0.15 }}
       variants={delay ? { hidden: rise.hidden, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE, delay } } } : rise}
       {...rest}
     >
