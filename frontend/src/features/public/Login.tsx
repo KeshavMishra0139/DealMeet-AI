@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Building2, Sparkles, UserPlus } from "lucide-react";
+import type { ConfirmationResult } from "firebase/auth";
+import { ArrowRight, Building2, Phone, Sparkles, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext } from "@/components/shared/AuthGate";
@@ -9,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Segmented, Skeleton } from "@/components/ui/form";
 import { api } from "@/lib/api";
+import { confirmPhoneCode, firebaseEnabled, firebaseMessage, googleIdToken, sendPhoneCode, signOutFirebase } from "@/lib/firebase";
 import { forgetAllTokens, rememberDemoToken, type Role, type SessionUser } from "@/lib/session";
 import { useHealth } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
@@ -61,6 +64,7 @@ export default function Login() {
             ]}
           />
 
+          <FirebaseSignIn role={role} next={next} serverReady={!!health.data?.modes.auth.includes("firebase")} loaded={!!health.data} />
           <AccountForm role={role} next={next} demo={demo} />
           {demo && <DemoProfiles role={role} next={next} />}
 
@@ -88,6 +92,103 @@ export default function Login() {
   );
 }
 
+/** Where to go after signing in: back where you came from if it's your side of the app. */
+function destination(user: SessionUser, next: string | null) {
+  const home = homeFor(user);
+  const side = home.split("/").slice(0, 2).join("/");
+  return next && next.startsWith(side) ? next : home;
+}
+
+function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next: string | null; serverReady: boolean; loaded: boolean }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState<null | "google" | "send" | "verify">(null);
+  const [error, setError] = useState("");
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phone, setPhone] = useState("+91 ");
+  const [code, setCode] = useState("");
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+
+  if (!loaded) return null;
+  if (!firebaseEnabled || !serverReady)
+    return <p className="mt-5 text-xs text-muted">Google and phone sign-in aren't configured on this server. Use email and password below.</p>;
+
+  const exchange = async (idToken: string) => {
+    // The server verifies the token with Firebase and starts the app's own session.
+    const r = await api<{ user: SessionUser; note?: string }>("/auth/firebase", { method: "POST", json: { id_token: idToken, role }, role: null });
+    await signOutFirebase();
+    forgetAllTokens();
+    await qc.invalidateQueries({ queryKey: ["session"] });
+    if (r.note) toast.info(r.note);
+    navigate(destination(r.user, next));
+  };
+  const attempt = async (step: "google" | "send" | "verify", fn: () => Promise<void>) => {
+    setBusy(step);
+    setError("");
+    try {
+      await fn();
+    } catch (e) {
+      const msg = firebaseMessage(e);
+      if (msg) setError(msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section aria-label="Sign in with Google or phone" className="mt-5 space-y-2.5">
+      <Button variant="outline" className="w-full" loading={busy === "google"} onClick={() => attempt("google", async () => exchange(await googleIdToken()))}>
+        Continue with Google
+      </Button>
+      {!phoneOpen ? (
+        <Button variant="ghost" className="w-full" onClick={() => setPhoneOpen(true)}>
+          <Phone aria-hidden /> Use my phone number
+        </Button>
+      ) : (
+        <div className="card-surface space-y-3 rounded-2xl p-4">
+          {!confirmation ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void attempt("send", async () => setConfirmation(await sendPhoneCode(phone.replace(/\s+/g, ""), "recaptcha-anchor")));
+              }}
+            >
+              <Label htmlFor="fb-phone">Phone number</Label>
+              <Input id="fb-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              <FieldHint>We send a one-time code by SMS. Standard SMS rates may apply.</FieldHint>
+              <Button type="submit" variant="primary" className="w-full" loading={busy === "send"}>
+                Send code
+              </Button>
+            </form>
+          ) : (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void attempt("verify", async () => exchange(await confirmPhoneCode(confirmation, code.trim())));
+              }}
+            >
+              <Label htmlFor="fb-code">Code from the SMS</Label>
+              <Input id="fb-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={8} />
+              <Button type="submit" variant="primary" className="w-full" loading={busy === "verify"}>
+                Verify and sign in
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+      <div id="recaptcha-anchor" />
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <p className="text-xs text-muted">First time? You'll join as {role === "creator" ? "a creator" : "a brand"}, the side picked above. That can't change later.</p>
+    </section>
+  );
+}
+
 function AccountForm({ role, next, demo }: { role: Role; next: string | null; demo: boolean }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
@@ -104,8 +205,7 @@ function AccountForm({ role, next, demo }: { role: Role; next: string | null; de
       // The cookie session now speaks for this browser; demo tokens would shadow it.
       forgetAllTokens();
       await qc.invalidateQueries({ queryKey: ["session"] });
-      const home = homeFor(user);
-      navigate(next && next.startsWith(home.split("/").slice(0, 2).join("/")) ? next : home);
+      navigate(destination(user, next));
     },
   });
 

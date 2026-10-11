@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
+from ..services import firebase_auth
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -109,6 +110,54 @@ def me(user: dict = Depends(au.current_user)):
         b = db.brands.find_one({"_id": user["brand_id"]}, {"name": 1})
         profile = {"id": b["_id"], "name": b["name"]} if b else None
     return {"user": au.public_user(user), "profile": profile, "demo_mode": get_settings().demo_mode}
+
+
+# ------------------------------------------------------------------ Firebase (Google, phone OTP)
+class FirebaseIn(BaseModel):
+    id_token: str = Field(min_length=20, max_length=4096)
+    # Chosen once, at the first sign-in. Ignored for an existing account: a role never changes.
+    role: Literal["creator", "brand"] | None = None
+    name: str | None = Field(default=None, max_length=60)
+
+
+@router.post("/firebase")
+def firebase_signin(body: FirebaseIn, request: Request, response: Response):
+    """Exchange a verified Firebase ID token for the app's own session."""
+    claims = firebase_auth.verify(body.id_token)
+    uid = claims.get("uid") or claims.get("sub")
+    if not uid:
+        raise HTTPException(401, "That sign-in couldn't be verified. Sign in again.")
+    db = get_db()
+    email = (claims.get("email") or "").strip().lower() or None
+    verified_email = email if claims.get("email_verified") else None
+    provider = (claims.get("firebase") or {}).get("sign_in_provider", "firebase")
+    user = db.users.find_one({"firebase_uid": uid})
+    if not user and verified_email:
+        # An email-and-password account with the same verified email: link it, keep its role.
+        user = db.users.find_one({"email": verified_email, "firebase_uid": {"$exists": False}})
+        if user:
+            db.users.update_one({"_id": user["_id"]}, {"$set": {"firebase_uid": uid}})
+            user["firebase_uid"] = uid
+            au.audit("link_firebase", user["_id"], user["role"], via=provider)
+    note = None
+    if user:
+        if user.get("suspended"):
+            raise HTTPException(403, "This account is suspended. Contact support if you think this is a mistake.")
+        if body.role and body.role != user["role"]:
+            note = f"This account is a {user['role']} account. The side chosen at first sign-in can't change."
+    else:
+        if not body.role:
+            raise HTTPException(409, "First sign-in: choose creator or brand.")
+        name = (body.name or claims.get("name") or (email or "").split("@")[0] or claims.get("phone_number") or "New member").strip()[:60]
+        fields = {"firebase_uid": uid, "phone": claims.get("phone_number")}
+        if verified_email and not db.users.find_one({"email": verified_email}):
+            fields["email"] = verified_email
+        user = au.new_user(body.role, name, **fields)
+        au.audit("signup", user["_id"], user["role"], via=provider)
+    out = _signed_in(request, response, user, f"firebase:{provider}")
+    if note:
+        out["note"] = note
+    return out
 
 
 # ------------------------------------------------------------------ demo mode
