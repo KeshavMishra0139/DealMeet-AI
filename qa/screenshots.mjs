@@ -33,6 +33,8 @@ const ROUTES = [
   ["creator-kit", "/creator/kit?as=cr_a"],
   ["creator-privacy", "/creator/privacy?as=cr_a"],
   ["link-in-bio", "/c/creator.a"],
+  ["worth", "/worth"],
+  ["creator-connections", "/creator/connections?as=cr_a"],
   ["brand-onboarding", "/brand/onboarding?as=new_brand"],
   ["brand-home", "/brand?as=br_senpai"],
   ["brand-campaigns", "/brand/campaigns?as=br_senpai"],

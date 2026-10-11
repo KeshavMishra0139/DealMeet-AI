@@ -7,6 +7,8 @@ export const en = {
   "nav.deals": "Deals",
   "nav.kit": "Media kit",
   "nav.privacy": "Privacy",
+  "nav.connections": "Connections",
+  "connections.title": "Connections",
   "nav.more": "More",
   "home.greeting": "Here's what to do this week",
   "home.moves": "Your next 3 moves",

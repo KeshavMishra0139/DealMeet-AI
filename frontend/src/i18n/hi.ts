@@ -9,6 +9,8 @@ export const hi: Dict = {
   "nav.deals": "डील",
   "nav.kit": "मीडिया किट",
   "nav.privacy": "प्राइवेसी",
+  "nav.connections": "कनेक्शन",
+  "connections.title": "कनेक्शन",
   "nav.more": "और",
   "home.greeting": "इस हफ़्ते क्या करना है",
   "home.moves": "आपके अगले 3 कदम",

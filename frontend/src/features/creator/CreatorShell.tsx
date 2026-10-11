@@ -6,6 +6,7 @@ import {
   IndianRupee,
   Inbox,
   Languages,
+  Link2,
   Map as MapIcon,
   Menu,
   RotateCcw,
@@ -39,6 +40,7 @@ const PRIMARY: NavItem[] = [
   { to: "/creator/deals", key: "nav.deals", icon: Handshake },
 ];
 const SECONDARY: NavItem[] = [
+  { to: "/creator/connections", key: "nav.connections", icon: Link2 },
   { to: "/creator/kit", key: "nav.kit", icon: FileText },
   { to: "/creator/privacy", key: "nav.privacy", icon: ShieldCheck },
 ];

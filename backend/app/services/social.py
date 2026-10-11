@@ -1,34 +1,40 @@
 """Connection status for each social platform a creator can connect.
 
 A platform is "connected" only through its official login (OAuth, read-only
-scopes). Until that integration is configured on the server it is "unavailable";
-until the creator connects it is "not_connected". Nothing is simulated for an
-account that isn't connected.
+scopes); a YouTube channel linked by its handle is "linked" (public data, ownership
+not verified). When an integration isn't configured on the server it is
+"unavailable"; before the creator connects it is "not_connected". Nothing is
+simulated for an account that isn't connected.
 """
 from __future__ import annotations
 
-from ..db import get_db
+from typing import Callable
 
-PLATFORMS = {
-    "instagram": "Instagram",
-    "youtube": "YouTube",
-}
+PLATFORMS = {"instagram": "Instagram", "youtube": "YouTube"}
 
-# Each integration registers (is_configured, connection_for_creator) here when it exists.
-PROVIDERS: dict[str, tuple] = {}
+# platform -> (is the integration configured on this server?, status for one creator)
+PROVIDERS: dict[str, tuple[Callable[[], bool], Callable[[dict], dict]]] = {}
+
+
+def register(platform: str, configured: Callable[[], bool], status_for: Callable[[dict], dict]) -> None:
+    PROVIDERS[platform] = (configured, status_for)
 
 
 def status(creator: dict) -> dict:
-    db = get_db()
     out = []
     for key, label in PLATFORMS.items():
         provider = PROVIDERS.get(key)
-        if not provider or not provider[0]():
+        if not provider:
             out.append({"platform": key, "label": label, "status": "unavailable", "detail": f"{label} connect isn't set up on this server yet."})
             continue
-        conn = db.connections.find_one({"creator_id": creator["_id"], "platform": key})
-        if not conn:
-            out.append({"platform": key, "label": label, "status": "not_connected", "detail": f"Connect {label} with its official login to use your real numbers."})
-            continue
-        out.append(provider[1](conn))
+        out.append(provider[1](creator))
     return {"platforms": out, "sample_data": creator.get("insights_source") == "synthetic"}
+
+
+def register_builtin() -> None:
+    from . import youtube_public
+
+    register("youtube", youtube_public.configured, youtube_public.status)
+
+
+register_builtin()
