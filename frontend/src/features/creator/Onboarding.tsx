@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Instagram, Lock, Sparkles, Youtube } from "lucide-react";
 import { useState } from "react";
@@ -11,7 +11,6 @@ import { ChipGroup, FieldHint, Input, Label, Progress, Select, Slider, Switch, T
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import { inr } from "@/lib/format";
-import { setPersona } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +79,7 @@ export default function Onboarding() {
   const tags = useMutation({
     mutationFn: () => post<TagResult>("/ai/tag", { captions: f.captions.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 8) }),
   });
+  const qc = useQueryClient();
   const create = useMutation({
     mutationFn: () =>
       post<{ id: string }>("/creators", {
@@ -99,8 +99,9 @@ export default function Onboarding() {
         discoverable: f.discoverable,
         consent_defaults: f.scopes,
       }),
-    onSuccess: ({ id }) => {
-      setPersona("creator", id);
+    onSuccess: async () => {
+      // The new profile is linked to this account on the server; re-read the session to pick it up.
+      await qc.invalidateQueries({ queryKey: ["session"] });
       navigate("/creator");
     },
   });

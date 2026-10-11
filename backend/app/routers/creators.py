@@ -5,7 +5,7 @@ import random
 import re
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..ai.regional import tag_captions
@@ -16,6 +16,7 @@ from ..engines.fair_price import fair_price
 from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
+from ..services import auth as au
 from ..services import cache
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
@@ -31,7 +32,7 @@ def _summary(c: dict) -> dict:
 
 
 @router.get("/creators/{creator_id}/home")
-def home(creator_id: str):
+def home(creator_id: str, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     ctx = cc.build(c)
     return {
@@ -53,7 +54,7 @@ class MoveAction(BaseModel):
 
 
 @router.post("/creators/{creator_id}/moves/{move_id}")
-def update_move(creator_id: str, move_id: str, body: MoveAction):
+def update_move(creator_id: str, move_id: str, body: MoveAction, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     status = {"done": "done", "skip": "skipped", "reopen": "open"}[body.action]
     try:
@@ -63,14 +64,14 @@ def update_move(creator_id: str, move_id: str, body: MoveAction):
 
 
 @router.post("/creators/{creator_id}/plan/next")
-def plan_next(creator_id: str):
+def plan_next(creator_id: str, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     ctx = cc.build(c, with_plan=False)
     return next_step.next_week(c, ctx)
 
 
 @router.get("/creators/{creator_id}/roadmap")
-def get_roadmap(creator_id: str):
+def get_roadmap(creator_id: str, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     ctx = cc.build(c)
     return {
@@ -81,7 +82,7 @@ def get_roadmap(creator_id: str):
 
 
 @router.get("/creators/{creator_id}/money")
-def money(creator_id: str):
+def money(creator_id: str, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     ctx = cc.build(c, with_plan=False)
     brands = sorted(
@@ -105,7 +106,7 @@ def money(creator_id: str):
 
 
 @router.get("/creators/{creator_id}/fair-price")
-def get_fair_price(creator_id: str, lister_id: str | None = None, listing_id: str | None = None):
+def get_fair_price(creator_id: str, lister_id: str | None = None, listing_id: str | None = None, _: dict = Depends(au.own_creator)):
     c = cc.load_creator(creator_id)
     db = get_db()
     lister = db.brands.find_one({"_id": lister_id}) if lister_id else None
@@ -156,10 +157,14 @@ def _handle(name: str) -> str:
 
 
 @router.post("/creators")
-def create_creator(body: OnboardingIn):
+def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
+    """Onboarding: creates the signed-in creator account's profile, once."""
+    au.require_role(user, "creator")
     if body.niche not in NICHES:
         raise HTTPException(422, "Unknown niche")
     db = get_db()
+    if user.get("creator_id") and db.creators.count_documents({"_id": user["creator_id"]}):
+        raise HTTPException(409, "This account already has a creator profile.")
     if db.creators.count_documents({"created_by": "onboarding"}) >= 100:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     followers = body.followers if body.followers is not None else STAGE_FOLLOWERS[body.audience_stage]
@@ -232,6 +237,7 @@ def create_creator(body: OnboardingIn):
     if AGE_PROFILES.get(body.niche) is None:
         raise HTTPException(422, "Unknown niche")
     db.creators.insert_one(doc)
+    au.link_profile(user, cid)
     cache.invalidate("trust:")  # per-creator scores; the trained model stays
     cache.invalidate("spam")
     return {"id": cid, "handle": doc["handle"]}
@@ -242,12 +248,12 @@ class TagIn(BaseModel):
 
 
 @router.post("/ai/tag")
-def ai_tag(body: TagIn):
+def ai_tag(body: TagIn, _: dict = Depends(au.current_user)):
     return tag_captions(body.captions)
 
 
 @router.post("/oauth/{platform}/authorize")
-def mock_oauth(platform: Literal["instagram", "youtube"]):
+def mock_oauth(platform: Literal["instagram", "youtube"], _: dict = Depends(au.current_user)):
     """Stands in for the official Instagram Graph API / YouTube Data API consent
     screen. Returns the scopes a real integration would request."""
     scopes = {

@@ -28,4 +28,4 @@ e2e:
 
 # Reset the in-memory demo data while the app is running.
 reset:
-	curl -s -X POST http://localhost:8000/api/demo/reset
+	curl -s -X POST -H "X-Requested-With: make" http://localhost:8000/api/demo/reset

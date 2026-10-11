@@ -15,6 +15,7 @@ import {
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
+import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { LangScope, useI18n } from "@/i18n";
 import type { Dict } from "@/i18n/en";
 import { api, post } from "@/lib/api";
-import { useSharedDemo } from "@/lib/shared-demo";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { isEmbedFrame, useCreatorId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { Creator } from "@/lib/types";
@@ -50,7 +51,9 @@ export function useCreator() {
 export default function CreatorShell() {
   return (
     <LangScope>
-      <Studio />
+      <RequireSession role="creator">
+        <Studio />
+      </RequireSession>
     </LangScope>
   );
 }
@@ -239,35 +242,41 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
   const shared = useSharedDemo();
+  const demo = useDemoMode();
   return (
     <div className="space-y-1">
       <div className="hidden lg:block">
         <LangToggle />
       </div>
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        onClick={() => {
-          onDone?.();
-          navigate("/login?role=creator");
-        }}
-      >
-        <Users aria-hidden /> {t("common.switchProfile")}
-      </Button>
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        loading={resetting}
-        onClick={async () => {
-          setResetting(true);
-          await post("/demo/reset");
-          await qc.invalidateQueries();
-          setResetting(false);
-          onDone?.();
-        }}
-      >
-        {!resetting && <RotateCcw aria-hidden />} {t("common.resetDemo")}
-      </Button>
+      {demo && (
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={() => {
+            onDone?.();
+            navigate("/login?role=creator");
+          }}
+        >
+          <Users aria-hidden /> {t("common.switchProfile")}
+        </Button>
+      )}
+      {demo && (
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          loading={resetting}
+          onClick={async () => {
+            setResetting(true);
+            await post("/demo/reset");
+            await qc.invalidateQueries();
+            setResetting(false);
+            onDone?.();
+          }}
+        >
+          {!resetting && <RotateCcw aria-hidden />} {t("common.resetDemo")}
+        </Button>
+      )}
+      <SignOutButton role="creator" onDone={onDone} className="w-full justify-start" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">{t("common.sharedDemo")}</p>}
     </div>
   );

@@ -3,18 +3,19 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from ..ai.llm import generate
-from ..config import now_iso, today
+from ..config import get_settings, now_iso, today
 from ..db import get_db
 from ..engines import brand_safety, metrics
 from ..engines.common import inr, inr_range, short
 from ..engines.fair_price import fair_price
 from ..engines.trust import trust_score
 from ..seed.catalog import LANGS, NICHES
+from ..services import auth as au
 from ..services.creator_ctx import best_fit_brand, load_creator
 from ..services.pdf import media_kit_pdf
 
@@ -138,7 +139,7 @@ def build_kit(c: dict) -> dict:
 
 
 @router.get("/creators/{creator_id}/kit")
-def kit(creator_id: str):
+def kit(creator_id: str, _: dict = Depends(au.own_creator)):
     return build_kit(load_creator(creator_id))
 
 
@@ -149,14 +150,14 @@ class PublicIn(BaseModel):
 
 
 @router.post("/creators/{creator_id}/kit")
-def update_public(creator_id: str, body: PublicIn):
+def update_public(creator_id: str, body: PublicIn, _: dict = Depends(au.own_creator)):
     load_creator(creator_id)
     get_db().creators.update_one({"_id": creator_id}, {"$set": {"public_scopes": body.model_dump()}})
     return build_kit(load_creator(creator_id))
 
 
 @router.get("/creators/{creator_id}/kit.pdf")
-def kit_pdf(creator_id: str, request: Request):
+def kit_pdf(creator_id: str, request: Request, _: dict = Depends(au.own_creator)):
     k = build_kit(load_creator(creator_id))
     k["link"] = request.url.netloc + k["path"]  # the address this demo is served from
     return Response(media_kit_pdf(k), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-{k["handle"]}.pdf"'})
@@ -180,34 +181,51 @@ class BookIn(BaseModel):
 
 
 @router.post("/public/{handle}/book")
-def book(handle: str, body: BookIn):
+def book(handle: str, body: BookIn, user: dict | None = Depends(au.optional_user)):
+    """A brand books a creator from their public page. A signed-in brand books as itself.
+    In demo mode a visitor without an account gets a guest brand account to follow the
+    booking; outside demo mode they sign in first."""
     db = get_db()
     c = db.creators.find_one({"handle": handle.lstrip("@")})
     if not c:
         raise HTTPException(404, "Creator not found")
+    if user and user.get("role") != "brand":
+        raise HTTPException(403, "Sign in with a brand account to book a creator.")
+    if not user and not get_settings().demo_mode:
+        raise HTTPException(401, "Sign in with a brand account to book a creator.")
     if (
         db.deals.count_documents({"creator_id": c["_id"], "source": "link_in_bio"}) >= 30
         or db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50
     ):
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
-    bid = f"br_guest_{uuid.uuid4().hex[:6]}"
-    db.brands.insert_one(
-        {
-            "_id": bid,
-            "kind": "brand",
-            "name": body.brand_name.strip(),
-            "category": "Booked via link-in-bio",
-            "description": "",
-            "hue": sum(map(ord, body.brand_name)) % 360,
-            "niches": [c["niche"]],
-            "target": {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []},
-            "verified": False,
-            "guest": True,
-            # The email isn't stored: other visitors of this shared demo could read it.
-            "contact_given": True,
-            "created_at": now_iso(),
-        }
-    )
+    guest = False
+    if user and user.get("brand_id") and db.brands.count_documents({"_id": user["brand_id"]}):
+        bid = user["brand_id"]
+    elif user:
+        raise HTTPException(409, "Set up your brand profile first, then book.")
+    else:
+        bid = f"br_guest_{uuid.uuid4().hex[:6]}"
+        db.brands.insert_one(
+            {
+                "_id": bid,
+                "kind": "brand",
+                "name": body.brand_name.strip(),
+                "category": "Booked via link-in-bio",
+                "description": "",
+                "hue": sum(map(ord, body.brand_name)) % 360,
+                "niches": [c["niche"]],
+                "target": {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []},
+                "verified": False,
+                "guest": True,
+                # The email isn't stored: other visitors of this shared demo could read it.
+                "contact_given": True,
+                "created_at": now_iso(),
+            }
+        )
+        # A demo account for the guest brand, so the booking link below can open their console.
+        account = au.new_user("brand", body.brand_name.strip(), brand_id=bid, demo=True)
+        au.audit("signup", account["_id"], "brand", via="guest_booking")
+        guest = True
     deliverables = {
         "reel": [{"kind": "reel", "count": 1}],
         "reel_stories": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}],
@@ -238,7 +256,9 @@ def book(handle: str, body: BookIn):
     return {
         "ok": True,
         "fair": fp["total"] if _public(c)["rates"] else None,
-        "message": f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow on this booking's page. Nothing is emailed in this demo, so use Follow this booking to get back to it.",
-        # The guest has no login yet, so this link opens the deal as their brand to sign and pay.
-        "track": f"/brand/deals/{did}?as={bid}",
+        "message": f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow on this booking's page. Nothing is emailed in this demo, so use Follow this booking to get back to it."
+        if guest
+        else f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow from Deals in your Brand Console.",
+        # A guest (demo mode) follows the booking with the guest account made for them.
+        "track": f"/brand/deals/{did}?as={bid}" if guest else f"/brand/deals/{did}",
     }

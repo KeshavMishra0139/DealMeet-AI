@@ -11,3 +11,8 @@ export function useHealth() {
 export function useSharedDemo(): boolean {
   return !!useHealth().data?.shared_demo;
 }
+
+/** Demo mode (DEMO_MODE=1): persona sign-in, seeded data and the Reset button exist. */
+export function useDemoMode(): boolean {
+  return !!useHealth().data?.demo_mode;
+}

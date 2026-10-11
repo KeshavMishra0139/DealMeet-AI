@@ -20,8 +20,10 @@ RUN cd frontend && npm run build
 FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    # Everyone on a public URL shares one demo: put it back to its seeded state
-    # every 30 minutes (skipped while someone is mid-walkthrough).
+    # This image runs the shared demo: seeded personas and demo sign-in (DEMO_MODE=1),
+    # put back to its seeded state every 30 minutes (skipped while someone is
+    # mid-walkthrough). Set DEMO_MODE=0 on the host for real accounts only.
+    DEMO_MODE=1 \
     DEMO_RESET_MINUTES=30
 WORKDIR /app
 COPY backend/requirements.txt backend/

@@ -140,9 +140,24 @@ if (setupOnly) {
   process.exit(0);
 }
 
+/** A value from the repo-root .env, if the file sets it. */
+function dotenv(key) {
+  const file = join(root, ".env");
+  if (!existsSync(file)) return undefined;
+  for (const line of readFileSync(file, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+    if (m && m[1] === key) return m[2].trim().replace(/^["']|["']$/g, "") || undefined;
+  }
+  return undefined;
+}
+
+// The local runner starts the demo (seeded personas, demo sign-in, the Reset button) unless
+// DEMO_MODE=0 is set in the environment or .env. The API itself defaults to demo mode off.
+const DEMO_MODE = process.env.DEMO_MODE ?? dotenv("DEMO_MODE") ?? "1";
+
 const procs = [];
 function start(name, color, cmd, args, cwd) {
-  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, FORCE_COLOR: "1" } });
+  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, DEMO_MODE, FORCE_COLOR: "1" } });
   const tag = color(name.padEnd(4));
   const pipe = (stream) => {
     let buf = "";

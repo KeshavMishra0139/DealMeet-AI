@@ -3,12 +3,13 @@ import { Building2, Handshake, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
+import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
-import { useSharedDemo } from "@/lib/shared-demo";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useBrandId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,14 @@ export function useBrand() {
 
 export default function BrandShell() {
   useTheme("brand");
+  return (
+    <RequireSession role="brand">
+      <Console />
+    </RequireSession>
+  );
+}
+
+function Console() {
   const brand = useBrand();
   const [open, setOpen] = useState(false);
 
@@ -150,34 +159,40 @@ function Controls({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
   const shared = useSharedDemo();
+  const demo = useDemoMode();
   return (
     <div className="space-y-0.5">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start"
-        onClick={() => {
-          onDone?.();
-          navigate("/login?role=brand");
-        }}
-      >
-        <Users aria-hidden /> Switch brand
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start"
-        loading={resetting}
-        onClick={async () => {
-          setResetting(true);
-          await post("/demo/reset");
-          await qc.invalidateQueries();
-          setResetting(false);
-          onDone?.();
-        }}
-      >
-        {!resetting && <RotateCcw aria-hidden />} Reset demo
-      </Button>
+      {demo && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => {
+            onDone?.();
+            navigate("/login?role=brand");
+          }}
+        >
+          <Users aria-hidden /> Switch brand
+        </Button>
+      )}
+      {demo && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          loading={resetting}
+          onClick={async () => {
+            setResetting(true);
+            await post("/demo/reset");
+            await qc.invalidateQueries();
+            setResetting(false);
+            onDone?.();
+          }}
+        >
+          {!resetting && <RotateCcw aria-hidden />} Reset demo
+        </Button>
+      )}
+      <SignOutButton role="brand" onDone={onDone} size="sm" className="w-full justify-start" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.</p>}
     </div>
   );

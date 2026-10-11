@@ -28,6 +28,9 @@ COLLECTIONS = [
     "notifications",
     "ai_cache",
 ]
+# Accounts live apart from the demo data: a demo reset keeps the seeded persona
+# accounts (and their sessions) and never touches the audit log.
+ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "audit"]
 
 
 def get_db():
