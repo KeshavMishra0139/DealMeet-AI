@@ -16,7 +16,8 @@ import { useI18n } from "@/i18n";
 import { api, post } from "@/lib/api";
 import { count } from "@/lib/format";
 import { useCreatorId } from "@/lib/session";
-import type { InstagramAccount, InstagramData, LinkedYouTube, PlatformStatus } from "@/lib/youtube-types";
+import { firebaseEnabled, firebaseMessage, youtubeAnalyticsToken } from "@/lib/firebase";
+import type { InstagramAccount, InstagramData, LinkedYouTube, PlatformStatus, YouTubeAnalytics } from "@/lib/youtube-types";
 
 const STATUS_LABEL: Record<PlatformStatus["status"], string> = {
   connected: "Connected",
@@ -153,6 +154,7 @@ function YouTubeCard({ creatorId, status }: { creatorId: string; status: Platfor
               <p className="text-xs text-muted">Refreshing uses YouTube's numbers from the last 12 hours at most.</p>
             </>
           )}
+          <AnalyticsPanel data={d} onChange={done} />
         </div>
       )}
     </section>
@@ -334,6 +336,134 @@ function InstagramSummary({ acct }: { acct: InstagramAccount }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function duration(s: number) {
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function AnalyticsPanel({ data, onChange }: { data: LinkedYouTube; onChange: (d: LinkedYouTube) => void }) {
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const off = useMutation({
+    mutationFn: () => api<LinkedYouTube>("/connect/youtube/analytics", { method: "DELETE" }),
+    onSuccess: (d) => {
+      onChange(d);
+      toast.success("YouTube Analytics disconnected", { description: "Its snapshots were deleted." });
+    },
+  });
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const token = await youtubeAnalyticsToken();
+      onChange(await post<LinkedYouTube>("/connect/youtube/analytics", { access_token: token }));
+      setConsent(false);
+      toast.success("YouTube Analytics connected");
+    } catch (e) {
+      const msg = firebaseMessage(e);
+      if (msg) toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const a = data.analytics;
+  return (
+    <div className="border-t border-line pt-4">
+      <h3 className="text-sm font-semibold">YouTube Analytics</h3>
+      {!firebaseEnabled ? (
+        <p className="mt-1 text-sm text-fg-2">YouTube Analytics needs Google sign-in (Firebase), which isn't set up on this server.</p>
+      ) : !a ? (
+        <>
+          <p className="mt-1 text-sm text-fg-2">Confirms the channel is yours and adds watch time and your audience's age, gender and country.</p>
+          <Button className="mt-3" variant="outline" onClick={() => setConsent(true)}>
+            <Youtube aria-hidden /> Connect YouTube Analytics
+          </Button>
+        </>
+      ) : (
+        <AnalyticsView a={a} />
+      )}
+      {a && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setConsent(true)}>
+            <RefreshCw aria-hidden /> Refresh
+          </Button>
+          <Button size="sm" variant="ghost" loading={off.isPending} onClick={() => off.mutate()}>
+            <Trash2 aria-hidden /> Disconnect Analytics
+          </Button>
+        </div>
+      )}
+      <Dialog open={consent} onOpenChange={setConsent}>
+        <DialogContent title="Connect YouTube Analytics" description="Google's official sign-in. Read-only.">
+          <p className="rounded-2xl border border-line bg-surface-2 p-4 text-sm leading-relaxed">{data.analytics_consent}</p>
+          <p className="mt-3 text-xs text-muted">
+            Sign in with the Google account that owns {data.channel?.title}. JodiDar reads the last 28 days once and doesn't keep Google's access, so
+            Refresh asks again.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConsent(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" loading={busy} onClick={connect}>
+              Continue to Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AnalyticsView({ a }: { a: YouTubeAnalytics }) {
+  const byAge = new Map<string, number>();
+  const byGender = new Map<string, number>();
+  for (const r of a.age_gender) {
+    byAge.set(r.age, (byAge.get(r.age) ?? 0) + r.percent);
+    byGender.set(r.gender, (byGender.get(r.gender) ?? 0) + r.percent);
+  }
+  const ages: ShareRow[] = [...byAge.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([label, p]) => ({ label, share: p / 100 }));
+  const totalViews = a.countries.reduce((s, c) => s + c.views, 0) || 1;
+  const countries: ShareRow[] = a.countries.slice(0, 6).map((c) => ({ label: c.country, share: c.views / totalViews }));
+  return (
+    <div className="mt-2 space-y-4">
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <SourceBadge source={a.source} fetchedAt={a.fetched_at} /> Snapshot of {a.start} to {a.end}, taken {a.fetched_at.slice(0, 10)}
+      </p>
+      <dl className="grid grid-cols-3 gap-3">
+        {[
+          ["Views, 28 days", count(a.views)],
+          ["Hours watched", count(Math.round(a.minutes_watched / 60))],
+          ["Average view", duration(a.average_view_duration_s)],
+        ].map(([k, v]) => (
+          <div key={k} className="rounded-2xl bg-surface-2 p-3">
+            <dt className="text-[11px] text-muted">{k}</dt>
+            <dd className="num font-display text-lg font-semibold">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="grid gap-4 md:grid-cols-2">
+        {ages.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold">Viewers by age</h4>
+            <p className="mt-0.5 text-xs text-muted">
+              {[...byGender.entries()].map(([g, p]) => `${Math.round(p)}% ${g === "female" ? "women" : g === "male" ? "men" : g}`).join(", ")}
+            </p>
+            <div className="mt-2">
+              <ShareBars rows={ages} caption="YouTube viewers by age" />
+            </div>
+          </div>
+        )}
+        {countries.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold">Views by country</h4>
+            <div className="mt-2">
+              <ShareBars rows={countries} caption="YouTube views by country" />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

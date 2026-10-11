@@ -245,7 +245,11 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
     }
     prev = (db.creators.find_one({"_id": creator_id}, {"channels": 1}) or {}).get("channels", {}).get("youtube") or {}
     if prev.get("channel_id") == ch["id"]:
+        # A refresh keeps what YouTube Analytics confirmed for this same channel.
         summary["ownership_verified"] = bool(prev.get("ownership_verified"))
+        for k in ("analytics", "analytics_connected"):
+            if k in prev:
+                summary[k] = prev[k]
     db.creators.update_one({"_id": creator_id}, {"$set": {"channels.youtube": summary}})
     for v in report["videos"]:
         db.posts.update_one(

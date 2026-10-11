@@ -57,6 +57,25 @@ export async function confirmPhoneCode(confirmation: ConfirmationResult, code: s
   return result.user.getIdToken();
 }
 
+const YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"];
+
+/**
+ * Asks Google for read-only YouTube access, only when a creator clicks "Connect YouTube
+ * Analytics" (ordinary sign-in never asks, so brands are never asked). Returns the
+ * access token for the server to use once; it isn't kept anywhere.
+ */
+export async function youtubeAnalyticsToken(): Promise<string> {
+  const { auth, instance } = await load();
+  const provider = new auth.GoogleAuthProvider();
+  YOUTUBE_SCOPES.forEach((s) => provider.addScope(s));
+  provider.setCustomParameters({ prompt: "consent" });
+  const result = await auth.signInWithPopup(instance, provider);
+  const token = auth.GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+  await auth.signOut(instance);
+  if (!token) throw new Error("Google didn't return YouTube access. Try again and allow both YouTube permissions.");
+  return token;
+}
+
 export async function signOutFirebase() {
   if (!firebaseEnabled) return;
   try {
