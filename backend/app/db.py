@@ -1,5 +1,13 @@
-"""MongoDB access. Uses Atlas when MONGODB_URI is set and reachable, otherwise an
-in-memory mongomock database so the demo never depends on the network."""
+"""The one place the app talks to MongoDB.
+
+- USE_MOCK_DB=1: an in-memory mongomock database (tests and the local demo).
+  Data is gone when the process stops.
+- Otherwise MONGODB_URI (MongoDB Atlas or any MongoDB) with TLS certificates
+  from certifi. A missing or unreachable URI stops startup with a clear message:
+  the app never falls back to memory on its own, so data can't silently vanish.
+
+Every module gets the database from `get_db()`; nothing else creates a client.
+"""
 from __future__ import annotations
 
 import logging
@@ -11,8 +19,9 @@ from .config import get_settings
 log = logging.getLogger("jodidar.db")
 
 _lock = threading.Lock()
+_client = None
 _db = None
-_mode = "in-memory"
+_mode = "unset"
 
 COLLECTIONS = [
     "creators",
@@ -35,36 +44,106 @@ COLLECTIONS = [
 ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "audit"]
 
 
+class DatabaseNotConfigured(RuntimeError):
+    pass
+
+
+def _connect():
+    settings = get_settings()
+    if settings.use_mock_db:
+        import mongomock
+
+        return mongomock.MongoClient(), "mock"
+    if not settings.mongodb_uri:
+        raise DatabaseNotConfigured(
+            "No database configured. Set MONGODB_URI to your MongoDB Atlas connection string, "
+            "or set USE_MOCK_DB=1 for an in-memory database whose data is lost on restart."
+        )
+    import certifi
+    from pymongo import MongoClient
+
+    client = MongoClient(settings.mongodb_uri, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=5000)
+    try:
+        client.admin.command("ping")
+    except Exception as exc:  # bad URI, wrong password, IP not allowed, network down
+        client.close()
+        raise DatabaseNotConfigured(
+            f"Can't reach the database in MONGODB_URI ({type(exc).__name__}). Check the connection string, "
+            "the database user's password, and that this server's IP is allowed in Atlas Network Access."
+        ) from None
+    uri = settings.mongodb_uri
+    return client, "atlas" if (uri.startswith("mongodb+srv://") or "mongodb.net" in uri) else "mongodb"
+
+
 def get_db():
-    global _db, _mode
+    global _client, _db, _mode
     if _db is not None:
         return _db
     with _lock:
-        if _db is not None:
-            return _db
-        settings = get_settings()
-        if settings.mongodb_uri:
-            try:
-                from pymongo import MongoClient
-
-                client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=2500)
-                client.admin.command("ping")
-                _db = client[settings.mongodb_db]
-                _mode = "atlas"
-                log.info("Connected to MongoDB Atlas")
-            except Exception as exc:  # network down, bad URI, etc.
-                log.warning("MongoDB unreachable (%s); using in-memory database", exc)
         if _db is None:
-            import mongomock
-
-            _db = mongomock.MongoClient()[settings.mongodb_db]
-            _mode = "in-memory"
+            client, mode = _connect()
+            db = client[get_settings().mongodb_db]
+            # Indexes come first, while a fresh in-memory database is still empty.
+            ensure_indexes(db)
+            _client, _mode, _db = client, mode, db
+            log.info("Database: %s (%s)", _mode, get_settings().mongodb_db)
         return _db
+
+
+def reset_client() -> None:
+    """Drop the cached client, so the next get_db() connects again (tests, restarts)."""
+    global _client, _db, _mode
+    with _lock:
+        if _client is not None and _mode != "mock":
+            _client.close()
+        _client, _db, _mode = None, None, "unset"
 
 
 def db_mode() -> str:
     get_db()
     return _mode
+
+
+def ping() -> bool:
+    try:
+        get_db().command("ping")
+        return True
+    except Exception:
+        return False
+
+
+def ensure_indexes(db) -> None:
+    """Create the indexes the app relies on. Runs on every connect; safe to repeat."""
+    text = {"$type": "string"}
+    db.users.create_index("firebase_uid", unique=True, partialFilterExpression={"firebase_uid": text})
+    db.users.create_index("email", unique=True, partialFilterExpression={"email": text})
+    db.users.create_index("creator_id")
+    db.users.create_index("brand_id")
+    db.sessions.create_index("user_id")
+    db.login_failures.create_index([("email", 1), ("at", 1)])
+    db.audit.create_index([("ts", -1)])
+    db.audit.create_index("user_id")
+    db.creators.create_index("handle", unique=True, partialFilterExpression={"handle": text})
+    db.brands.create_index("slug", unique=True, partialFilterExpression={"slug": text})
+    db.connections.create_index([("user_id", 1), ("platform", 1)], unique=True)
+    db.connections.create_index([("creator_id", 1), ("platform", 1)])
+    db.metric_snapshots.create_index([("creator_id", 1), ("platform", 1), ("date", 1)])
+    db.posts.create_index([("creator_id", 1), ("platform", 1), ("post_id", 1)], unique=True)
+    db.listings.create_index("owner_id")
+    db.listings.create_index("status")
+    db.deals.create_index("creator_id")
+    db.deals.create_index("brand_id")
+    db.deals.create_index("stage")
+    db.deals.create_index("collective_id")
+    db.collectives.create_index("brand_id")
+    db.consents.create_index([("creator_id", 1), ("lister_id", 1)])
+    db.consent_audit.create_index([("creator_id", 1), ("at", -1)])
+    db.applications.create_index("listing_id")
+    db.invoices.create_index("creator_id")
+    db.invoices.create_index("deal_id")
+    db.payments.create_index([("kind", 1), ("ref_id", 1)])
+    db.payments.create_index("payment_id", unique=True, partialFilterExpression={"payment_id": text})
+    db.notifications.create_index("to")
 
 
 def out(doc: dict[str, Any] | None) -> dict[str, Any] | None:

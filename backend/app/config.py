@@ -66,6 +66,8 @@ class Settings:
     demo_mode: bool = False
     session_hours: int = 72
     razorpay_webhook_secret: str | None = None
+    # In-memory mongomock instead of MONGODB_URI (tests and the local demo). Never a silent fallback.
+    use_mock_db: bool = False
 
     @property
     def has_ai(self) -> bool:
@@ -100,6 +102,7 @@ def get_settings() -> Settings:
         demo_mode=_flag("DEMO_MODE"),
         session_hours=int(_env("SESSION_HOURS", "72") or 72),
         razorpay_webhook_secret=_env("RAZORPAY_WEBHOOK_SECRET"),
+        use_mock_db=_flag("USE_MOCK_DB"),
     )
 
 

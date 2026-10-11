@@ -334,7 +334,7 @@ def view(d: dict, role: str) -> dict:
     fair_total = d.get("fair_at_offer")
     if not fair_total and creator:
         fair_total = fair_price(creator, brand or None, terms, with_model=False)["total"]
-    if role == "brand" and d.get("source") == "link_in_bio" and (creator.get("public_scopes") or {}).get("rates") is False:
+    if role == "brand" and d.get("channel") == "link_in_bio" and (creator.get("public_scopes") or {}).get("rates") is False:
         fair_total = None  # the creator hides rates on their public page, so the guest brand doesn't see them here
     alerts = []
     if d["stage"] == "offer" and fair_total and d["amount"] < 0.7 * fair_total:

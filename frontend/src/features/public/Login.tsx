@@ -76,7 +76,7 @@ export default function Login() {
         </main>
         {health.data && (
           <footer className="mt-8 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-            <span>Data: {health.data.modes.db}</span>
+            <span>Data: {health.data.modes.db === "mock" ? "in-memory (mock)" : health.data.modes.db}</span>
             <span>AI: {health.data.modes.ai}</span>
             <span>Payments: {health.data.modes.payments}</span>
             <span>Auth: {health.data.modes.auth}</span>

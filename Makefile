@@ -1,4 +1,4 @@
-.PHONY: dev demo setup test shots e2e reset
+.PHONY: dev demo setup test shots e2e reset seed
 
 # Start API (:8000) and web (:5173). Installs dependencies on first run.
 dev:
@@ -29,3 +29,8 @@ e2e:
 # Reset the in-memory demo data while the app is running.
 reset:
 	curl -s -X POST -H "X-Requested-With: make" http://localhost:8000/api/demo/reset
+
+# Load the sample (synthetic) data into the configured database (MONGODB_URI) if it's empty.
+# Add ARGS="--reset --confirm-reset" to replace the sample data on a real database.
+seed:
+	backend/.venv/bin/python scripts/seed.py $(ARGS)
