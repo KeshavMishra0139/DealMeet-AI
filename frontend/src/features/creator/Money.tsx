@@ -22,6 +22,7 @@ import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import type { FairPrice, Money as MoneyData, MoneyPath } from "@/lib/api-types";
 import { inr, inrRange, signedPct } from "@/lib/format";
+import { SourceBadge } from "@/components/shared/SourceBadge";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { StagePill } from "./Home";
@@ -126,6 +127,11 @@ function FairPriceCard({
               .
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {data.data_label && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-fg-2">
+                  {data.data_label} <SourceBadge source={data.data_source} />
+                </span>
+              )}
               <EstimateNote estimate={data.estimate} />
               <WhyPopover why={data.why} subject="Fair rate" />
             </div>

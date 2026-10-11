@@ -82,6 +82,18 @@ def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int
     }
 
 
+def data_label(c: dict) -> tuple[str, str]:
+    """(label, source) for what a creator's price is built from. Connecting an account
+    changes the data source, not the certainty: the price stays an estimate."""
+    if c.get("insights_source") == "instagram_api" and metrics.prov(c, "reels.0.views") == "real":
+        return "Estimate from Instagram data", "instagram_api"
+    if not metrics.has_reels(c):
+        return "Estimate from your follower count", "manual"
+    if metrics.recent_simulated(c, "views") or metrics.prov(c, "reels.0.views") in ("simulated", "seed") or c.get("insights_source") == "synthetic":
+        return "Estimate from sample data", "synthetic"
+    return "Estimate from self-reported numbers", "manual"
+
+
 def follower_price(c: dict) -> int:
     return nice_round(c.get("followers", 0) * FOLLOWER_RATE)
 
@@ -315,7 +327,10 @@ def fair_price(
         confidence = "high"
     fp = follower_price(c)
 
+    label, source = data_label(c)
     result = {
+        "data_label": label,
+        "data_source": source,
         "creator_id": c["_id"],
         "lister_id": lister["_id"] if lister else None,
         "lister_name": lister["name"] if lister else None,

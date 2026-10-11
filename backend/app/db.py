@@ -145,6 +145,8 @@ def ensure_indexes(db) -> None:
     db.payments.create_index("payment_id", unique=True, partialFilterExpression={"payment_id": text})
     db.notifications.create_index("to")
     db.rate_limits.create_index("expires")
+    db.oauth_states.create_index("expires")
+    db.fan_proof.create_index([("creator_id", 1), ("platform", 1)])
 
 
 def out(doc: dict[str, Any] | None) -> dict[str, Any] | None:

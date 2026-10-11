@@ -65,3 +65,25 @@ export interface LinkedYouTube {
   source?: string;
   fetched_at?: string;
 }
+
+export interface InstagramAccount {
+  ig_user_id: string;
+  username: string | null;
+  account_type: string | null;
+  followers: number;
+  media_count: number | null;
+  picture: string | null;
+  reach_28d: number | null;
+  views_28d: number | null;
+  demographics: { age?: Record<string, number>; gender?: Record<string, number>; city?: Record<string, number>; country?: Record<string, number> } | null;
+  notes: string[];
+  source: "instagram_api";
+  fetched_at: string;
+}
+
+export interface InstagramData {
+  status: PlatformStatus;
+  consent: string;
+  account: InstagramAccount | null;
+  posts: { post_id: string; caption: string; permalink: string; published_at: string; views: number | null; likes: number | null; media_product_type: string }[];
+}

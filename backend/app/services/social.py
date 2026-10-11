@@ -32,8 +32,9 @@ def status(creator: dict) -> dict:
 
 
 def register_builtin() -> None:
-    from . import youtube_public
+    from . import instagram, youtube_public
 
+    register("instagram", instagram.configured, instagram.status)
     register("youtube", youtube_public.configured, youtube_public.status)
 
 
