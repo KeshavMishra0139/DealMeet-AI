@@ -12,6 +12,7 @@ from ..db import get_db, out_many
 from ..engines.opportunities import matched
 from ..services import cache
 from ..services import consent as cs
+from ..services import social
 from ..services.auth import own_creator
 from ..services.creator_ctx import load_creator
 
@@ -149,11 +150,12 @@ def privacy(creator_id: str):
         "audit": audit,
         "sources": [
             {
-                "platform": p,
-                "connected": bool((c.get("insights_connected") or {}).get(p)),
-                "via": "Official login (demo sandbox)" if (c.get("insights_connected") or {}).get(p) else None,
+                "platform": p["platform"],
+                "connected": p["status"] == "connected",
+                "status": p["status"],
+                "via": "Official login, read-only" if p["status"] == "connected" else None,
             }
-            for p in ("instagram", "youtube")
+            for p in social.status(c)["platforms"]
         ],
         "is_reference": c.get("is_reference", False),
     }

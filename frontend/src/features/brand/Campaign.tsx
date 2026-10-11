@@ -351,7 +351,7 @@ function CollectivePanel({ listing }: { listing: Listing }) {
     mutationFn: () => post<{ members: number; total: number }>(`/listings/${listing.id}/collective/book`, { member_ids: q.data?.members.map((m) => m.id) ?? [], combined_reach: q.data?.combined_reach ?? null }),
     onSuccess: async (r) => {
       await qc.invalidateQueries();
-      toast.success(`Offer sent to ${r.members} creators`, { description: `One escrow payment of ${inr(r.total)}, split automatically by UPI once posts are verified.` });
+      toast.success(`Offer sent to ${r.members} creators`, { description: `One escrow payment of ${inr(r.total)}, split by member once each post is approved.` });
       navigate("/brand");
     },
   });
@@ -490,7 +490,7 @@ function CollectivePanel({ listing }: { listing: Listing }) {
           <div className="sticky bottom-0 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/95 p-3 backdrop-blur">
             <p className="text-sm">
               <span className="font-semibold">One offer, one escrow payment of {inr(c.total)}.</span>{" "}
-              <span className="text-fg-2">Payouts split automatically by UPI after each post is verified.</span>
+              <span className="text-fg-2">Each member's share is released after you approve their post.</span>
             </p>
             <Button variant="primary" onClick={() => book.mutate()} loading={book.isPending} disabled={c.size < 2}>
               {!book.isPending && <Check aria-hidden />} Book this collective

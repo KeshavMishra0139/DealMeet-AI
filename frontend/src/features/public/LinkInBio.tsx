@@ -37,7 +37,7 @@ export default function LinkInBio() {
               footer={
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-1.5 text-xs text-muted">
-                    <ShieldCheck className="size-4 text-success" aria-hidden /> Payment held in escrow until the post is verified.
+                    <ShieldCheck className="size-4 text-success" aria-hidden /> Brands fund escrow before the post; it's released after they approve it.
                   </p>
                   <Button variant="primary" size="lg" onClick={() => setOpen(true)}>
                     <CalendarCheck aria-hidden /> Book {q.data.name.split(" ")[0]}
@@ -51,7 +51,7 @@ export default function LinkInBio() {
           <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
             <Wordmark />
           </Link>
-          <span>· Fair prices, escrow, UPI payouts</span>
+          <span>· Fair prices and escrow</span>
         </footer>
       </div>
       {q.data && <BookDialog kit={q.data} open={open} onOpenChange={setOpen} />}

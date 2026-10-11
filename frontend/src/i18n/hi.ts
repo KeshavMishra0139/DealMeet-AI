@@ -101,7 +101,7 @@ export const hi: Dict = {
 
 /** Fixed phrases the API sends in English (CTA labels, headlines). */
 export const hiPhrases: Record<string, string> = {
-  "Your profile. The demo sandbox login filled in sample insights, marked simulated.": "आपकी प्रोफ़ाइल। डेमो सैंडबॉक्स लॉगिन ने सैंपल इनसाइट्स भरी हैं, जिन्हें सिम्युलेटेड दिखाया गया है।",
+  "Your profile. Insights are sample data for the demo, marked simulated.": "आपकी प्रोफ़ाइल। इनसाइट्स डेमो के लिए सैंपल डेटा हैं, जिन्हें सिम्युलेटेड दिखाया गया है।",
   "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.": "आपकी प्रोफ़ाइल, ऑनबोर्डिंग में आपके भरे जवाबों से। ऑडियंस की जानकारी सैंपल डेटा है, जिसे सिम्युलेटेड दिखाया गया है।",
   "Fictional demo profile.": "काल्पनिक डेमो प्रोफ़ाइल।",
   "See your price breakdown": "रेट का पूरा हिसाब देखें",

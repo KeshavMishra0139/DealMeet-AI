@@ -18,7 +18,7 @@ export default function BrandDeals() {
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold tracking-tight">Deals</h1>
-      <p className="mt-1 text-sm text-fg-2">Escrow-protected. You fund before posts go live and release after you confirm.</p>
+      <p className="mt-1 text-sm text-fg-2">You fund escrow before posts go live, then review each post and approve it or ask for a revision.</p>
 
       {q.data.collectives.length > 0 && (
         <section aria-labelledby="cols" className="mt-6">

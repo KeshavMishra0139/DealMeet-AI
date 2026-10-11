@@ -2,9 +2,16 @@ from fastapi import APIRouter
 
 from ..config import get_settings, now_iso, today
 from ..db import db_mode
+from ..services import payments
+from ..services.social import PROVIDERS
 from ..seed.catalog import CITIES, FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
 
 router = APIRouter(prefix="/api", tags=["meta"])
+
+
+def social_mode() -> str:
+    on = [k for k, (configured, _) in PROVIDERS.items() if configured()]
+    return ", ".join(sorted(on)) if on else "not_connected"
 
 
 @router.get("/health")
@@ -17,7 +24,10 @@ def health():
         "modes": {
             "db": db_mode(),
             "ai": "live" if s.has_ai else "templates",
-            "payments": "razorpay-test" if s.has_razorpay else "simulated",
+            "payments": payments.mode(),
+            "payouts": payments.payout_mode(),
+            "social": social_mode(),
+            "post_checks": "automatic when connected" if social_mode() != "not_connected" else "brand review (automatic checks not connected)",
             "auth": ", ".join(["password"] + (["firebase"] if s.has_firebase else []) + (["demo"] if s.demo_mode else [])),
         },
         "demo_mode": s.demo_mode,

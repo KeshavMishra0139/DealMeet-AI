@@ -104,7 +104,7 @@ export default function Landing() {
               {
                 icon: ShieldCheck,
                 title: "Paid through escrow",
-                body: "Brands fund escrow before a post goes live. Collective deals split payouts automatically over UPI.",
+                body: "Brands fund escrow before a post goes live and approve the post before the fee is released. Collective deals split one payment by member.",
               },
             ].map((p) => (
               <StaggerItem key={p.title} className="bg-[var(--bg)]/80 p-6">

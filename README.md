@@ -4,7 +4,7 @@
 
 A creator monetisation and brand opportunity engine, built by **Team TheVortex** for **CodeX 3.0** (Problem Statement 3). It runs locally with one command and works fully offline on seeded mock data.
 
-- **Creator Studio** (mobile-first, dark): your stage, your next 3 moves, a fair price for every brand reel, a growth roadmap, ranked money paths, opportunities you opt in to, and deals that pay out through escrow. English or हिंदी.
+- **Creator Studio** (mobile-first, dark): your stage, your next 3 moves, a fair price for every brand reel, a growth roadmap, ranked money paths, opportunities you opt in to, and deals funded through escrow before you post. English or हिंदी.
 - **Brand Console** (desktop, light): campaigns, creators ranked by audience fit with only the fields each creator chose to share, a collective builder for small creators, and the same deal rail from the brand's side.
 - **Demo screens**: `/demo/compare` puts Creator A and Creator B side by side with a guided, captioned walkthrough; `/demo/live` runs a creator phone and a brand console next to each other, in sync.
 
@@ -47,7 +47,8 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | --- | --- | --- |
 | `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas | In-memory database (mongomock), seeded on start |
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow: orders and signature checks (`rzp_test_` keys only). UPI payouts to creators stay simulated either way | Simulated escrow |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow (`rzp_test_` keys only). Each order is stored with its deal and amount; checkout must match both, and a payment is used once. A failed Razorpay call is an error (502), never a simulated success | Demo mode: a simulated payment, labelled so. Otherwise funding answers 503 and no money moves |
+| `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google sign-in before choosing a demo profile | Demo login with a profile picker |
 | `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
 | `SESSION_HOURS` | How long a sign-in lasts | 72 |
@@ -97,7 +98,7 @@ flowchart LR
     end
     subgraph SVC["Services"]
       CON["Consent ledger"]
-      RAIL["Deal rail + escrow"]
+      RAIL["Deal rail + escrow<br/>(honest payment states)"]
       PDF["Invoices and media kit<br/>ReportLab"]
       AI["AI layer<br/>validated, cached, fallback"]
     end
@@ -131,7 +132,7 @@ flowchart LR
 | **Fair-Price AI** | Base = median views of the last 6 reels × the niche's CPM (₹100–200 per 1,000 views). Then capped adjustments: engagement ±15%, audience fit −20%/+12%, consistency ±8%, brand safety down to −15%, trust −20%/+5%, usage and exclusivity up to +40%. Shown as a waterfall next to the follower-based price. A GradientBoostingRegressor trained on 4,000 synthetic deals cross-checks the result. |
 | **Trust Score** | IsolationForest over growth spikes, views and likes per follower, comments per like, generic-comment share and follow ratio. A small shield with the top two reasons; low-trust profiles are ranked last and kept out of collectives. |
 | **Next-Step Engine** | Candidate moves from money, growth and opportunity generators; the best of each, with a reason, a ₹ or reach range, an effort size and a "Why?". Marking a move done (worked / partly / didn't land) picks next week's follow-up: lock the rate, offer a bundle, make it a series, or test a new hook. |
-| **Collective Builder** | Greedy knapsack on effective reach × fit per rupee, with an audience-overlap penalty (city × language × niche) and a trust threshold of 60. Creators who opted in are included first. One escrow payment, split automatically by UPI. |
+| **Collective Builder** | Greedy knapsack on effective reach × fit per rupee, with an audience-overlap penalty (city × language × niche) and a trust threshold of 60. Creators who opted in are included first. One escrow payment for the pack, split by member. |
 | **Durable-Income Score** | 100 × (0.5 diversification + 0.25 recurring share + 0.25 payment reliability), where diversification is 1 − HHI over income sources. Warns when one source is above 70%. |
 | **Money paths** | Brand deals, services, digital products, affiliate, PR and collectives, each scored on fit, size against the creator's goal, and ease. Expertise-first creators (a skill, a small audience) see services first. |
 | **Matching and consent** | Audience fit on niche, age, gender, language and region. Brands only see the fields a creator granted (stats, demographics, rate card); everything else is redacted and every profile a brand opens is logged in the consent ledger. |
@@ -146,7 +147,7 @@ These stay out of the way until they matter:
 - **Brand-safety notes**, with the fix already suggested to the creator.
 - **Overlap de-dup** in collectives.
 - **Spam and duplicate listings** hidden from creators.
-- **Payment-delay nudges**, auto-release after the verification window, and auto-invoices.
+- **Payment-delay nudges**, automatic approval after the review window, and auto-invoices.
 - **Media kit PDF** and a `/c/:handle` link-in-bio page where brands can book the creator.
 - **"Why?" popovers** on every number.
 - **EN/हिंदी toggle**.
@@ -159,7 +160,7 @@ Motion is there to explain, not decorate. Every effect checks reduced motion fir
 | --- | --- |
 | Landing (1280 px and wider) | A 3D "creator core" with brand cards and rupee coins in orbit, following the pointer and the scroll |
 | Creator Studio home | **Reach vs followers in 3D**: the last 6 reels rise as bars through a glass plane set at the follower count, so "reach is about 7x followers" is visible at a glance. Hover a bar for its views |
-| Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to UPI payout |
+| Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to payout |
 | Brand Console campaign | **Match space**: matched creators placed by fair price, reach and trust, coloured and sized by fit. Drag to turn it, hover for details, click to open a profile |
 | Everywhere | Pages ease in; cards reveal and stagger as they scroll into view; move and KPI cards tilt toward the pointer; key numbers count up; a scroll-progress bar; the aurora background drifts with parallax |
 
@@ -175,11 +176,14 @@ The 3D scenes:
 
 ### The deal rail
 
-Offer → Contract (both sides e-sign) → Escrow funded → Post live (official link) → Verified (mock official-API insights check) → Paid by UPI.
+Offer → Contract (both sides e-sign) → Escrow funded → Post submitted → Approved → Paid out.
 
-- A creator posts only once the money is held.
-- If the brand doesn't confirm within 3 days of the verification deadline, escrow releases to the creator automatically.
-- Collectives fund once and split automatically.
+- A creator posts only once escrow is funded: a verified Razorpay test payment, or in demo mode a simulated one (labelled "simulated, no money moved").
+- The brand reviews the post link and approves it or asks for a revision with a reason. If the brand doesn't respond within 3 days of the review deadline, the post is approved automatically.
+- Automatic post checks need the creator's connected account. Until then each check reads "not checked" and the brand's review decides.
+- **There is no payout integration.** A deal funded through Razorpay stops at "Approved, payout not connected". In demo mode a simulated payment gets a simulated payout, labelled so, with no bank reference. Nothing is called paid unless it was.
+- Collectives fund once for the whole pack; each member's share is released after their post is approved.
+- `/api/health` reports the real modes of payments, payouts, social data and post checks.
 
 ## 3-minute demo script
 
@@ -193,7 +197,7 @@ Before you start, click **Reset demo** (top of `/demo/compare`). On a shared URL
 | 1:05 | Steps 4–5: Roadmap and money paths. | "A keeps their best format and adds original voiceover, which removes a copyright risk. B fills a gap nobody else in Tamil food is covering: quick breakfasts. Money paths are ranked against each goal: anime-merch affiliate and gaming collectives for A; a food collective, a ₹199 e-book and kitchenware affiliate for B." |
 | 1:30 | Steps 6–7. Then press **P** for two phones. | "Matches are opt-in: brands see only what each creator shares. And this is what each creator actually sees each week: their next 3 moves." On A's phone, tap **हिं** to show the Hindi Studio. |
 | 1:55 | Click **Live deal demo**. On the phone tap **Counter at ₹17,362**, then **Send counter**. | "Senpai offered ₹7,300, 58% below fair. One tap counters at the fair price." |
-| 2:15 | In the console: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. On the phone: **Submit post link** (any `instagram.com/reel/...` link). In the console: **Confirm post and release payment**. | "Both sides sign. The brand funds escrow before the creator posts. Once the post is verified, the payout goes out by UPI and the invoice is marked paid. Each side updates live." |
+| 2:15 | In the console: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. On the phone: **Submit post link** (any `instagram.com/reel/...` link). In the console: **Approve post**. | "Both sides sign. The brand funds escrow before the creator posts, then reviews the post and approves it. In the demo the payment and payout are simulated and say so; with Razorpay connected the deal stops at 'payout not connected' until a payout partner is added. Each side updates live." |
 | 2:35 | Open the Brand Console campaign (`/brand/campaigns/lst_senpai_hoodie?as=br_senpai`) and turn the **Match space**. | "Brands see every match by price, reach and trust. Up and to the left is more reach per rupee; hollow spheres are weak trust or unshared stats." |
 | 2:45 | Back on **Live deal demo**, switch the scenario to **Collective**. On the phone, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. The pack updates in the Thalam Foods console. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
 | 2:55 | Close. | "No guarantees, no scraping, and the reference creator stays anonymous. That's JodiDar AI." |
@@ -245,12 +249,13 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 148 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make test` | 160 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
 | `make e2e` | 16 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
+- Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.
 - Creator A's and Creator B's expected outputs.
 - Every engine.

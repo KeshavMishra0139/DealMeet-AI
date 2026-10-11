@@ -1,6 +1,6 @@
 // Brand Console: the deal rail as a 3D track. Each stage is a ring on a glowing
 // rail; coin stacks show how many deals sit at that stage, and small glowing
-// tokens flow from Offer to Paid, the way money moves through escrow.
+// tokens flow from Offer to Paid out, the way money moves through escrow.
 import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";

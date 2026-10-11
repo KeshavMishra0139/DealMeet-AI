@@ -1,38 +1,45 @@
 """Trust-first deal rail.
 
-Offer -> Contract (e-sign) -> Escrow funded -> Post live -> Verified -> Paid by UPI
+Offer -> Contract (e-sign) -> Escrow funded -> Post submitted -> Approved -> Paid out
 
-Money only moves through escrow. Brands fund before the post goes live; the
-creator is paid automatically once the post is verified (brand confirmation
-plus a mock official-API check), or automatically after a grace period if the
-brand doesn't respond. Collective deals share one escrow payment and pay each
-member their split.
+Brands fund escrow before the post goes live. The brand reviews the post link and
+approves it or asks for a revision; if they don't respond within the grace period
+it is approved automatically. Collective deals share one escrow payment.
+
+Honesty rules:
+- Funding happens only from a verified payment (Razorpay test mode) or, in demo
+  mode, a payment recorded and labelled simulated.
+- There is no payout integration. A real payment stops at "Approved, payout not
+  connected"; a simulated one gets a simulated payout, labelled so, with no bank
+  reference. Nothing is called paid unless that's what happened.
+- Automatic post checks need the creator's connected account. Until then each
+  check reads "not checked" and the brand's review is what approves the post.
 """
 from __future__ import annotations
 
-import random
 import re
 import uuid
 from datetime import date, timedelta
 
 from fastapi import HTTPException
 
-from ..config import get_settings, now_iso, today
+from ..config import now_iso, today
 from ..db import get_db
 from ..engines.common import day_month, inr, inr_full
 from ..engines.fair_price import deliverables_label, fair_price
+from . import payments
 
 RAIL = [
     ("offer", "Offer"),
     ("contract", "Contract signed"),
     ("escrow_funded", "Escrow funded"),
-    ("live", "Post live"),
-    ("verified", "Verified"),
-    ("paid", "Paid by UPI"),
+    ("live", "Post submitted"),
+    ("verified", "Approved"),
+    ("paid", "Paid out"),
 ]
 ORDER = {k: i for i, (k, _) in enumerate(RAIL)}
 VERIFY_DAYS = 3  # brand has this long to confirm a live post
-GRACE_DAYS = 3  # then escrow auto-releases to the creator
+GRACE_DAYS = 3  # then the post is approved automatically
 POST_URL = re.compile(r"^https://(www\.)?(instagram\.com/(reel|p)/|youtube\.com/shorts/|youtu\.be/)[\w\-]+/?(\?.*)?$")
 
 
@@ -58,10 +65,6 @@ def _names(d: dict) -> tuple[dict, dict]:
 
 def invoice_number(creator: dict, seq: int) -> str:
     return f"JD-{re.sub(r'[^A-Za-z0-9]', '', creator.get('handle', 'creator'))[:8].upper()}-{seq:04d}"
-
-
-def upi_for(creator: dict) -> str:
-    return f"{re.sub(r'[^a-z0-9]', '', creator.get('handle', 'creator'))}@upi-demo"
 
 
 def _ensure_contract(d: dict) -> None:
@@ -108,35 +111,38 @@ def _invoice_for(d: dict, status: str) -> dict:
 
 
 def _payout(d: dict) -> None:
-    creator, brand = _names(d)
-    utr = f"SIM{today().strftime('%y%m%d')}{random.randint(100000, 999999)}"
-    d.setdefault("payouts", []).append({"creator_id": d["creator_id"], "amount": d["amount"], "upi": upi_for(creator), "utr": utr, "at": now_iso()})
-    d["stage"] = "paid"
-    _event(d, "paid", f"{inr(d['amount'])} paid by UPI to {upi_for(creator)} (UTR {utr})")
-    _invoice_for(d, "paid")
-    if d.get("kind") == "collective":
-        col = get_db().collectives.find_one({"_id": d["collective_id"]})
-        if col:
-            get_db().collectives.update_one({"_id": col["_id"]}, {"$inc": {"paid_out": d["amount"]}})
+    """After approval. Only simulated escrow (demo mode) gets a payout, a simulated one with
+    no bank reference. Anything paid for real waits until a payout partner is connected."""
+    creator, _ = _names(d)
+    if (d.get("escrow") or {}).get("mode") == "simulated":
+        d.setdefault("payouts", []).append({"creator_id": d["creator_id"], "amount": d["amount"], "mode": "simulated", "at": now_iso()})
+        d["payout"] = {"status": "simulated", "at": now_iso()}
+        d["stage"] = "paid"
+        _event(d, "paid", f"Simulated payout of {inr(d['amount'])} to {creator.get('name', 'the creator')}. No money moved.")
+        _invoice_for(d, "paid_simulated")
+        if d.get("kind") == "collective":
+            get_db().collectives.update_one({"_id": d["collective_id"]}, {"$inc": {"paid_out": d["amount"]}})
+        return
+    d["payout"] = {"status": "not_connected", "at": now_iso()}
+    _event(d, "verified", "Payout isn't connected yet, so nothing has been paid out. The payment stays in escrow.")
 
 
-def mock_insights_check(d: dict) -> dict:
-    """Stands in for reading the post's insights through the official API."""
-    creator, brand = _names(d)
-    from ..engines import metrics
+POST_CHECKS = ("The post is public and live", "Posted after the contract was signed", "The caption mentions the brand", "Paid-partnership label added")
 
-    views = int(metrics.median_views(creator) * random.Random(d["_id"]).uniform(0.55, 0.9)) if creator else 0
+
+def post_check(d: dict) -> dict:
+    """Automatic checks of a submitted post. They need the creator's connected account;
+    without it every check reads 'not checked' and the brand's review decides."""
+    from . import post_checks  # the Instagram / YouTube connections plug in here
+
+    result = post_checks.run(d)
+    if result:
+        return result
     return {
-        "source": "Official API (demo sandbox)",
-        "checked_at": now_iso(),
-        "post_found": True,
-        "views_so_far": views,
-        "checks": [
-            {"label": "Post is public and live", "ok": True},
-            {"label": "Posted after the contract was signed", "ok": True},
-            {"label": f"Mentions @{(brand.get('name') or 'brand').lower().replace(' ', '').replace('.', '')}", "ok": True},
-            {"label": "Paid-partnership label added", "ok": True},
-        ],
+        "source": "not_connected",
+        "checked_at": None,
+        "note": "Automatic checks need the creator's connected Instagram or YouTube account. The brand reviews the link.",
+        "checks": [{"label": label, "status": "not_checked"} for label in POST_CHECKS],
     }
 
 
@@ -147,13 +153,13 @@ def auto_release_due(d: dict) -> date | None:
 
 
 def sweep(d: dict) -> dict:
-    """Background rule, applied whenever a deal is read: release escrow if the
-    brand hasn't confirmed a live post within the grace period."""
+    """Background rule, applied whenever a deal is read: approve a submitted post
+    automatically if the brand hasn't reviewed it within the grace period."""
     due = auto_release_due(d)
     if due and today() >= due:
-        d["verification"] = {**mock_insights_check(d), "auto": True}
+        d["verification"] = {**post_check(d), "auto": True, "approved_by": "auto", "approved_at": now_iso()}
         d["stage"] = "verified"
-        _event(d, "verified", "Auto-verified: the brand didn't respond in time")
+        _event(d, "verified", "Approved automatically: the brand didn't review the post in time")
         _payout(d)
         _save(d)
     return d
@@ -224,24 +230,42 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         c = d.get("contract") or {}
         need(stage == "contract" and c.get("signed_by_creator") and c.get("signed_by_brand"), "Both sides sign before escrow is funded")
         need(d.get("kind") != "collective", "Fund the collective once from its page")
-        ref = payload.get("payment_ref") or f"esc_sim_{uuid.uuid4().hex[:4].upper()}"
-        d["escrow"] = {"mode": payload.get("mode", "simulated"), "ref": ref, "funded_at": now_iso(), "amount": d["amount"]}
+        # Only the payment routes call this, after a verified or (demo mode) simulated payment.
+        need(payload.get("mode") in ("simulated", "razorpay-test") and bool(payload.get("payment_ref")), "Fund escrow through the payment step")
+        ref = payload["payment_ref"]
+        d["escrow"] = {"mode": payload["mode"], "ref": ref, "funded_at": now_iso(), "amount": d["amount"]}
         d["stage"] = "escrow_funded"
-        _event(d, "escrow_funded", f"{inr(d['amount'])} held in escrow ({'Razorpay test' if payload.get('mode') == 'razorpay-test' else 'simulated'} payment {ref})")
+        _event(
+            d,
+            "escrow_funded",
+            f"{inr(d['amount'])} paid into escrow (Razorpay test mode, payment {ref})"
+            if payload["mode"] == "razorpay-test"
+            else f"{inr(d['amount'])} in simulated escrow. No money moved (demo payment {ref}).",
+        )
     elif role == "creator" and action == "submit_post":
         need(stage == "escrow_funded", "Wait until escrow is funded before posting")
         url = (payload.get("url") or "").strip()
         need(bool(POST_URL.match(url)), "Paste the link to your Instagram reel or YouTube Short")
         d["proof_url"] = url
         d["stage"] = "live"
+        d["submitted_at"] = now_iso()
         d["verify_due"] = (today() + timedelta(days=VERIFY_DAYS)).isoformat()
-        _event(d, "live", "Post link submitted")
-    elif role == "brand" and action == "confirm":
+        d["post_check"] = post_check(d)
+        _event(d, "live", "Post link submitted" + (f" (revision {len(d.get('revisions') or [])})" if d.get("revisions") else ""))
+    elif role == "brand" and action in ("approve", "confirm"):
         need(stage == "live")
-        d["verification"] = mock_insights_check(d)
+        d["verification"] = {**(d.get("post_check") or post_check(d)), "approved_by": "brand", "approved_at": now_iso()}
         d["stage"] = "verified"
-        _event(d, "verified", f"{brand.get('name')} confirmed; official-API check passed")
+        _event(d, "verified", f"{brand.get('name')} approved the post")
         _payout(d)
+    elif role == "brand" and action == "request_revision":
+        need(stage == "live")
+        reason = (payload.get("note") or "").strip()
+        need(len(reason) >= 3, "Say what needs to change")
+        d.setdefault("revisions", []).append({"reason": reason, "at": now_iso(), "post": d.get("proof_url")})
+        d["stage"] = "escrow_funded"
+        d.pop("verify_due", None)
+        _event(d, "escrow_funded", f"{brand.get('name')} asked for a revision: {reason}")
     elif role == "creator" and action == "nudge":
         need(stage == "live")
         _event(d, "live", f"{creator.get('name')} sent a reminder to confirm")
@@ -284,7 +308,10 @@ def actions_for(d: dict, role: str) -> list[dict]:
         if s == "contract" and not d.get("escrow") and d.get("kind") != "collective":
             out.append({"id": "withdraw", "label": "Cancel deal", "kind": "ghost"})
         elif s == "live":
-            out = [{"id": "confirm", "label": "Confirm post and release payment", "kind": "primary"}]
+            out = [
+                {"id": "approve", "label": "Approve post", "kind": "primary"},
+                {"id": "request_revision", "label": "Ask for a revision", "kind": "secondary", "needs": "note"},
+            ]
     return out
 
 
@@ -319,8 +346,18 @@ def view(d: dict, role: str) -> dict:
         alerts.append(
             {
                 "kind": "verify_late" if late else "verify_window",
-                "text": (f"{brand.get('name', 'The brand')} is {(today() - date.fromisoformat(d['verify_due'])).days} days late confirming" if late else f"{brand.get('name', 'The brand')} has until {day_month(d['verify_due'])} to confirm"),
-                "detail": f"Escrow auto-releases to the creator in {days_left} day{'s' if days_left != 1 else ''} if there's no response.",
+                "text": (f"{brand.get('name', 'The brand')} is {(today() - date.fromisoformat(d['verify_due'])).days} days late reviewing the post" if late else f"{brand.get('name', 'The brand')} has until {day_month(d['verify_due'])} to review the post"),
+                "detail": f"If there's no response, the post is approved automatically in {days_left} day{'s' if days_left != 1 else ''}.",
+            }
+        )
+    if d["stage"] == "escrow_funded" and d.get("revisions"):
+        alerts.append({"kind": "revision", "text": f"{brand.get('name', 'The brand')} asked for a revision", "detail": d["revisions"][-1]["reason"]})
+    if d["stage"] == "verified" and (d.get("payout") or {}).get("status") == "not_connected":
+        alerts.append(
+            {
+                "kind": "payout_not_connected",
+                "text": "Approved, payout not connected",
+                "detail": "Nothing has been paid out yet: JodiDar has no payout partner connected. The payment stays in escrow until one is.",
             }
         )
     invoice = db.invoices.find_one({"deal_id": d["_id"]})
@@ -340,7 +377,7 @@ def view(d: dict, role: str) -> dict:
         "usage_rights_days": d.get("usage_rights_days") or 0,
         "exclusivity_days": d.get("exclusivity_days") or 0,
         "message": d.get("message"),
-        "creator": {"id": creator.get("_id"), "name": creator.get("name"), "handle": creator.get("handle"), "avatar_hue": creator.get("avatar_hue", 260), "is_reference": creator.get("is_reference", False), "upi": upi_for(creator) if creator else None},
+        "creator": {"id": creator.get("_id"), "name": creator.get("name"), "handle": creator.get("handle"), "avatar_hue": creator.get("avatar_hue", 260), "is_reference": creator.get("is_reference", False)},
         "brand": {"id": brand.get("_id"), "name": brand.get("name", "Brand"), "hue": brand.get("hue", 260), "verified": brand.get("verified", True)},
         "listing": {"id": listing["_id"], "title": listing["title"]} if listing else None,
         "steps": steps,
@@ -352,12 +389,16 @@ def view(d: dict, role: str) -> dict:
         "verify_due": d.get("verify_due"),
         "auto_release_on": due.isoformat() if due else None,
         "verification": d.get("verification"),
+        "post_check": d.get("post_check") or (post_check(d) if d["stage"] == "live" else None),
+        "revisions": d.get("revisions") or [],
+        "payout": d.get("payout"),
         "payouts": d.get("payouts") or [],
         "invoice": {"id": invoice["_id"], "number": invoice["number"], "status": invoice["status"]} if invoice else None,
         "alerts": alerts,
         "collective": collective,
         "actions": actions_for(d, role),
-        "payments_mode": "razorpay-test" if get_settings().has_razorpay else "simulated",
+        "payments_mode": payments.mode(),
+        "payout_mode": payments.payout_mode(),
     }
 
 
@@ -366,15 +407,16 @@ def contract_terms(d: dict, creator: dict, brand: dict) -> list[str]:
     brand_name = (brand.get("name") or "the brand").rstrip(".")
     t = [
         f"{creator.get('name', 'The creator')} will publish {deliverables_label(terms)} for {brand_name}.",
-        f"Fee: {inr_full(d['amount'])}, held in escrow by JodiDar before the post goes live.",
-        f"Payment is released by UPI once the post is verified, or automatically {VERIFY_DAYS + GRACE_DAYS} days after it goes live if the brand doesn't respond.",
+        f"Fee: {inr_full(d['amount'])}, paid into JodiDar escrow before the post goes live.",
+        f"The brand reviews the post and approves it or asks for a revision. If the brand doesn't respond, the post is approved automatically {VERIFY_DAYS + GRACE_DAYS} days after it's submitted.",
+        "The fee is released to the creator after approval, through JodiDar's payout partner.",
         "The post carries a paid-partnership label and stays up for at least 30 days.",
     ]
     if d.get("usage_rights_days"):
         t.append(f"The brand may use the post in paid ads for {d['usage_rights_days']} days.")
     if d.get("exclusivity_days"):
         t.append(f"No competing brand in the same category for {d['exclusivity_days']} days.")
-    t.append("Either side may cancel before escrow is funded at no cost. Once funded, the fee stays in escrow until the post is verified or auto-released to the creator.")
+    t.append("Either side may cancel before escrow is funded at no cost. Once funded, the fee stays in escrow until the post is approved, by the brand or automatically.")
     return t
 
 
@@ -405,14 +447,15 @@ def list_for(role: str, owner_id: str) -> list[dict]:
     return rows
 
 
-def fund_collective(collective_id: str, mode: str = "simulated", ref: str | None = None) -> dict:
+def fund_collective(collective_id: str, mode: str, ref: str) -> dict:
+    """Called only after a verified (or, in demo mode, simulated) payment for the whole pack."""
     db = get_db()
     col = db.collectives.find_one({"_id": collective_id})
     if not col:
         raise HTTPException(404, "Collective not found")
     if col.get("funded"):
         raise HTTPException(409, "Already funded")
-    escrow = {"mode": mode, "ref": ref or f"esc_sim_{uuid.uuid4().hex[:4].upper()}", "funded_at": now_iso(), "amount": col["total"]}
+    escrow = {"mode": mode, "ref": ref, "funded_at": now_iso(), "amount": col["total"]}
     db.collectives.update_one({"_id": collective_id}, {"$set": {"funded": True, "escrow": escrow, "status": "funded"}})
     for d in db.deals.find({"collective_id": collective_id}):
         _maybe_fund_from_collective(d)
@@ -471,5 +514,5 @@ def collective_view(collective_id: str, viewer: str | None = None) -> dict:
         "members": members,
         "stages": stages,
         "created_at": col.get("created_at"),
-        "payments_mode": "razorpay-test" if get_settings().has_razorpay else "simulated",
+        "payments_mode": payments.mode(),
     }

@@ -161,7 +161,7 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                     [
                         f"{per_month[0]:g} to {per_month[1]:g} collective deals a month",
                         f"Your share is priced on your reach: {inr_range(share['low'], share['high'])} per deal",
-                        "One escrow payment from the brand, split automatically by UPI",
+                        "One escrow payment from the brand, split among the members",
                     ],
                     "medium",
                 ),
