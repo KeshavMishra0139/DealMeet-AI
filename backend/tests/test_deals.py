@@ -89,7 +89,7 @@ def test_media_kit_and_public_booking(client, login, db):
     assert a.get("/api/creators/cr_a/kit.pdf").content[:4] == b"%PDF"
     r = client.post("/api/public/creator.b/book", json={"brand_name": "Kadai Co", "email": "a@kadai.test", "budget": 1500, "deliverable": "reel"})
     assert r.status_code == 200
-    d = db.deals.find_one({"creator_id": "cr_b", "source": "link_in_bio"})
+    d = db.deals.find_one({"creator_id": "cr_b", "channel": "link_in_bio"})
     assert d["stage"] == "offer"
     assert db.brands.find_one({"_id": d["brand_id"]})["verified"] is False
 

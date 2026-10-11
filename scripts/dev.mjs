@@ -154,10 +154,12 @@ function dotenv(key) {
 // The local runner starts the demo (seeded personas, demo sign-in, the Reset button) unless
 // DEMO_MODE=0 is set in the environment or .env. The API itself defaults to demo mode off.
 const DEMO_MODE = process.env.DEMO_MODE ?? dotenv("DEMO_MODE") ?? "1";
+// No MONGODB_URI: run on the in-memory database, said out loud (the API never falls back on its own).
+const USE_MOCK_DB = process.env.USE_MOCK_DB ?? dotenv("USE_MOCK_DB") ?? (process.env.MONGODB_URI ?? dotenv("MONGODB_URI") ? "0" : "1");
 
 const procs = [];
 function start(name, color, cmd, args, cwd) {
-  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, DEMO_MODE, FORCE_COLOR: "1" } });
+  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, DEMO_MODE, USE_MOCK_DB, FORCE_COLOR: "1" } });
   const tag = color(name.padEnd(4));
   const pipe = (stream) => {
     let buf = "";

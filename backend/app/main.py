@@ -54,8 +54,11 @@ def _auto_reset(minutes: int) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
+    # Connect (and create indexes) first: without USE_MOCK_DB=1, a missing or unreachable
+    # MONGODB_URI stops startup here with a clear message.
+    db = get_db()
     if settings.demo_mode:
-        seed_all(get_db())
+        seed_all(db)
     _warm_models()
     # The shared demo's timed reset never runs outside demo mode, so it can't touch real accounts.
     if settings.demo_mode and settings.demo_reset_minutes > 0:

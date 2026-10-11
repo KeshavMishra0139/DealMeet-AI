@@ -13,6 +13,8 @@ from .market import CONSENT_AUDIT, CONSENTS, DEALS, INVOICES, LISTERS, LISTINGS
 log = logging.getLogger("jodidar.seed")
 
 CONSENT_DEFAULTS = {"stats": True, "demographics": False, "rate_card": False}
+SYNTHETIC = "synthetic"  # data source of everything seeded: sample data, never shown as real
+SEEDED = ("creators", "brands", "listings", "consents", "consent_audit", "deals", "invoices")
 
 
 def all_creators() -> list[dict]:
@@ -32,31 +34,43 @@ def all_creators() -> list[dict]:
     return creators
 
 
-def seed_all(db, force: bool = False) -> dict:
+def seed_all(db, force: bool = False, sandbox: bool = True) -> dict:
+    """Load the sample data. `sandbox` (demo mode) wipes every record first, since all of it
+    is sandbox data. Otherwise (the seed script on a real database) only records marked
+    synthetic are replaced, and real accounts and their data are left alone."""
     if not force and db.creators.count_documents({}) > 0:
         return {"seeded": False}
-    for name in COLLECTIONS:
-        if name != "ai_cache":  # cached AI copy stays valid across resets and saves paid calls
-            db[name].delete_many({})
+    if sandbox:
+        for name in COLLECTIONS:
+            if name != "ai_cache":  # cached AI copy stays valid across resets and saves paid calls
+                db[name].delete_many({})
+    else:
+        for name in SEEDED:
+            db[name].delete_many({"source": SYNTHETIC})
     creators = all_creators()
-    db.creators.insert_many(copy.deepcopy(creators))
-    db.brands.insert_many(copy.deepcopy(LISTERS))
-    db.listings.insert_many(copy.deepcopy(LISTINGS))
-    db.consents.insert_many(copy.deepcopy(CONSENTS))
-    db.consent_audit.insert_many(copy.deepcopy(CONSENT_AUDIT))
-    db.deals.insert_many(copy.deepcopy(DEALS))
-    db.invoices.insert_many(copy.deepcopy(INVOICES))
-    seed_users(db, creators)
+    for name, docs in (
+        ("creators", creators),
+        ("brands", LISTERS),
+        ("listings", LISTINGS),
+        ("consents", CONSENTS),
+        ("consent_audit", CONSENT_AUDIT),
+        ("deals", DEALS),
+        ("invoices", INVOICES),
+    ):
+        # Every seeded record is sample data, and says so.
+        db[name].insert_many([{**copy.deepcopy(d), "source": SYNTHETIC} for d in docs])
+    seed_users(db, creators, drop_sandbox_accounts=sandbox)
     counts = {name: db[name].count_documents({}) for name in COLLECTIONS}
     log.info("Seeded demo data: %s", counts)
     return {"seeded": True, "counts": counts}
 
 
-def seed_users(db, creators: list[dict]) -> None:
+def seed_users(db, creators: list[dict], drop_sandbox_accounts: bool = True) -> None:
     """One demo account per seeded creator and lister, with stable ids so sessions
-    survive a reset. Accounts made during the demo (new personas, guest brands and
-    sign-ups) are sandbox data too, and a reset removes them with their sessions."""
-    db.users.delete_many({"seeded": {"$ne": True}})
+    survive a reset. In demo mode, accounts made during the demo (new personas, guest
+    brands and sign-ups) are sandbox data too, and a reset removes them with their sessions."""
+    if drop_sandbox_accounts:
+        db.users.delete_many({"seeded": {"$ne": True}})
     users = [
         {"_id": f"us_{c['_id']}", "role": "creator", "name": c["name"], "creator_id": c["_id"], "brand_id": None}
         for c in creators

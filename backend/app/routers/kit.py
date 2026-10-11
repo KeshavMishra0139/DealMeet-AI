@@ -194,7 +194,7 @@ def book(handle: str, body: BookIn, user: dict | None = Depends(au.optional_user
     if not user and not get_settings().demo_mode:
         raise HTTPException(401, "Sign in with a brand account to book a creator.")
     if (
-        db.deals.count_documents({"creator_id": c["_id"], "source": "link_in_bio"}) >= 30
+        db.deals.count_documents({"creator_id": c["_id"], "channel": "link_in_bio"}) >= 30
         or db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50
     ):
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
@@ -248,7 +248,7 @@ def book(handle: str, body: BookIn, user: dict | None = Depends(au.optional_user
             "exclusivity_days": 0,
             "stage": "offer",
             "message": body.message,
-            "source": "link_in_bio",
+            "channel": "link_in_bio",  # how the booking arrived
             "timeline": [{"stage": "offer", "at": at, "note": f"Booking request from {body.brand_name.strip()} via link-in-bio"}],
             "created_at": at,
         }

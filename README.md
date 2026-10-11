@@ -45,7 +45,8 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 
 | Variable | Used for | When it's not set |
 | --- | --- | --- |
-| `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas | In-memory database (mongomock), seeded on start |
+| `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas (or any MongoDB), with TLS certificates from certifi | Without `USE_MOCK_DB=1`, startup stops with a clear message. The API never falls back to memory on its own |
+| `USE_MOCK_DB` | `1`: in-memory database (mongomock); data is lost on restart. `make dev` sets it when `MONGODB_URI` is empty; the Docker image sets it for the shared demo | `0` |
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow (`rzp_test_` keys only). Each order is stored with its deal and amount; checkout must match both, and a payment is used once. A failed Razorpay call is an error (502), never a simulated success | Demo mode: a simulated payment, labelled so. Otherwise funding answers 503 and no money moves |
 | `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
@@ -58,6 +59,30 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 
 Every AI call goes through one function with a fallback: if the key is missing, the call fails, the reply breaks the copy rules, or it quotes a number that isn't in our data, the template is used instead. Answers are cached.
 
+## Database
+
+`backend/app/db.py` is the only place that connects to MongoDB. It creates its indexes on every start (safe to repeat): unique `users.email`, `users.firebase_uid`, `creators.handle`, `brands.slug`, `connections (user_id, platform)` and `posts (creator_id, platform, post_id)`, plus `metric_snapshots (creator_id, platform, date)` and indexes on owner ids, deal stage and campaign status. `/api/health` pings it and reports `mock`, `atlas` or `mongodb` (503 when the ping fails).
+
+Load the sample data, every record marked `source: "synthetic"`:
+
+```bash
+make seed                                     # or: npm run seed   (only into empty collections)
+make seed ARGS="--reset --confirm-reset"      # or: npm run seed -- --reset --confirm-reset
+```
+
+On a real database `--reset` needs `--confirm-reset` and replaces only records marked synthetic and the seeded demo accounts; real accounts and their data stay. The **Reset demo** button and `DEMO_RESET_MINUTES` exist only in demo mode.
+
+**Atlas setup** (one time):
+
+1. Create a free cluster at cloud.mongodb.com.
+2. Database Access: add a database user with a strong password (read and write to any database is enough).
+3. Network Access: allow Render's outbound IP addresses (Render dashboard → your service → Connect → Outbound), or 0.0.0.0/0 for the hackathon only, with that strong password.
+4. Connect → Drivers: copy the `mongodb+srv://...` string and put the password in it.
+5. On Render (Environment) set `MONGODB_URI` to that string, `MONGODB_DB=jodidar` and `USE_MOCK_DB=0`. Locally, put the same in `.env`.
+6. Optional: run `make seed` once against it to load the sample data.
+
+`TEST_MONGODB_URI=... make test` also runs an integration test that writes, reconnects with a new client and reads back.
+
 ## Deploy
 
 The repo builds into one container: the API serves the built web app on the port the host gives it (`$PORT`, default 8000).
@@ -69,7 +94,7 @@ docker run -p 8000:8000 jodidar-ai      # http://localhost:8000
 
 - **Render**: New → Blueprint → pick this repository → Apply. `render.yaml` sets up a free Docker web service with the health check at `/api/health`. Free services sleep after 15 minutes without visitors; the first visit after that takes about a minute.
 - **Any other Docker host** (Railway, Fly.io, Google Cloud Run, Hugging Face Spaces): point it at the `Dockerfile`. Health check path: `/api/health`.
-- **Run one instance with one worker.** The demo data lives in the server's memory, so a second instance would see different data. (Set `MONGODB_URI` if you ever need more.)
+- **Run one instance with one worker** while `USE_MOCK_DB=1`: the demo data lives in the server's memory, so a second instance would see different data. With Atlas (`MONGODB_URI`, `USE_MOCK_DB=0`) data survives restarts.
 - **Everyone shares one demo.** The image runs with `DEMO_MODE=1`. Data resets on every restart, and every 30 minutes when idle (`DEMO_RESET_MINUTES`). The Studio and Console say so next to **Reset demo**, which resets it for everyone. Set `DEMO_MODE=0` on the host for real accounts only: then there is no seeded data, no persona sign-in and no reset.
 - **Leave `ANTHROPIC_API_KEY` unset on a public URL**, or set a spend limit on the key: every visitor could otherwise trigger paid calls (capped by `AI_MAX_CALLS_PER_HOUR`).
 - Razorpay accepts `rzp_test_` keys only. `VITE_FIREBASE_*` values are baked in at build time (Docker build args), and the deployed domain must be added to Firebase's authorised domains.
@@ -249,7 +274,7 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 160 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make test` | 168 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
 | `make e2e` | 16 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 

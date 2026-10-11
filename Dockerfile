@@ -24,7 +24,9 @@ ENV PYTHONUNBUFFERED=1 \
     # put back to its seeded state every 30 minutes (skipped while someone is
     # mid-walkthrough). Set DEMO_MODE=0 on the host for real accounts only.
     DEMO_MODE=1 \
-    DEMO_RESET_MINUTES=30
+    DEMO_RESET_MINUTES=30 \
+    # The shared demo keeps its data in memory. For Atlas set MONGODB_URI and USE_MOCK_DB=0.
+    USE_MOCK_DB=1
 WORKDIR /app
 COPY backend/requirements.txt backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt

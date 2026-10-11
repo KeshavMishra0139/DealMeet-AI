@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from ..config import get_settings, now_iso, today
-from ..db import db_mode
+from ..db import db_mode, ping
 from ..services import payments
 from ..services.social import PROVIDERS
 from ..seed.catalog import CITIES, FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
@@ -15,14 +15,18 @@ def social_mode() -> str:
 
 
 @router.get("/health")
-def health():
+def health(response: Response):
     s = get_settings()
+    db_ok = ping()
+    if not db_ok:
+        response.status_code = 503  # the host's health check sees the database is down
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "database_unreachable",
         "today": today().isoformat(),
         "now": now_iso(),
         "modes": {
             "db": db_mode(),
+            "db_ok": db_ok,
             "ai": "live" if s.has_ai else "templates",
             "payments": payments.mode(),
             "payouts": payments.payout_mode(),
