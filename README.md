@@ -246,6 +246,16 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
 
+## YouTube Analytics (optional)
+
+After linking a channel, a creator can click **Connect YouTube Analytics**. Only then does the app ask Google (through Firebase) for `youtube.readonly` and `yt-analytics.readonly`; ordinary sign-in never asks, so brands are never asked for YouTube access. The same plain-language consent comes first.
+
+- The browser reads the access token with `GoogleAuthProvider.credentialFromResult(result).accessToken` and sends it once to `POST /api/connect/youtube/analytics`. The server uses it immediately and doesn't store or log it (Firebase gives no refresh token), so **Refresh** repeats the consent.
+- `reports.query` with `ids=channel==MINE` for the last 28 days: views, estimated minutes watched and average view duration; `ageGroup,gender` with `viewerPercentage`; and `country` with `views`. Stored as a snapshot with `source: "youtube_api"` and `fetched_at`, shown with the date it was taken.
+- The token's channel must be the channel linked by handle, or it's refused. A match marks the channel's ownership as verified.
+- Disconnecting deletes the snapshots. No channel, a declined permission and a used-up quota each get a clear message.
+- **Google OAuth app**: in Google Cloud → APIs & Services, enable the YouTube Data API v3 and the **YouTube Analytics API** for the Firebase project, and add both scopes on the OAuth consent screen. Keep the app in **Testing** and add each creator's Google account as a **test user** (at most 100); YouTube scopes need Google's verification before the app can leave Testing.
+
 ## Connecting Instagram
 
 Creators connect Instagram from **Connections** with the Instagram API with Instagram Login (Business Login). Before the login opens they see: "We can see: your profile, posts, reach and audience age/gender/city. We can't: post, read your DMs or see your password. You can disconnect anytime."
@@ -327,7 +337,7 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 201 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make test` | 207 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
 | `make e2e` | 17 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
@@ -335,6 +345,7 @@ The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- YouTube Analytics: 28-day numbers, a token that's never stored, another account's channel refused, no channel, a declined permission, disconnect, and owner-only access.
 - YouTube data (against a fake Data API): median-views pricing per format, no `search.list`, the 12-hour cache, the per-IP limit, unknown handle, used-up quota, network failure, hidden subscribers, too few videos, linking with posts and a daily snapshot, unlinking, and owner-only access.
 - Firebase sign-in: a forged token, an expired or revoked token, a token from another Firebase project (checked by the real Admin SDK, offline), a first sign-in, a role that can't change, and linking a verified email.
 - Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.

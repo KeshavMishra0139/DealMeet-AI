@@ -55,7 +55,22 @@ export interface PlatformStatus {
   fetched_at?: string | null;
 }
 
+export interface YouTubeAnalytics {
+  period_days: number;
+  start: string;
+  end: string;
+  views: number;
+  minutes_watched: number;
+  average_view_duration_s: number;
+  age_gender: { age: string; gender: string; percent: number }[];
+  countries: { country: string; views: number }[];
+  source: "youtube_api";
+  fetched_at: string;
+}
+
 export interface LinkedYouTube {
+  analytics?: YouTubeAnalytics | null;
+  analytics_consent?: string;
   linked: boolean;
   status: PlatformStatus;
   channel?: YouTubeChannel & { source: string; fetched_at: string };
