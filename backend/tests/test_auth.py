@@ -26,6 +26,7 @@ PUBLIC = {
     ("GET", "/api/public/{handle}"),
     ("POST", "/api/public/{handle}/book"),
     ("POST", "/api/payments/razorpay/webhook"),  # proves itself with Razorpay's signature
+    ("POST", "/api/youtube/preview"),  # public, rate-limited per IP
 }
 
 

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from .config import ROOT, get_settings
 from .db import get_db
-from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles
+from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles, youtube
 from .seed.load import seed_all
 from .services.auth import audit
 from .static import mount_spa
@@ -119,7 +119,7 @@ async def guard(request: Request, call_next):
     return response
 
 
-for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit):
+for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit, youtube):
     app.include_router(r.router)
 
 # Single-port mode: serve the built web app when it exists (npm run build).

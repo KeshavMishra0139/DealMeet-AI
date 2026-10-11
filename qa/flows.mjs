@@ -55,6 +55,7 @@ async function apiAs(persona, path) {
 await reset();
 const browser = await launch();
 page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+const mobile = page;
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 
@@ -221,6 +222,15 @@ await step("Accounts: sign up as a brand, set up the brand, sign out", async () 
   await p.goto(`${BASE}/brand`);
   await p.waitForURL(/\/login\?role=brand/);
   await ctx.close();
+});
+
+await step("What am I worth?: public page says plainly when YouTube data isn't connected", async () => {
+  page = mobile;
+  await page.goto(`${BASE}/worth`);
+  await page.getByLabel("YouTube handle or channel link").fill("@somechannel");
+  await page.getByRole("button", { name: "Check my price" }).click();
+  // No YOUTUBE_API_KEY on the QA server: a clear "not connected" message, never made-up numbers.
+  await page.getByRole("alert").getByText(/YouTube data isn't connected on this server/).waitFor();
 });
 
 // Presenting on a laptop: compare, phone view and the live split.

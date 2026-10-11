@@ -30,6 +30,8 @@ const CreatorDeals = lazy(() => import("@/features/creator/Deals"));
 const CreatorKit = lazy(() => import("@/features/creator/Kit"));
 const DealView = lazy(() => import("@/features/deals/DealView"));
 const LinkInBio = lazy(() => import("@/features/public/LinkInBio"));
+const Worth = lazy(() => import("@/features/public/Worth"));
+const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
 const DemoCompare = lazy(() => import("@/features/demo/Compare"));
 const DemoLive = lazy(() => import("@/features/demo/Live"));
 
@@ -60,6 +62,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
+        <Route path="/worth" element={<Worth />} />
 
         <Route
           path="/creator/onboarding"
@@ -80,6 +83,7 @@ export default function App() {
           <Route path="deals/:id" element={<DealView role="creator" />} />
           <Route path="kit" element={<CreatorKit />} />
           <Route path="privacy" element={<CreatorPrivacy />} />
+          <Route path="connections" element={<CreatorConnections />} />
         </Route>
 
         <Route

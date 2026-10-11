@@ -151,9 +151,9 @@ def privacy(creator_id: str):
         "sources": [
             {
                 "platform": p["platform"],
-                "connected": p["status"] == "connected",
+                "connected": p["status"] in ("connected", "linked"),
                 "status": p["status"],
-                "via": "Official login, read-only" if p["status"] == "connected" else None,
+                "via": {"connected": "Official login, read-only", "linked": "Public channel data (YouTube Data API)"}.get(p["status"]),
             }
             for p in social.status(c)["platforms"]
         ],

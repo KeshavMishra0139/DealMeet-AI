@@ -70,6 +70,7 @@ class Settings:
     use_mock_db: bool = False
     firebase_service_account_json: str | None = None
     google_application_credentials: str | None = None
+    youtube_api_key: str | None = None
 
     @property
     def has_ai(self) -> bool:
@@ -108,6 +109,7 @@ def get_settings() -> Settings:
         use_mock_db=_flag("USE_MOCK_DB"),
         firebase_service_account_json=_env("FIREBASE_SERVICE_ACCOUNT_JSON"),
         google_application_credentials=_env("GOOGLE_APPLICATION_CREDENTIALS"),
+        youtube_api_key=_env("YOUTUBE_API_KEY"),
     )
 
 
