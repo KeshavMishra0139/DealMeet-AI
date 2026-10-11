@@ -24,12 +24,15 @@ def test_low_offer_counter_and_full_rail(login, db):
     assert paid["mode"] == "simulated" and paid["deal"]["stage"] == "escrow_funded"
     assert _act(a, "dl_a_senpai", "submit_post", url="https://example.com/x").status_code == 409
     assert _act(a, "dl_a_senpai", "submit_post", url="https://www.instagram.com/reel/X1/").json()["stage"] == "live"
-    v = _act(senpai, "dl_a_senpai", "confirm").json()
-    assert v["stage"] == "paid"
-    assert v["payouts"][0]["amount"] == 17400 and v["payouts"][0]["utr"].startswith("SIM")
-    assert all(c["ok"] for c in v["verification"]["checks"])
+    v = _act(senpai, "dl_a_senpai", "approve").json()
+    # Simulated escrow (demo mode) gets a simulated payout: labelled so, with no bank reference.
+    assert v["stage"] == "paid" and v["payout"]["status"] == "simulated"
+    assert v["payouts"][0] == {"creator_id": "cr_a", "amount": 17400, "mode": "simulated", "at": v["payouts"][0]["at"]}
+    # Nothing checked the post automatically: no connected account.
+    assert {c["status"] for c in v["verification"]["checks"]} == {"not_checked"}
+    assert v["verification"]["approved_by"] == "brand"
     inv = db.invoices.find_one({"deal_id": "dl_a_senpai"})
-    assert inv["status"] == "paid"
+    assert inv["status"] == "paid_simulated"
     pdf = a.get(f"/api/invoices/{inv['_id']}.pdf")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
     assert senpai.get(f"/api/invoices/{inv['_id']}.pdf").status_code == 200  # the brand it bills

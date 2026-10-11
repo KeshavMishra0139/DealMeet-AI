@@ -82,9 +82,8 @@ await step("Onboarding: 5 steps create a plan", async () => {
   await page.getByRole("button", { name: "Read my captions" }).click();
   await page.getByText("Brand safe").first().waitFor();
   await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: /Instagram/ }).click();
-  await page.getByRole("button", { name: "Allow" }).click();
-  await page.getByText("Connected (demo sandbox)").waitFor();
+  await page.getByText("Not connected yet. Connect after setup.").first().waitFor();
+  await page.getByRole("switch", { name: "Fill in sample insights (demo)" }).click();
   await page.getByRole("button", { name: "Build my plan" }).click();
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
   const cards = await page.getByRole("article").count();
@@ -147,7 +146,7 @@ await step("Privacy: revoking a brand logs it and hides the creator", async () =
   await page.getByText("access revoked").first().waitFor();
 });
 
-await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify, UPI payout", async () => {
+await step("Deal rail: counter a low offer, brand accepts, escrow, post, approve, simulated payout", async () => {
   await reset();
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByText(/58% below the fair price/).waitFor();
@@ -159,15 +158,16 @@ await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify,
   await page.getByRole("dialog").getByRole("button", { name: /Accept .* and sign/ }).click();
   await page.getByRole("button", { name: /Fund escrow/ }).click();
   await page.getByRole("button", { name: /Pay .*simulated/ }).click();
-  await page.getByText(/held in escrow/).first().waitFor();
+  await page.getByText(/in simulated escrow/).first().waitFor();
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByRole("button", { name: "Submit post link" }).click();
   await page.getByLabel(/Instagram reel or YouTube Short link/).fill("https://www.instagram.com/reel/DEMOA1/");
   await page.getByRole("dialog").getByRole("button", { name: "Submit link" }).click();
   await page.getByRole("button", { name: "Remind the brand" }).waitFor();
   await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
-  await page.getByRole("button", { name: /Confirm post and release payment/ }).click();
-  await page.getByText(/paid by UPI to/).first().waitFor();
+  await page.getByText("The post is public and live").waitFor(); // automatic checks: not checked without a connected account
+  await page.getByRole("button", { name: "Approve post" }).click();
+  await page.getByText(/Simulated payout of .* No money moved/).first().waitFor();
   await page.getByRole("link", { name: /Invoice JD-/ }).waitFor();
 });
 

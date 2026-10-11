@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..ai.regional import tag_captions
-from ..config import now_iso
+from ..config import get_settings, now_iso
 from ..db import get_db
 from ..engines import brand_safety, money_paths, next_step, roadmap
 from ..engines.fair_price import fair_price
@@ -141,7 +141,9 @@ class OnboardingIn(BaseModel):
     city: str = Field(max_length=60)
     expertise: str | None = Field(default=None, max_length=80)
     captions: list[Caption] = Field(default=[], max_length=8)
-    connected: dict[Literal["instagram", "youtube"], bool] = {}
+    # Demo mode only: fill the profile with generated sample insights, labelled sample data.
+    # Real numbers come from connecting Instagram or YouTube after onboarding.
+    sample_insights: bool = False
     discoverable: bool = True
     consent_defaults: dict[Literal["stats", "demographics", "rate_card"], bool] = {"stats": True, "demographics": False, "rate_card": False}
 
@@ -165,6 +167,8 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     db = get_db()
     if user.get("creator_id") and db.creators.count_documents({"_id": user["creator_id"]}):
         raise HTTPException(409, "This account already has a creator profile.")
+    if body.sample_insights and not get_settings().demo_mode:
+        raise HTTPException(422, "Sample insights exist only in demo mode. Connect Instagram or YouTube for real numbers.")
     if db.creators.count_documents({"created_by": "onboarding"}) >= 100:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     followers = body.followers if body.followers is not None else STAGE_FOLLOWERS[body.audience_stage]
@@ -173,7 +177,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         cid += "x"
     rng = random.Random(cid)
     city = body.city if body.city in CITIES else "Mumbai"
-    connected = bool(body.connected.get("instagram") or body.connected.get("youtube"))
+    connected = body.sample_insights  # sample data stands in for a connected account, labelled so
     langs = body.languages
     captions = [x.strip() for x in body.captions if x.strip()]
     caption_tags = tag_captions(captions) if captions else None
@@ -183,7 +187,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         "name": body.name.strip(),
         "avatar_hue": rng.randint(0, 359),
         "is_reference": False,
-        "reference_note": "Your profile. The demo sandbox login filled in sample insights, marked simulated." if connected else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.",
+        "reference_note": "Your profile. Insights are sample data for the demo, marked simulated." if connected else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.",
         "bio": f"{NICHES[body.niche]['label']} from {city}.",
         "niche": body.niche,
         "sub_niches": [],
@@ -212,8 +216,8 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         "content_flags": [f for f in ((caption_tags or {}).get("summary") or {}).get("flags", []) if f in brand_safety.FLAGS],
         "discoverable": body.discoverable,
         "consent_defaults": body.consent_defaults,
-        "insights_connected": {"instagram": bool(body.connected.get("instagram")), "youtube": bool(body.connected.get("youtube"))},
-        "insights_source": "mock_official_api" if connected else "typed",
+        "insights_connected": {"instagram": False, "youtube": False},
+        "insights_source": "synthetic" if connected else "typed",
         "caption_tags": caption_tags,
         "onboarded": True,
         "created_by": "onboarding",
@@ -252,18 +256,10 @@ def ai_tag(body: TagIn, _: dict = Depends(au.current_user)):
     return tag_captions(body.captions)
 
 
-@router.post("/oauth/{platform}/authorize")
-def mock_oauth(platform: Literal["instagram", "youtube"], _: dict = Depends(au.current_user)):
-    """Stands in for the official Instagram Graph API / YouTube Data API consent
-    screen. Returns the scopes a real integration would request."""
-    scopes = {
-        "instagram": ["instagram_basic", "instagram_manage_insights", "pages_show_list"],
-        "youtube": ["youtube.readonly", "yt-analytics.readonly"],
-    }[platform]
-    return {
-        "platform": platform,
-        "granted": True,
-        "scopes": scopes,
-        "mode": "demo sandbox",
-        "note": "Official login only. JodiDar AI never reads accounts that haven't connected, and never scrapes.",
-    }
+@router.get("/creators/{creator_id}/connections")
+def connections(creator_id: str, _: dict = Depends(au.own_creator)):
+    """Instagram and YouTube connection status. Nothing is simulated for an account that
+    isn't connected."""
+    from ..services import social
+
+    return social.status(cc.load_creator(creator_id))

@@ -5,7 +5,7 @@ import uuid
 from datetime import date, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -76,11 +76,20 @@ def _brand_party(deal_id: str, user: dict) -> dict:
     return d
 
 
+def _ready_to_fund(d: dict) -> None:
+    c = d.get("contract") or {}
+    if d.get("kind") == "collective":
+        raise HTTPException(409, "Fund the collective once from its page")
+    if d["stage"] != "contract" or not (c.get("signed_by_creator") and c.get("signed_by_brand")):
+        raise HTTPException(409, "Both sides sign before escrow is funded")
+
+
 @router.post("/deals/{deal_id}/pay")
 def start_payment(deal_id: str, user: dict = Depends(au.current_user)):
-    """Start escrow funding: a Razorpay test order, or a simulated payment."""
+    """Start escrow funding: a Razorpay test order, or (demo mode only) a simulated payment."""
     d = _brand_party(deal_id, user)
-    order = payments.create_order(d["amount"], deal_id)
+    _ready_to_fund(d)
+    order = payments.create_order(d["amount"], "deal", deal_id)
     if order["mode"] == "simulated":
         view = rail.act(deal_id, "brand", "fund", {"mode": "simulated", "payment_ref": order["ref"]})
         return {"mode": "simulated", "deal": view}
@@ -95,10 +104,11 @@ class VerifyIn(BaseModel):
 
 @router.post("/deals/{deal_id}/pay/verify")
 def verify_payment(deal_id: str, body: VerifyIn, user: dict = Depends(au.current_user)):
-    _brand_party(deal_id, user)
-    if not payments.verify_signature(body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature):
-        raise HTTPException(400, "Payment signature didn't match")
-    return rail.act(deal_id, "brand", "fund", {"mode": "razorpay-test", "payment_ref": body.razorpay_payment_id})
+    d = _brand_party(deal_id, user)
+    p = payments.verify_checkout("deal", deal_id, d["amount"], body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature)
+    if (d.get("escrow") or {}).get("ref") == p["payment_id"]:
+        return rail.view(d, "brand")  # already funded by this payment (a repeat or the webhook got here first)
+    return rail.act(deal_id, "brand", "fund", {"mode": "razorpay-test", "payment_ref": p["payment_id"]})
 
 
 def _collective(collective_id: str) -> dict:
@@ -126,7 +136,9 @@ def collective(collective_id: str, user: dict = Depends(au.current_user)):
 @router.post("/collectives/{collective_id}/fund")
 def fund_collective(collective_id: str, user: dict = Depends(au.current_user)):
     col = _own_collective(collective_id, user)
-    order = payments.create_order(col["total"], collective_id)
+    if col.get("funded"):
+        raise HTTPException(409, "Already funded")
+    order = payments.create_order(col["total"], "collective", collective_id)
     if order["mode"] == "simulated":
         return rail.fund_collective(collective_id, "simulated", order["ref"])
     return order
@@ -134,19 +146,45 @@ def fund_collective(collective_id: str, user: dict = Depends(au.current_user)):
 
 @router.post("/collectives/{collective_id}/fund/verify")
 def verify_collective(collective_id: str, body: VerifyIn, user: dict = Depends(au.current_user)):
-    _own_collective(collective_id, user)
-    if not payments.verify_signature(body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature):
-        raise HTTPException(400, "Payment signature didn't match")
-    return rail.fund_collective(collective_id, "razorpay-test", body.razorpay_payment_id)
+    col = _own_collective(collective_id, user)
+    p = payments.verify_checkout("collective", collective_id, col["total"], body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature)
+    if col.get("funded") and (col.get("escrow") or {}).get("ref") == p["payment_id"]:
+        return rail.collective_view(collective_id)
+    return rail.fund_collective(collective_id, "razorpay-test", p["payment_id"])
+
+
+@router.post("/payments/razorpay/webhook")
+async def razorpay_webhook(request: Request):
+    """Razorpay calls this; it proves itself with the webhook signature, not a session.
+    Each event is applied once. A captured payment funds its deal or collective if the
+    brand's browser didn't finish the checkout step."""
+    body = await request.body()
+    payment, reply = payments.apply_webhook(body, request.headers.get("x-razorpay-signature"), request.headers.get("x-razorpay-event-id"))
+    if payment:
+        _fund_from(payment)
+    return reply
+
+
+def _fund_from(p: dict) -> None:
+    db = get_db()
+    if p["kind"] == "deal":
+        d = db.deals.find_one({"_id": p["ref_id"]})
+        c = (d or {}).get("contract") or {}
+        if d and d["stage"] == "contract" and c.get("signed_by_creator") and c.get("signed_by_brand") and d["amount"] == p["amount"]:
+            rail.act(d["_id"], "brand", "fund", {"mode": "razorpay-test", "payment_ref": p["payment_id"]})
+    elif p["kind"] == "collective":
+        col = db.collectives.find_one({"_id": p["ref_id"]})
+        if col and not col.get("funded") and col["total"] == p["amount"]:
+            rail.fund_collective(col["_id"], "razorpay-test", p["payment_id"])
 
 
 @router.post("/collectives/{collective_id}/release")
 def release_verified(collective_id: str, user: dict = Depends(au.current_user)):
-    """Confirm every live member post at once; each member is paid their split."""
+    """Approve every submitted member post at once. Payouts follow the honest-payments rules."""
     _own_collective(collective_id, user)
     db = get_db()
     for d in db.deals.find({"collective_id": collective_id, "stage": "live"}):
-        rail.act(d["_id"], "brand", "confirm", {})
+        rail.act(d["_id"], "brand", "approve", {})
     return rail.collective_view(collective_id)
 
 

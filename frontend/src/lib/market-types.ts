@@ -56,7 +56,7 @@ export interface Privacy {
   }[];
   requests: { id: string; lister_id: string; lister: string; scopes: string[]; at: string }[];
   audit: { id: string; lister: string; action: string; scopes: string[]; at: string; actor: string }[];
-  sources: { platform: string; connected: boolean; via: string | null }[];
+  sources: { platform: string; connected: boolean; status: "connected" | "not_connected" | "unavailable" | "expired" | "error"; via: string | null }[];
   is_reference: boolean;
 }
 
@@ -185,7 +185,10 @@ export interface Console {
     deals: number;
     committed: number;
   }[];
-  escrow: { held: number; count: number; items: { deal_id: string; creator: string; amount: number; stage: string; stage_label: string }[] };
+  escrow: { held: number; simulated: boolean; count: number; items: { deal_id: string; creator: string; amount: number; stage: string; stage_label: string }[] };
+  paid_simulated: boolean;
+  payments_mode: string;
+  payout_mode: string;
   paid_total: number;
   stages: { stage: string; label: string; count: number; amount: number }[];
   needs_you: { deal_id: string; kind: string; text: string; detail: string; urgent: boolean }[];

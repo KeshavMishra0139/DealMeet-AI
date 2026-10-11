@@ -79,7 +79,7 @@ def test_late_confirmation_alerts_describe_real_behaviour(login, db):
     left = re.search(r"in (\d+) day", days).group(1)
     console = pixel.get("/api/brands/br_pixelforge/console").json()
     item = next(n for n in console["needs_you"] if n["deal_id"] == "dl_a_pixelforge")
-    assert f"auto-releases in {left} day" in item["detail"]
+    assert f"approved automatically in {left} day" in item["detail"]
 
 
 def test_declined_collective_shares_return_to_the_brand(login, db):
@@ -103,7 +103,7 @@ def test_onboarding_sample_insights_are_labelled_simulated(login, db):
         "income_goal": 10000,
         "languages": ["ta"],
         "city": "Chennai",
-        "connected": {"instagram": True},
+        "sample_insights": True,
     }
     me = login("new_creator")
     cid = me.post("/api/creators", json=body).json()["id"]
@@ -117,7 +117,7 @@ def test_onboarding_sample_insights_are_labelled_simulated(login, db):
     assert "views" in simulated
 
     # A typed follower count is the creator's own; only generated data is simulated.
-    typed = login("new_creator").post("/api/creators", json={**body, "name": "Typed Creator", "followers": 4200, "connected": {}}).json()["id"]
+    typed = login("new_creator").post("/api/creators", json={**body, "name": "Typed Creator", "followers": 4200, "sample_insights": False}).json()["id"]
     t = db.creators.find_one({"_id": typed})
     assert "followers" not in t["provenance"] and t["provenance"]["audience"] == "simulated"
 
@@ -151,7 +151,8 @@ def test_new_brands_are_not_marked_verified(login, db):
 def test_contract_text_names_no_policy_that_does_not_exist(login, db):
     d = login("cr_a").get("/api/deals/dl_a_pixelforge").json()
     terms = " ".join(d["contract"]["terms"])
-    assert "refund policy" not in terms and "until the post is verified or auto-released" in terms
+    assert "refund policy" not in terms and "until the post is approved, by the brand or automatically" in terms
+    assert "UPI" not in terms and "verified" not in terms
 
 
 def test_link_in_bio_guest_can_sign_and_pay(client, login, db):
@@ -172,7 +173,7 @@ def test_fictional_seed_data_is_never_high_confidence(login, db):
 
 def test_caption_safety_flags_become_brand_safety_notes(login, db):
     body = {"name": "Caption Creator", "niche": "fitness", "audience_stage": "1k_10k", "income_goal": 10000,
-            "languages": ["en"], "city": "Pune", "connected": {"instagram": True},
+            "languages": ["en"], "city": "Pune", "sample_insights": True,
             "captions": ["This drink will cure your back pain, permanent results", "Morning workout, no excuses"]}
     me = login("new_creator")
     cid = me.post("/api/creators", json=body).json()["id"]

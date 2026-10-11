@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   CheckCircle2,
+  CircleDashed,
   Clock,
   Download,
   ExternalLink,
@@ -24,9 +25,9 @@ import { Input, Label, Skeleton, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import type { FairPrice } from "@/lib/api-types";
-import type { Deal, DealAction } from "@/lib/deal-types";
+import type { Deal, DealAction, PaymentsMode, PostCheck } from "@/lib/deal-types";
 import { STAGE_LABEL } from "@/lib/deal-types";
-import { count, inr, possessive, shortDate, timeOfDay } from "@/lib/format";
+import { inr, possessive, shortDate, timeOfDay } from "@/lib/format";
 import { fundEscrow } from "@/lib/payments";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,7 @@ type Role = "creator" | "brand";
 export function useDeal(id: string, role: Role) {
   return useQuery({
     queryKey: ["deal", id, role],
-    queryFn: () => api<Deal>(`/deals/${id}?role=${role}`),
+    queryFn: () => api<Deal>(`/deals/${id}`),
     refetchInterval: 3000,
   });
 }
@@ -44,11 +45,12 @@ export default function DealView({ role }: { role: Role }) {
   const { id = "" } = useParams();
   const q = useDeal(id, role);
   const qc = useQueryClient();
-  const [dialog, setDialog] = useState<null | "counter" | "url" | "pay" | "sign">(null);
+  const [dialog, setDialog] = useState<null | "counter" | "url" | "pay" | "sign" | "revision">(null);
   const [pending, setPending] = useState<DealAction | null>(null);
 
   const act = useMutation({
-    mutationFn: (body: Record<string, unknown>) => post<Deal>(`/deals/${id}/action`, { role, ...body }),
+    // The server takes the acting side from the session.
+    mutationFn: (body: Record<string, unknown>) => post<Deal>(`/deals/${id}/action`, body),
     onSuccess: (d) => {
       qc.setQueryData(["deal", id, role], d);
       qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "deal" });
@@ -67,6 +69,7 @@ export default function DealView({ role }: { role: Role }) {
     if (a.needs === "amount") return setDialog("counter");
     if (a.needs === "url") return setDialog("url");
     if (a.needs === "payment") return setDialog("pay");
+    if (a.needs === "note") return setDialog("revision");
     if (a.id === "sign" || a.id === "accept" || a.id === "accept_counter") {
       setPending(a);
       return setDialog("sign");
@@ -112,9 +115,16 @@ export default function DealView({ role }: { role: Role }) {
         <div
           key={a.text}
           role="status"
-          className={cn("flex flex-wrap items-center gap-3 rounded-2xl border p-3.5", a.kind === "low_offer" ? "border-warn/40 bg-warn-soft" : "border-line bg-surface-2")}
+          className={cn(
+            "flex flex-wrap items-center gap-3 rounded-2xl border p-3.5",
+            a.kind === "low_offer" || a.kind === "revision" ? "border-warn/40 bg-warn-soft" : "border-line bg-surface-2",
+          )}
         >
-          {a.kind === "low_offer" ? <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden /> : <Clock className="size-5 shrink-0 text-muted" aria-hidden />}
+          {a.kind === "low_offer" || a.kind === "revision" ? (
+            <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden />
+          ) : (
+            <Clock className="size-5 shrink-0 text-muted" aria-hidden />
+          )}
           <div className="min-w-[200px] flex-1">
             <p className="text-sm font-semibold">{a.text}</p>
             {a.detail && <p className="text-xs text-fg-2">{a.detail}</p>}
@@ -171,8 +181,8 @@ export default function DealView({ role }: { role: Role }) {
           </h2>
           {d.escrow ? (
             <dl className="mt-3 space-y-2 text-[13px]">
-              <Row k="Held in escrow" v={inr(d.escrow.amount ?? d.amount)} />
-              <Row k="Payment" v={`${d.escrow.mode === "razorpay-test" ? "Razorpay test" : "Simulated"} · ${d.escrow.ref}`} />
+              <Row k={d.escrow.mode === "simulated" ? "In escrow (simulated)" : "In escrow"} v={inr(d.escrow.amount ?? d.amount)} />
+              <Row k="Payment" v={`${d.escrow.mode === "razorpay-test" ? "Razorpay test mode" : "Simulated, no money moved"} · ${d.escrow.ref}`} />
               <Row k="Funded" v={`${shortDate(d.escrow.funded_at)}, ${timeOfDay(d.escrow.funded_at)}`} />
               {d.collective && <Row k="Your split of the collective" v={`${((d.collective.split ?? 0) * 100).toFixed(1)}% of ${inr(d.collective.total)}`} />}
             </dl>
@@ -182,13 +192,16 @@ export default function DealView({ role }: { role: Role }) {
             </p>
           )}
           {d.payouts.map((p) => (
-            <div key={p.utr} className="mt-3 flex items-center gap-2.5 rounded-xl bg-success-soft p-3 text-sm text-success">
-              <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+            <div key={p.at} className="mt-3 flex items-center gap-2.5 rounded-xl bg-surface-2 p-3 text-sm text-fg-2">
+              <CheckCircle2 className="size-4 shrink-0 text-muted" aria-hidden />
               <span>
-                {inr(p.amount)} paid by UPI to {p.upi}. UTR <span className="num">{p.utr}</span>
+                {p.mode === "simulated" ? `Simulated payout of ${inr(p.amount)} recorded ${shortDate(p.at)}. No money moved.` : `${inr(p.amount)} paid out ${shortDate(p.at)}.`}
               </span>
             </div>
           ))}
+          {d.payout?.status === "not_connected" && (
+            <p className="mt-3 rounded-xl bg-surface-2 p-3 text-sm text-fg-2">Approved. Payout isn't connected yet, so nothing has been paid out.</p>
+          )}
           {d.invoice && (
             <Button asChild size="sm" variant="outline" className="mt-3">
               <a href={`/api/invoices/${d.invoice.id}.pdf`} target="_blank" rel="noreferrer">
@@ -200,30 +213,35 @@ export default function DealView({ role }: { role: Role }) {
 
         <section aria-labelledby="post" className="card-surface rounded-2xl p-5">
           <h2 id="post" className="flex items-center gap-1.5 text-sm font-semibold">
-            <ShieldCheck className="size-4 text-muted" aria-hidden /> Post and verification
+            <ShieldCheck className="size-4 text-muted" aria-hidden /> Post and review
           </h2>
           {d.proof_url ? (
             <a href={d.proof_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 break-all text-sm text-accent underline-offset-4 hover:underline">
               {d.proof_url} <ExternalLink className="size-3.5 shrink-0" aria-hidden />
             </a>
           ) : (
-            <p className="mt-3 text-sm text-muted">The post link appears here once it's live.</p>
+            <p className="mt-3 text-sm text-muted">The post link appears here once it's submitted.</p>
           )}
-          {d.verification ? (
-            <div className="mt-3">
-              <p className="text-xs text-muted">
-                {d.verification.auto ? "Auto-verified" : "Checked"} via {d.verification.source} · {count(d.verification.views_so_far)} views so far
-              </p>
-              <ul className="mt-2 space-y-1">
-                {d.verification.checks.map((c) => (
-                  <li key={c.label} className="flex items-center gap-2 text-[13px]">
-                    <CheckCircle2 className="size-4 text-success" aria-hidden /> {c.label}
+          {d.verification && (
+            <p className="mt-3 text-xs text-muted">
+              {d.verification.approved_by === "auto" ? "Approved automatically: the brand didn't review it in time." : `Approved by ${d.brand.name}.`}
+            </p>
+          )}
+          {(d.verification ?? d.post_check) && <PostChecks check={(d.verification ?? d.post_check)!} />}
+          {!d.verification && d.auto_release_on && (
+            <p className="mt-3 text-xs text-muted">If {d.brand.name} doesn't review it, the post is approved automatically on {shortDate(d.auto_release_on)}.</p>
+          )}
+          {d.revisions.length > 0 && (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-xs font-semibold text-muted">Revisions asked for ({d.revisions.length})</p>
+              <ul className="mt-1.5 space-y-1 text-[13px] text-fg-2">
+                {d.revisions.map((r) => (
+                  <li key={r.at}>
+                    {shortDate(r.at)}: {r.reason}
                   </li>
                 ))}
               </ul>
             </div>
-          ) : (
-            d.auto_release_on && <p className="mt-3 text-xs text-muted">If {d.brand.name} doesn't respond, escrow releases to the creator on {shortDate(d.auto_release_on)}.</p>
           )}
         </section>
       </div>
@@ -269,6 +287,9 @@ export default function DealView({ role }: { role: Role }) {
 
       {dialog === "counter" && <CounterDialog deal={d} onClose={() => setDialog(null)} onSubmit={(amount, note) => act.mutate({ action: "counter", amount, note })} pending={act.isPending} />}
       {dialog === "url" && <PostDialog onClose={() => setDialog(null)} onSubmit={(url) => act.mutate({ action: "submit_post", url })} pending={act.isPending} />}
+      {dialog === "revision" && (
+        <RevisionDialog deal={d} onClose={() => setDialog(null)} onSubmit={(note) => act.mutate({ action: "request_revision", note })} pending={act.isPending} />
+      )}
       {dialog === "sign" && pending && (
         <SignDialog
           deal={d}
@@ -286,7 +307,9 @@ export default function DealView({ role }: { role: Role }) {
           onPaid={async () => {
             await qc.invalidateQueries();
             setDialog(null);
-            toast.success(`${inr(d.amount)} held in escrow`, { description: `${d.creator.name} can post now.` });
+            toast.success(d.payments_mode === "simulated" ? `${inr(d.amount)} in simulated escrow` : `${inr(d.amount)} paid into escrow (test mode)`, {
+              description: `${d.creator.name} can post now.`,
+            });
           }}
         />
       )}
@@ -362,14 +385,59 @@ function CounterDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClo
   );
 }
 
+function PostChecks({ check }: { check: PostCheck }) {
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-muted">
+        {check.source === "not_connected"
+          ? check.note ?? "Automatic checks need the creator's connected account. The brand reviews the link."
+          : `Checked through ${check.source}${check.checked_at ? `, ${shortDate(check.checked_at)} ${timeOfDay(check.checked_at)}` : ""}`}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {check.checks.map((c) => (
+          <li key={c.label} className="flex items-start gap-2 text-[13px]">
+            {c.status === "passed" ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+            ) : c.status === "failed" ? (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+            ) : (
+              <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+            )}
+            <span>
+              {c.label}
+              <span className="text-muted"> · {c.status === "not_checked" ? "not checked" : c.status}</span>
+              {c.detail && <span className="block text-xs text-muted">{c.detail}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RevisionDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClose: () => void; onSubmit: (note: string) => void; pending: boolean }) {
+  const [note, setNote] = useState("");
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent sheet title="Ask for a revision" description={`${deal.creator.name} sees your note and submits a new link. The fee stays in escrow.`}>
+        <Label htmlFor="revision-note">What needs to change?</Label>
+        <Textarea id="revision-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-24" placeholder="For example: tag us in the caption and add the paid-partnership label." />
+        <Button variant="primary" size="lg" className="mt-5 w-full" disabled={note.trim().length < 3} loading={pending} onClick={() => onSubmit(note.trim())}>
+          Send revision request
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PostDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSubmit: (url: string) => void; pending: boolean }) {
   const [url, setUrl] = useState("https://www.instagram.com/reel/");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent sheet title="Submit your post link" description="Before payment is released, the post is checked. In this demo, a sandbox stands in for the official API.">
+      <DialogContent sheet title="Submit your post link" description="The brand reviews your post and approves it or asks for a revision.">
         <Label htmlFor="post-url">Instagram reel or YouTube Short link</Label>
         <Input id="post-url" type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} />
-        <p className="mt-2 text-xs text-muted">The brand has 3 days to confirm. If they don't respond, payment releases to you automatically a few days later.</p>
+        <p className="mt-2 text-xs text-muted">The brand has 3 days to review it. If they don't respond, it's approved automatically a few days later.</p>
         <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(url)}>
           Submit link
         </Button>
@@ -401,25 +469,41 @@ function SignDialog({ deal, role, action, onClose, onSubmit, pending }: { deal: 
   );
 }
 
-export function PayDialog({ deal, onClose, onPaid, path, amount }: { deal?: Deal; onClose: () => void; onPaid: () => void; path?: string; amount?: number }) {
+export function PayDialog({
+  deal,
+  onClose,
+  onPaid,
+  path,
+  amount,
+  mode: mode_ = "simulated",
+}: {
+  deal?: Deal;
+  onClose: () => void;
+  onPaid: () => void;
+  path?: string;
+  amount?: number;
+  mode?: PaymentsMode;
+}) {
   const total = amount ?? deal?.amount ?? 0;
-  const [upi, setUpi] = useState("brand.payments@okbank");
   const [busy, setBusy] = useState(false);
-  const mode = deal?.payments_mode ?? "simulated";
+  const mode = deal?.payments_mode ?? mode_;
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent title="Fund escrow" description={mode === "razorpay-test" ? "Razorpay test mode. No real money moves." : "Simulated payment. No real money moves."}>
+      <DialogContent
+        title="Fund escrow"
+        description={
+          mode === "razorpay-test"
+            ? "Razorpay test mode: use a test card or UPI. No real money moves."
+            : mode === "simulated"
+              ? "Demo mode: this records a simulated payment. No money moves."
+              : "Payments aren't connected on this server, so funding isn't possible yet."
+        }
+      >
         <div className="rounded-2xl border border-line bg-surface-2 p-4 text-center">
           <p className="text-xs text-muted">Pay into JodiDar escrow</p>
           <p className="num mt-1 font-display text-3xl font-semibold">{inr(total)}</p>
-          <p className="mt-1 text-xs text-muted">Held until the post is verified, then paid out by UPI{deal?.kind === "collective" ? " to each member" : ""}.</p>
+          <p className="mt-1 text-xs text-muted">Held until the post is approved{deal?.kind === "collective" ? ", for each member" : ""}.</p>
         </div>
-        {mode === "simulated" && (
-          <div className="mt-4">
-            <Label htmlFor="upi">Pay from UPI ID</Label>
-            <Input id="upi" value={upi} onChange={(e) => setUpi(e.target.value)} />
-          </div>
-        )}
         <Button
           variant="primary"
           size="lg"

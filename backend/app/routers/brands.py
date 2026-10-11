@@ -18,6 +18,7 @@ from ..seed.catalog import CITIES, LANGS, NICHES
 from ..services import auth as au
 from ..services import cache
 from ..services import consent as cs
+from ..services import payments
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
 
@@ -30,9 +31,9 @@ STAGE_LABELS = {
     "offer": "Offer sent",
     "contract": "Contract",
     "escrow_funded": "Escrow funded",
-    "live": "Post live",
-    "verified": "Verified",
-    "paid": "Paid",
+    "live": "Post submitted",
+    "verified": "Approved",
+    "paid": "Paid out",
     "declined": "Declined",
 }
 
@@ -97,7 +98,9 @@ def console(brand_id: str, _: dict = Depends(au.own_brand)):
             stages[d["stage"]]["amount"] += d["amount"]
     held = [d for d in deals if d["stage"] in ("escrow_funded", "live", "verified")]
     held_total = sum(d["amount"] for d in held)
+    held_simulated = bool(held) and all((d.get("escrow") or {}).get("mode") == "simulated" for d in held)
     paid_total = sum(d["amount"] for d in deals if d["stage"] == "paid")
+    paid_simulated = all((d.get("payout") or {}).get("status") == "simulated" for d in deals if d["stage"] == "paid")
     needs = []
     for d in deals:
         who = creators.get(d["creator_id"], {}).get("name", "A creator")
@@ -106,15 +109,15 @@ def console(brand_id: str, _: dict = Depends(au.own_brand)):
             late = due and due < today().isoformat()
             release = auto_release_due(d)
             left = (release - today()).days if release else 0
-            overdue = f" Overdue; auto-releases in {left} day{'s' if left != 1 else ''}." if late else ""
-            needs.append({"deal_id": d["_id"], "kind": "confirm", "text": f"Confirm {who}'s post", "detail": f"{inr(d['amount'])} releases from escrow when you confirm.{overdue}", "urgent": bool(late)})
+            overdue = f" Overdue; approved automatically in {left} day{'s' if left != 1 else ''}." if late else ""
+            needs.append({"deal_id": d["_id"], "kind": "confirm", "text": f"Review {who}'s post", "detail": f"Approve it or ask for a revision ({inr(d['amount'])} in escrow).{overdue}", "urgent": bool(late)})
         elif d["stage"] == "contract" and not (d.get("contract") or {}).get("signed_by_brand"):
             needs.append({"deal_id": d["_id"], "kind": "sign", "text": f"Sign {who}'s contract", "detail": inr(d["amount"]), "urgent": False})
         elif d["stage"] == "contract" and (d.get("contract") or {}).get("signed_by_creator") and d.get("escrow") is None:
             needs.append({"deal_id": d["_id"], "kind": "fund", "text": f"Fund escrow for {who}", "detail": inr(d["amount"]), "urgent": False})
     live_campaigns = [c for c in campaigns if c["status"] == "open"]
     waiting = sum(1 for n in needs if n["kind"] == "confirm")
-    headline = f"{len(live_campaigns)} campaign{'s' if len(live_campaigns) != 1 else ''} live. {inr(held_total)} held in escrow."
+    headline = f"{len(live_campaigns)} campaign{'s' if len(live_campaigns) != 1 else ''} live. {inr(held_total)} held in escrow{' (simulated)' if held_simulated else ''}."
     if waiting:
         headline += f" {waiting} post{'s' if waiting != 1 else ''} waiting for your confirmation."
     return {
@@ -123,6 +126,7 @@ def console(brand_id: str, _: dict = Depends(au.own_brand)):
         "campaigns": sorted(campaigns, key=lambda c: c["posted_on"] or "", reverse=True),
         "escrow": {
             "held": held_total,
+            "simulated": held_simulated,
             "count": len(held),
             "items": [
                 {"deal_id": d["_id"], "creator": creators.get(d["creator_id"], {}).get("name"), "amount": d["amount"], "stage": d["stage"], "stage_label": STAGE_LABELS[d["stage"]]}
@@ -130,6 +134,9 @@ def console(brand_id: str, _: dict = Depends(au.own_brand)):
             ],
         },
         "paid_total": paid_total,
+        "paid_simulated": paid_simulated,
+        "payments_mode": payments.mode(),
+        "payout_mode": payments.payout_mode(),
         "stages": [{"stage": s, "label": STAGE_LABELS[s], **stages[s]} for s in STAGES],
         "needs_you": needs,
         "recent": [

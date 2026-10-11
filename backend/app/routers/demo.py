@@ -95,7 +95,7 @@ def _opportunity_line(side: dict) -> str:
         return f"{_name(side)} has no open matches yet."
     coll = next((o for o in opps if o["type"] == "collective"), None)
     if coll and side["creator"]["followers"] < 10_000:
-        return f"{_name(side)} can join {possessive(coll['lister']['name'])} {coll['collective_size']}-creator collective: one escrow payment, split by UPI."
+        return f"{_name(side)} can join {possessive(coll['lister']['name'])} {coll['collective_size']}-creator collective: one escrow payment, split among the members."
     top = opps[0]
     return f"{_name(side)} matches {top['title']} from {top['lister']['name']} (fit {top['fit']}/100)."
 

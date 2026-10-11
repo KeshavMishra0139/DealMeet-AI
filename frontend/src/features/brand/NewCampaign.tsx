@@ -173,7 +173,7 @@ export default function NewCampaign() {
               <span className="flex items-center gap-1.5 text-sm font-medium">
                 <Users className="size-4 text-accent" aria-hidden /> Book as a collective
               </span>
-              <span className="block text-xs text-muted">10 to 50 small creators in one pack, one escrow payment, automatic split.</span>
+              <span className="block text-xs text-muted">10 to 50 small creators in one pack, one escrow payment, split by member.</span>
             </span>
             <Switch checked={f.collective} onCheckedChange={(v) => set("collective", v)} aria-label="Book as a collective" />
           </label>

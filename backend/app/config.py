@@ -65,6 +65,7 @@ class Settings:
     # Persona sign-in, seeded data and the reset button exist only in demo mode (DEMO_MODE=1).
     demo_mode: bool = False
     session_hours: int = 72
+    razorpay_webhook_secret: str | None = None
 
     @property
     def has_ai(self) -> bool:
@@ -98,6 +99,7 @@ def get_settings() -> Settings:
         demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
         demo_mode=_flag("DEMO_MODE"),
         session_hours=int(_env("SESSION_HOURS", "72") or 72),
+        razorpay_webhook_secret=_env("RAZORPAY_WEBHOOK_SECRET"),
     )
 
 

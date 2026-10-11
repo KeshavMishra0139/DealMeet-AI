@@ -26,6 +26,8 @@ COLLECTIONS = [
     "invoices",
     "applications",
     "notifications",
+    "payments",
+    "webhook_events",
     "ai_cache",
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
