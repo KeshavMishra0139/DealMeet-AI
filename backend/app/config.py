@@ -46,6 +46,10 @@ def _env(name: str, default: str | None = None) -> str | None:
     return value if value not in (None, "") else default
 
 
+def _flag(name: str) -> bool:
+    return (_env(name, "0") or "0").strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class Settings:
     mongodb_uri: str | None
@@ -58,6 +62,9 @@ class Settings:
     demo_today: date
     # On a shared URL, put the demo data back to its seeded state every N minutes (0 = never).
     demo_reset_minutes: int = 0
+    # Persona sign-in, seeded data and the reset button exist only in demo mode (DEMO_MODE=1).
+    demo_mode: bool = False
+    session_hours: int = 72
 
     @property
     def has_ai(self) -> bool:
@@ -89,6 +96,8 @@ def get_settings() -> Settings:
         firebase_project_id=_env("VITE_FIREBASE_PROJECT_ID"),
         demo_today=date.fromisoformat(_env("DEMO_TODAY", "2026-10-08") or "2026-10-08"),
         demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
+        demo_mode=_flag("DEMO_MODE"),
+        session_hours=int(_env("SESSION_HOURS", "72") or 72),
     )
 
 

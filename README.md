@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 14 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 16 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -49,6 +49,8 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow: orders and signature checks (`rzp_test_` keys only). UPI payouts to creators stay simulated either way | Simulated escrow |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google sign-in before choosing a demo profile | Demo login with a profile picker |
+| `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
+| `SESSION_HOURS` | How long a sign-in lasts | 72 |
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
 | `DEMO_RESET_MINUTES` | On a shared URL, put the demo data back to its seeded state every N minutes (skipped while someone changed something in the last 5 minutes). The Docker image sets 30 | Never resets on its own |
 | `AI_MAX_CALLS_PER_HOUR` | Cap on live AI calls across all visitors; beyond it, templates are used | 100 |
@@ -67,7 +69,7 @@ docker run -p 8000:8000 jodidar-ai      # http://localhost:8000
 - **Render**: New → Blueprint → pick this repository → Apply. `render.yaml` sets up a free Docker web service with the health check at `/api/health`. Free services sleep after 15 minutes without visitors; the first visit after that takes about a minute.
 - **Any other Docker host** (Railway, Fly.io, Google Cloud Run, Hugging Face Spaces): point it at the `Dockerfile`. Health check path: `/api/health`.
 - **Run one instance with one worker.** The demo data lives in the server's memory, so a second instance would see different data. (Set `MONGODB_URI` if you ever need more.)
-- **Everyone shares one demo.** Data resets on every restart, and every 30 minutes when idle (`DEMO_RESET_MINUTES`). The Studio and Console say so next to **Reset demo**, which resets it for everyone.
+- **Everyone shares one demo.** The image runs with `DEMO_MODE=1`. Data resets on every restart, and every 30 minutes when idle (`DEMO_RESET_MINUTES`). The Studio and Console say so next to **Reset demo**, which resets it for everyone. Set `DEMO_MODE=0` on the host for real accounts only: then there is no seeded data, no persona sign-in and no reset.
 - **Leave `ANTHROPIC_API_KEY` unset on a public URL**, or set a spend limit on the key: every visitor could otherwise trigger paid calls (capped by `AI_MAX_CALLS_PER_HOUR`).
 - Razorpay accepts `rzp_test_` keys only. `VITE_FIREBASE_*` values are baked in at build time (Docker build args), and the deployed domain must be added to Firebase's authorised domains.
 - Visitor-created records are capped (100 sign-ups, 50 new brands, 20 campaigns or collabs each, 30 bookings per creator, 50 offers per brand), and requests over 256 KB are refused.
@@ -198,9 +200,20 @@ Before you start, click **Reset demo** (top of `/demo/compare`). On a shared URL
 
 Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **→** move between steps and **Esc** ends it. Any link takes `?phone=1` to open in phone view and `?lang=hi` to open the Studio in Hindi.
 
+## Accounts and permissions
+
+Every private API route checks the signed-in account on the server, and that the account owns the creator profile, brand, campaign, deal, collective or invoice it touches. Nothing trusts a role or an owner id sent from the browser: a deal action's side (creator or brand) comes from the session.
+
+- **Accounts** are creators or brands, chosen at sign-up and fixed after that. Admin is granted only from the server: `python -m app.admin_cli grant <email>` (run in `backend/`).
+- **Sign-in**: email and password (hashed with scrypt). Five wrong passwords in 15 minutes pause sign-in for that email.
+- **Sessions**: a random token in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), or a `Authorization: Bearer` header for API clients. Only the token's SHA-256 hash is stored. Sessions last 72 hours (`SESSION_HOURS`) and signing out revokes them.
+- **CSRF**: a write sent with only the cookie must carry an `X-Requested-With` header, which a cross-site form can't add. The web app always sends it.
+- **Audit log**: sign-ups, sign-ins, sign-outs and every write (who, route, result) go to an append-only `audit` collection. Request bodies, passwords and tokens are never stored there.
+- **401 and 403**: the app sends you to sign in when a session ends, and says plainly when a page belongs to another account or the other side.
+
 ## Demo profiles
 
-Sign in at `/login` with no password: pick a profile.
+Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign in at `/login` with your own account, or pick a profile. Persona sessions are demo tokens kept per side, so a creator phone and a brand console can run side by side, and `?as=<profile id>` signs one tab or frame in as that demo profile. A demo reset removes accounts made during the demo; outside demo mode none of this exists.
 
 | Profile | Who | What to look at |
 | --- | --- | --- |
@@ -232,12 +245,13 @@ Sign in at `/login` with no password: pick a profile.
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 112 API tests (below), the copy rules on about 3,100 UI strings, and the TypeScript type check |
-| `make e2e` | 14 journeys in a real browser (below) |
+| `make test` | 148 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make e2e` | 16 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
+- Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.
 - Creator A's and Creator B's expected outputs.
 - Every engine.
 - Consent redaction.
@@ -253,6 +267,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- The sign-in gate, and an email sign-up that sets up a brand, survives a reload and signs out.
 - Onboarding.
 - The weekly learning loop.
 - Pricing per brand.

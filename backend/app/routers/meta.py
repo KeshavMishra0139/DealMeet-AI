@@ -18,9 +18,10 @@ def health():
             "db": db_mode(),
             "ai": "live" if s.has_ai else "templates",
             "payments": "razorpay-test" if s.has_razorpay else "simulated",
-            "auth": "firebase" if s.has_firebase else "demo",
+            "auth": ", ".join(["password"] + (["firebase"] if s.has_firebase else []) + (["demo"] if s.demo_mode else [])),
         },
-        "shared_demo": s.demo_reset_minutes > 0,
+        "demo_mode": s.demo_mode,
+        "shared_demo": s.demo_mode and s.demo_reset_minutes > 0,
     }
 
 

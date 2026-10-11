@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..config import now_iso, today
@@ -15,6 +15,7 @@ from ..engines.fair_price import fair_price
 from ..engines.matching import listing_fit
 from ..engines.trust import trust_score
 from ..seed.catalog import CITIES, LANGS, NICHES
+from ..services import auth as au
 from ..services import cache
 from ..services import consent as cs
 from ..services.deals import auto_release_due, sweep
@@ -50,6 +51,12 @@ def _listing(listing_id: str) -> dict:
     return x
 
 
+def _own_listing(listing_id: str, user: dict) -> dict:
+    x = _listing(listing_id)
+    au.require_listing_owner(user, x)
+    return x
+
+
 def _campaign_row(x: dict, brand: dict, deals: list[dict]) -> dict:
     db = get_db()
     mine = [d for d in deals if d.get("listing_id") == x["_id"]]
@@ -77,7 +84,7 @@ def _campaign_row(x: dict, brand: dict, deals: list[dict]) -> dict:
 
 
 @router.get("/brands/{brand_id}/console")
-def console(brand_id: str):
+def console(brand_id: str, _: dict = Depends(au.own_brand)):
     db = get_db()
     brand = _brand(brand_id)
     deals = [sweep(d) for d in db.deals.find({"brand_id": brand_id})]
@@ -144,7 +151,7 @@ def console(brand_id: str):
 
 
 @router.get("/brands/{brand_id}/campaigns")
-def campaigns(brand_id: str):
+def campaigns(brand_id: str, _: dict = Depends(au.own_brand)):
     brand = _brand(brand_id)
     deals = list(get_db().deals.find({"brand_id": brand_id}))
     return [_campaign_row(x, brand, deals) for x in get_db().listings.find({"owner_id": brand_id})]
@@ -170,7 +177,7 @@ class CampaignIn(BaseModel):
 
 
 @router.post("/brands/{brand_id}/campaigns")
-def create_campaign(brand_id: str, body: CampaignIn):
+def create_campaign(brand_id: str, body: CampaignIn, _: dict = Depends(au.own_brand)):
     _brand(brand_id)
     if any(n not in NICHES for n in body.niches):
         raise HTTPException(422, "Unknown niche")
@@ -207,7 +214,7 @@ def create_campaign(brand_id: str, body: CampaignIn):
 
 
 @router.get("/listings/{listing_id}")
-def listing_detail(listing_id: str):
+def listing_detail(listing_id: str, _: dict = Depends(au.current_user)):
     x = _listing(listing_id)
     d = out(x)
     owner = get_db().brands.find_one({"_id": x["owner_id"]})
@@ -218,8 +225,8 @@ def listing_detail(listing_id: str):
 
 
 @router.get("/listings/{listing_id}/matches")
-def listing_matches(listing_id: str):
-    x = _listing(listing_id)
+def listing_matches(listing_id: str, user: dict = Depends(au.current_user)):
+    x = _own_listing(listing_id, user)
     return brand_matching.matches(x, _brand(x["owner_id"]))
 
 
@@ -232,14 +239,14 @@ class CollectiveIn(BaseModel):
 
 
 @router.post("/listings/{listing_id}/collective")
-def build_collective(listing_id: str, body: CollectiveIn):
-    x = _listing(listing_id)
+def build_collective(listing_id: str, body: CollectiveIn, user: dict = Depends(au.current_user)):
+    x = _own_listing(listing_id, user)
     brand = _brand(x["owner_id"])
     return collective.build(x, brand, body.budget, body.size_min, body.size_max, body.trust_min, body.target_reach)
 
 
 @router.get("/brands/{brand_id}/creators/{creator_id}")
-def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = None):
+def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = None, _: dict = Depends(au.own_brand)):
     db = get_db()
     brand = _brand(brand_id)
     c = db.creators.find_one({"_id": creator_id})
@@ -248,8 +255,10 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
     scopes = cs.scopes_for(c, brand_id)
     if scopes is None:
         raise HTTPException(404, "This creator isn't discoverable to you")
-    cs.log_view(creator_id, brand_id, scopes)
     listing = db.listings.find_one({"_id": listing_id}) if listing_id else None
+    if listing_id and (not listing or listing["owner_id"] != brand_id):
+        raise HTTPException(403, "That campaign belongs to another account.")
+    cs.log_view(creator_id, brand_id, scopes)
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else None
     fp = fair_price(c, brand, terms, scopes=scopes)
     fit = listing_fit(c, listing, brand) if listing else None
@@ -311,7 +320,7 @@ class AccessIn(BaseModel):
 
 
 @router.post("/brands/{brand_id}/creators/{creator_id}/request-access")
-def request_access(brand_id: str, creator_id: str, body: AccessIn):
+def request_access(brand_id: str, creator_id: str, body: AccessIn, _: dict = Depends(au.own_brand)):
     _brand(brand_id)
     if not get_db().creators.find_one({"_id": creator_id}):
         raise HTTPException(404, "Creator not found")
@@ -320,7 +329,8 @@ def request_access(brand_id: str, creator_id: str, body: AccessIn):
 
 
 class OfferIn(BaseModel):
-    brand_id: str
+    # The sending brand comes from the session. An id sent here must match it.
+    brand_id: str | None = None
     creator_id: str
     listing_id: str | None = None
     amount: int = Field(ge=500, le=10_000_000)
@@ -328,15 +338,21 @@ class OfferIn(BaseModel):
 
 
 @router.post("/offers")
-def send_offer(body: OfferIn):
+def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
+    au.require_role(user, "brand")
+    if body.brand_id and body.brand_id != user.get("brand_id"):
+        raise HTTPException(403, "You can only send offers as your own brand.")
+    body.brand_id = user.get("brand_id")
     db = get_db()
-    brand = _brand(body.brand_id)
+    brand = _brand(body.brand_id or "")
     c = db.creators.find_one({"_id": body.creator_id})
     if not c or cs.scopes_for(c, body.brand_id) is None:
         raise HTTPException(404, "Creator not available")
     if db.deals.count_documents({"brand_id": body.brand_id}) >= 50:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     listing = db.listings.find_one({"_id": body.listing_id}) if body.listing_id else None
+    if body.listing_id and (not listing or listing["owner_id"] != body.brand_id):
+        raise HTTPException(403, "That campaign belongs to another account.")
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else {"deliverables": [{"kind": "reel", "count": 1}]}
     fp = fair_price(c, brand, terms, with_model=False)
     did = f"dl_{uuid.uuid4().hex[:10]}"
@@ -370,9 +386,9 @@ class BookIn(BaseModel):
 
 
 @router.post("/listings/{listing_id}/collective/book")
-def book_collective(listing_id: str, body: BookIn):
+def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.current_user)):
     db = get_db()
-    x = _listing(listing_id)
+    x = _own_listing(listing_id, user)
     brand = _brand(x["owner_id"])
     pack = collective.build(x, brand, must_include=body.member_ids, size_max=len(body.member_ids))
     members = [m for m in pack["members"] if m["id"] in body.member_ids]
@@ -432,8 +448,12 @@ class BrandIn(BaseModel):
 
 
 @router.post("/brands")
-def create_brand(body: BrandIn):
+def create_brand(body: BrandIn, user: dict = Depends(au.current_user)):
+    """Brand onboarding: creates the signed-in brand account's organisation, once."""
+    au.require_role(user, "brand")
     db = get_db()
+    if user.get("brand_id") and db.brands.count_documents({"_id": user["brand_id"]}):
+        raise HTTPException(409, "This account already has a brand profile.")
     if db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     bid = f"br_new_{uuid.uuid4().hex[:6]}"
@@ -454,5 +474,6 @@ def create_brand(body: BrandIn):
             "created_at": now_iso(),
         }
     )
+    au.link_profile(user, bid)
     return {"id": bid}
 

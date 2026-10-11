@@ -39,17 +39,20 @@ def test_rules_catch_examples():
         assert not any(rx.search(s) for rx, _ in PATTERNS), s
 
 
-def test_api_responses_have_no_promises(client, db):
+def test_api_responses_have_no_promises(client, login, db):
     """Runtime copy (engine output, English and Hindi) is checked too, not just source strings."""
     creators = ["cr_a", "cr_b", "cr_n01", "cr_t01", "cr_f08", "cr_g09"] + [c["_id"] for c in db.creators.find({}, {"_id": 1})][::9]
-    paths = ["/api/meta", "/api/auth/personas", "/api/demo/compare"]
+    paths = [(None, "/api/meta"), (None, "/api/auth/personas"), (None, "/api/demo/compare")]
     for cid in dict.fromkeys(creators):
-        paths += [f"/api/creators/{cid}{s}" for s in ("", "/home", "/money", "/roadmap", "/opportunities", "/kit")]
+        paths += [(cid, f"/api/creators/{cid}{s}") for s in ("", "/home", "/money", "/roadmap", "/opportunities", "/kit")]
     for bid in ("br_senpai", "br_thalam"):
-        paths += [f"/api/brands/{bid}/console", f"/api/brands/{bid}/campaigns"]
-    paths += ["/api/listings/lst_senpai_hoodie/matches", "/api/listings/lst_thalam_collective/matches"]
-    for p in paths:
-        r = client.get(p)
+        paths += [(bid, f"/api/brands/{bid}/console"), (bid, f"/api/brands/{bid}/campaigns")]
+    paths += [("br_senpai", "/api/listings/lst_senpai_hoodie/matches"), ("br_thalam", "/api/listings/lst_thalam_collective/matches")]
+    actors = {}
+    for who, p in paths:
+        if who and who not in actors:
+            actors[who] = login(who)
+        r = (actors[who] if who else client).get(p)
         assert r.status_code == 200, p
         for rx, why in PATTERNS:
             m = rx.search(r.text)

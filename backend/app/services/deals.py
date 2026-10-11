@@ -420,7 +420,9 @@ def fund_collective(collective_id: str, mode: str = "simulated", ref: str | None
     return collective_view(collective_id)
 
 
-def collective_view(collective_id: str) -> dict:
+def collective_view(collective_id: str, viewer: str | None = None) -> dict:
+    """The brand sees every member's price and split. A member (`viewer`) sees the pack
+    and everyone's progress, but only their own price and split."""
     db = get_db()
     col = db.collectives.find_one({"_id": collective_id})
     if not col:
@@ -451,6 +453,10 @@ def collective_view(collective_id: str) -> dict:
     stages: dict[str, int] = {}
     for m in members:
         stages[m["stage"] or "offer"] = stages.get(m["stage"] or "offer", 0) + 1
+    if viewer:
+        for m in members:
+            if m["creator_id"] != viewer:
+                m.update({"price": None, "split": None, "deal_id": None, "proof_url": None})
     return {
         "id": col["_id"],
         "brand": {"id": brand.get("_id"), "name": brand.get("name")},
@@ -459,9 +465,9 @@ def collective_view(collective_id: str) -> dict:
         "combined_reach": col.get("combined_reach"),
         "funded": bool(col.get("funded")),
         "escrow": col.get("escrow"),
-        "paid_out": sum(m["price"] for m in members if m["paid"]),
+        "paid_out": sum(m["price"] or 0 for m in members if m["paid"]) if not viewer else None,
         # The whole pack is held in escrow; a member who declines has their share returned to the brand.
-        "refunded": sum(m["price"] for m in members if m["stage"] == "declined") if col.get("funded") else 0,
+        "refunded": (sum(m["price"] or 0 for m in members if m["stage"] == "declined") if col.get("funded") else 0) if not viewer else None,
         "members": members,
         "stages": stages,
         "created_at": col.get("created_at"),

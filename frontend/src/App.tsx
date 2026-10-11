@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { EmbedBridge, PhoneStage, PhoneToggle, usePhoneShortcut } from "@/components/demo/PhoneMode";
+import { RequireSession } from "@/components/shared/AuthGate";
 import { LangScope } from "@/i18n";
 import { usePhoneMode } from "@/lib/phone";
 import { isEmbedFrame } from "@/lib/session";
@@ -64,7 +65,9 @@ export default function App() {
           path="/creator/onboarding"
           element={
             <LangScope>
-              <CreatorOnboarding />
+              <RequireSession role="creator" needsProfile={false}>
+                <CreatorOnboarding />
+              </RequireSession>
             </LangScope>
           }
         />
@@ -79,7 +82,14 @@ export default function App() {
           <Route path="privacy" element={<CreatorPrivacy />} />
         </Route>
 
-        <Route path="/brand/onboarding" element={<BrandOnboarding />} />
+        <Route
+          path="/brand/onboarding"
+          element={
+            <RequireSession role="brand" needsProfile={false}>
+              <BrandOnboarding />
+            </RequireSession>
+          }
+        />
         <Route path="/brand" element={<BrandShell />}>
           <Route index element={<BrandHome />} />
           <Route path="campaigns" element={<BrandCampaigns />} />

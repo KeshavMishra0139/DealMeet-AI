@@ -8,5 +8,8 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
+      # The shared demo. Set DEMO_MODE to "0" for real accounts only (no personas, no reset).
+      - key: DEMO_MODE
+        value: "1"
       - key: DEMO_RESET_MINUTES
         value: "30"

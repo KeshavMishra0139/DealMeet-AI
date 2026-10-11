@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..config import now_iso
@@ -12,9 +12,11 @@ from ..db import get_db, out_many
 from ..engines.opportunities import matched
 from ..services import cache
 from ..services import consent as cs
+from ..services.auth import own_creator
 from ..services.creator_ctx import load_creator
 
-router = APIRouter(prefix="/api/creators/{creator_id}", tags=["marketplace"])
+# Every route here acts on one creator's own data: only that creator's account may call it.
+router = APIRouter(prefix="/api/creators/{creator_id}", tags=["marketplace"], dependencies=[Depends(own_creator)])
 
 
 @router.get("/opportunities")

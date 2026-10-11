@@ -41,14 +41,33 @@ async function launch() {
   }
 }
 
-await fetch(`${API}/api/demo/reset`, { method: "POST" });
+// Writes need the app's header (CSRF guard); private reads need a session.
+const reset = () => fetch(`${API}/api/demo/reset`, { method: "POST", headers: { "X-Requested-With": "qa" } });
+async function apiAs(persona, path) {
+  const login = await fetch(`${API}/api/auth/demo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Requested-With": "qa" },
+    body: JSON.stringify({ persona, cookie: false }),
+  }).then((r) => r.json());
+  return fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${login.token}` } }).then((r) => r.json());
+}
+
+await reset();
 const browser = await launch();
 page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 
+await step("Sign-in gate: Creator Studio sends you to sign in", async () => {
+  await page.goto(`${BASE}/creator`);
+  await page.waitForURL(/\/login\?role=creator/);
+  await page.getByRole("heading", { name: "Sign in", exact: true }).waitFor();
+});
+
 await step("Onboarding: 5 steps create a plan", async () => {
-  await page.goto(`${BASE}/creator/onboarding`);
+  await page.goto(`${BASE}/login?role=creator`);
+  await page.getByRole("button", { name: /New creator/ }).click();
+  await page.waitForURL(/\/creator\/onboarding/);
   await page.getByLabel("Your name or channel name").fill("Meera Test Kitchen");
   await page.getByRole("checkbox", { name: "Food and cooking" }).click();
   await page.getByRole("button", { name: "Next" }).click();
@@ -86,7 +105,7 @@ await step("Creator A: mark a move done, then plan next week adapts", async () =
 });
 
 await step("Money: price changes per brand match", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await page.goto(`${BASE}/creator/money?as=cr_a`);
   await page.getByText("₹17K–18K").first().waitFor();
   await page.getByRole("radio", { name: /Thalam Foods/ }).click();
@@ -101,7 +120,7 @@ await step("Why? popovers open with reasons", async () => {
 });
 
 await step("Creator B opts in to the Thalam collective; the brand sees her in the pack", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await page.goto(`${BASE}/creator/opportunities?as=cr_b`);
   await page.getByRole("radio", { name: /Collectives/ }).click();
   await page.getByRole("button", { name: "Opt in" }).first().click();
@@ -117,7 +136,7 @@ await step("Brand sends an offer from matches; it lands in the creator's pipelin
   await page.getByRole("button", { name: "Offer" }).first().click();
   await page.getByRole("button", { name: "Send offer" }).click();
   await page.getByText(/Offer sent to/).waitFor();
-  const r = await fetch(`${API}/api/creators/cr_g01/home`).then((x) => x.json());
+  const r = await apiAs("cr_g01", "/api/creators/cr_g01/home");
   if (!r.pipeline) throw new Error("no pipeline");
 });
 
@@ -129,7 +148,7 @@ await step("Privacy: revoking a brand logs it and hides the creator", async () =
 });
 
 await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify, UPI payout", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByText(/58% below the fair price/).waitFor();
   await page.getByRole("button", { name: /Counter at/ }).click();
@@ -174,13 +193,43 @@ await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () =
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
 });
 
+await step("Accounts: sign up as a brand, set up the brand, sign out", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  p.on("pageerror", (e) => errors.push(String(e)));
+  page = p;
+  await p.goto(`${BASE}/login?role=brand`);
+  await p.getByRole("button", { name: "Create an account" }).click();
+  await p.getByLabel("Your name").fill("QA Brand Owner");
+  await p.getByLabel("Email").fill(`qa-${Date.now()}@example.test`);
+  await p.getByLabel("Password").fill("a long qa password");
+  await p.getByRole("button", { name: "Create account" }).click();
+  await p.waitForURL(/\/brand\/onboarding/);
+  await p.getByLabel("Brand name").fill("QA Snacks");
+  await p.getByLabel("Category").fill("Snacks");
+  await p.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Food and cooking" }).click();
+  await p.getByRole("group", { name: "Languages" }).getByRole("checkbox", { name: /Hindi/ }).first().click();
+  await p.getByRole("button", { name: "Continue to your first campaign" }).click();
+  await p.waitForURL(/\/brand\/campaigns\/new/);
+  await p.goto(`${BASE}/brand`);
+  await p.getByRole("heading", { name: "QA Snacks" }).waitFor(); // the session survives a reload (HttpOnly cookie)
+  // A brand account can't open the Creator Studio.
+  await p.goto(`${BASE}/creator`);
+  await p.getByRole("heading", { name: /for a creator account/ }).waitFor();
+  await p.getByRole("button", { name: "Sign out" }).click();
+  await p.waitForURL(/\/login/);
+  await p.goto(`${BASE}/brand`);
+  await p.waitForURL(/\/login\?role=brand/);
+  await ctx.close();
+});
+
 // Presenting on a laptop: compare, phone view and the live split.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 desk.on("pageerror", (e) => errors.push(String(e)));
 page = desk;
 
 await step("Compare: guided demo steps through both creators with captions", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await desk.goto(`${BASE}/demo/compare?phone=0`);
   await desk.getByText("Earning, underpriced").first().waitFor();
   await desk.getByText("Starting").first().waitFor();
@@ -210,7 +259,7 @@ await step("Phone view: P puts the app in a 390 x 844 phone and back", async () 
 });
 
 await step("Live demo: a counter on the phone appears in the brand console without a reload", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await desk.goto(`${BASE}/demo/live`);
   const phone = desk.frameLocator('iframe[title="Creator A\'s Creator Studio"]');
   const consoleFrame = desk.frameLocator('iframe[title="Senpai Supply Co. Brand Console"]');

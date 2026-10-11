@@ -1,8 +1,6 @@
 import { BadgeCheck } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/form";
 import { inr } from "@/lib/format";
 import { useBrand } from "./BrandShell";
@@ -45,9 +43,6 @@ export default function BrandProfile() {
         Matching uses this target to score audience fit. Creators share data with you only by consent; every profile you open is logged in their ledger.{" "}
         {b.created_at || b.guest ? <Badge size="sm">Not verified</Badge> : <Badge size="sm">Fictional brand</Badge>}
       </p>
-      <Button asChild variant="outline" size="sm" className="mt-4">
-        <Link to="/brand/onboarding">Set up another brand</Link>
-      </Button>
     </div>
   );
 }
