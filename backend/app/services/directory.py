@@ -306,7 +306,7 @@ def request_claim(slug: str, user: dict, message: str) -> dict:
     return {"status": "pending", "id": cid, "duplicate": False}
 
 
-def decide_claim(claim_id: str, approve: bool, admin: dict) -> dict:
+def decide_claim(claim_id: str, approve: bool, admin: dict, reason: str) -> dict:
     db = get_db()
     c = db.claim_requests.find_one({"_id": claim_id})
     if not c:
@@ -324,8 +324,8 @@ def decide_claim(claim_id: str, approve: bool, admin: dict) -> dict:
                                                           "target": b.get("target") or {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []}}})
         au.link_profile(u, b["_id"])
         db.claim_requests.update_many({"brand_id": b["_id"], "status": "pending", "_id": {"$ne": claim_id}}, {"$set": {"status": "rejected", "decided_at": now_iso()}})
-    db.claim_requests.update_one({"_id": claim_id}, {"$set": {"status": "approved" if approve else "rejected", "decided_at": now_iso(), "decided_by": admin["_id"]}})
-    au.audit("brand_claim_" + ("approved" if approve else "rejected"), admin["_id"], "admin", brand_id=c["brand_id"], claim_id=claim_id)
+    db.claim_requests.update_one({"_id": claim_id}, {"$set": {"status": "approved" if approve else "rejected", "decided_at": now_iso(), "decided_by": admin["_id"], "decision_reason": reason}})
+    au.audit("brand_claim_" + ("approved" if approve else "rejected"), admin["_id"], "admin", brand_id=c["brand_id"], claim_id=claim_id, reason=reason)
     return db.claim_requests.find_one({"_id": claim_id}, {"user_email": 0})
 
 
@@ -342,7 +342,7 @@ def request_removal(slug: str, reason: str, contact: str | None) -> dict:
     return {"status": "pending", "id": rid}
 
 
-def decide_removal(request_id: str, remove: bool, admin: dict) -> dict:
+def decide_removal(request_id: str, remove: bool, admin: dict, reason: str) -> dict:
     db = get_db()
     r = db.removal_requests.find_one({"_id": request_id})
     if not r:
@@ -352,8 +352,8 @@ def decide_removal(request_id: str, remove: bool, admin: dict) -> dict:
     if remove:
         db.brands.update_one({"_id": r["brand_id"]}, {"$set": {"removed": True, "removed_at": now_iso()}})
         db.wishlists.delete_many({"brand_id": r["brand_id"]})
-    db.removal_requests.update_one({"_id": request_id}, {"$set": {"status": "removed" if remove else "kept", "decided_at": now_iso(), "decided_by": admin["_id"]}})
-    au.audit("brand_removal_" + ("done" if remove else "declined"), admin["_id"], "admin", brand_id=r["brand_id"], request_id=request_id)
+    db.removal_requests.update_one({"_id": request_id}, {"$set": {"status": "removed" if remove else "kept", "decided_at": now_iso(), "decided_by": admin["_id"], "decision_reason": reason}})
+    au.audit("brand_removal_" + ("done" if remove else "declined"), admin["_id"], "admin", brand_id=r["brand_id"], request_id=request_id, reason=reason)
     return db.removal_requests.find_one({"_id": request_id})
 
 
@@ -379,7 +379,7 @@ class UnclaimedIn(BaseModel):
     public_handles: Handles = Handles()
 
 
-def add_unclaimed(body: UnclaimedIn, admin: dict) -> dict:
+def add_unclaimed(body: UnclaimedIn, admin: dict, reason: str) -> dict:
     db = get_db()
     name = body.name.strip()
     if db.brands.count_documents({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}, "removed": {"$ne": True}}):
@@ -396,8 +396,9 @@ def add_unclaimed(body: UnclaimedIn, admin: dict) -> dict:
         "verified": False,
         "source": "manual",
         "added_by": admin["_id"],
+        "added_reason": reason,
         "created_at": now_iso(),
     }
     db.brands.insert_one(doc)
-    au.audit("brand_unclaimed_added", admin["_id"], "admin", brand_id=bid)
+    au.audit("brand_unclaimed_added", admin["_id"], "admin", brand_id=bid, reason=reason)
     return card(doc)

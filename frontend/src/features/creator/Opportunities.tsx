@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
 import { Reveal } from "@/components/motion/Motion";
 import { RangeValue } from "@/components/shared/Estimate";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { ScopePicker } from "@/components/shared/ScopePicker";
 import { EstimateNote, WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -290,6 +291,11 @@ function ApplyDialog({ o, creatorId, onClose }: { o: Opportunity; creatorId: str
         <Button variant="primary" size="lg" className="mt-5 w-full" loading={apply.isPending} onClick={() => apply.mutate()}>
           {o.type === "collective" ? "Opt in and share" : "Apply and share"}
         </Button>
+        {o.type !== "creator_collab" && (
+          <div className="mt-2 flex justify-center">
+            <ReportButton type="campaign" id={o.id} role="creator" />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

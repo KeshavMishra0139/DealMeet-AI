@@ -41,6 +41,7 @@ const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
 const CreatorProfile = lazy(() => import("@/features/creator/Profile"));
 const DemoCompare = lazy(() => import("@/features/demo/Compare"));
 const DemoLive = lazy(() => import("@/features/demo/Live"));
+const AdminConsole = lazy(() => import("@/features/admin/AdminConsole"));
 
 const embedded = isEmbedFrame();
 
@@ -121,6 +122,7 @@ export default function App() {
           <Route path="inbox" element={<BrandFanInbox />} />
         </Route>
 
+        <Route path="/admin" element={<AdminConsole />} />
         <Route path="/demo/compare" element={<DemoCompare />} />
         <Route path="/demo/live" element={<DemoLive />} />
 

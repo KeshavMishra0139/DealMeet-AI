@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
+from ..seed.load import DEMO_ADMIN_ID
 from ..services import firebase_auth
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -28,6 +29,8 @@ PERSONAS = [
     {"id": "br_thalam", "role": "brand", "title": "Thalam Foods", "subtitle": "Regional masala and FMCG", "tag": "Fictional brand"},
     {"id": "new_brand", "role": "brand", "title": "New brand", "subtitle": "Start from brand onboarding", "tag": "Onboarding"},
 ]
+# Only with DEMO_ADMIN=1 on a local demo (Settings.demo_admin): the admin console walkthrough.
+ADMIN_PERSONA = {"id": "demo_admin", "role": "admin", "title": "Demo admin", "subtitle": "Admin console (local demo only)", "tag": "Admin"}
 MAX_NEW_DEMO_USERS = 500
 
 
@@ -164,7 +167,7 @@ def firebase_signin(body: FirebaseIn, request: Request, response: Response):
 @router.get("/personas")
 def personas():
     _demo_only()
-    return PERSONAS
+    return PERSONAS + ([ADMIN_PERSONA] if get_settings().demo_admin else [])
 
 
 class DemoLogin(BaseModel):
@@ -179,7 +182,12 @@ def demo_login(body: DemoLogin, request: Request, response: Response):
     _demo_only()
     db = get_db()
     p = next((p for p in PERSONAS if p["id"] == body.persona), None)
-    if p and p["id"].startswith("new_"):
+    if body.persona == ADMIN_PERSONA["id"]:
+        user = db.users.find_one({"_id": DEMO_ADMIN_ID, "role": "admin", "demo": True}) if get_settings().demo_admin else None
+        if not user:
+            raise HTTPException(404, "The demo admin is off. Admins are granted on the server: python -m app.admin_cli grant <email>.")
+        p = ADMIN_PERSONA
+    elif p and p["id"].startswith("new_"):
         if db.users.count_documents({"demo": True, "seeded": {"$ne": True}}) >= MAX_NEW_DEMO_USERS:
             raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
         user = au.new_user(p["role"], p["title"], demo=True)
@@ -189,6 +197,8 @@ def demo_login(body: DemoLogin, request: Request, response: Response):
         user = db.users.find_one({"demo": True, "$or": [{"creator_id": body.persona}, {"brand_id": body.persona}]})
         if not user:
             raise HTTPException(404, "Persona data missing; reset the demo")
+    if user.get("suspended"):
+        raise HTTPException(403, "This account is suspended. Contact support if you think this is a mistake.")
     out = _signed_in(request, response, user, "demo", cookie=body.cookie)
     out["persona"] = p or {"id": body.persona, "role": user["role"], "title": user.get("name"), "subtitle": "", "tag": "Demo"}
     return out

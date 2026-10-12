@@ -106,10 +106,11 @@ def test_saved_brands_notify_when_they_open_a_campaign(login, db):
 
 # ------------------------------------------------------------------ unclaimed brands, claims, removal
 def test_only_admins_add_unclaimed_brands(client, login, admin):
-    body = {"name": "Chai Tapri Co", "category": "Tea", "public_handles": {"instagram": "chaitapri.co"}}
+    body = {"name": "Chai Tapri Co", "category": "Tea", "public_handles": {"instagram": "chaitapri.co"}, "reason": "Creators keep pitching them."}
     assert client.post("/api/admin/brands", json=body).status_code == 401
     assert login("br_senpai").post("/api/admin/brands", json=body).status_code == 403
     assert admin.post("/api/admin/brands", json={**body, "public_handles": {"instagram": "not a handle!"}}).status_code == 422
+    assert admin.post("/api/admin/brands", json={**body, "reason": "   "}).status_code == 422  # every admin action needs a reason
     d = admin.post("/api/admin/brands", json=body).json()
     assert d["claimed"] is False and d["public_handles"] == {"instagram": "@chaitapri.co"} and d["slug"] == "chai-tapri-co"
     assert admin.post("/api/admin/brands", json=body).status_code == 409
@@ -125,14 +126,16 @@ def test_claiming_a_page_needs_an_admin(client, login, admin, db):
     assert r["status"] == "pending" and r["duplicate"] is False
     assert me.post("/api/directory/brands/notebook-nagar/claim", json={"message": "We run Notebook Nagar in Pune."}).json()["duplicate"] is True
     assert client.get("/api/directory/brands/notebook-nagar").json()["claimed"] is False  # stays unclaimed until approved
-    assert me.post(f"/api/admin/claims/{r['id']}", json={"action": "approve"}).status_code == 403
+    ok = "Checked their company email domain."
+    assert me.post(f"/api/admin/claims/{r['id']}", json={"action": "approve", "reason": ok}).status_code == 403
+    assert admin.post(f"/api/admin/claims/{r['id']}", json={"action": "approve"}).status_code == 422
     assert admin.get("/api/admin/claims").json()["items"][0]["_id"] == r["id"]
-    done = admin.post(f"/api/admin/claims/{r['id']}", json={"action": "approve"}).json()
-    assert done["status"] == "approved"
-    assert admin.post(f"/api/admin/claims/{r['id']}", json={"action": "reject"}).status_code == 409
+    done = admin.post(f"/api/admin/claims/{r['id']}", json={"action": "approve", "reason": ok}).json()
+    assert done["status"] == "approved" and done["decision_reason"] == ok
+    assert admin.post(f"/api/admin/claims/{r['id']}", json={"action": "reject", "reason": ok}).status_code == 409
     assert client.get("/api/directory/brands/notebook-nagar").json()["claimed"] is True
     assert me.get("/api/brands/br_unc_notebook/profile").status_code == 200  # the account now owns it
-    assert db.audit.count_documents({"action": "brand_claim_approved", "brand_id": "br_unc_notebook"}) == 1
+    assert db.audit.count_documents({"action": "brand_claim_approved", "brand_id": "br_unc_notebook", "reason": ok}) == 1
 
 
 def test_anyone_can_ask_to_remove_an_unclaimed_page(client, admin, login, db):
@@ -146,6 +149,7 @@ def test_anyone_can_ask_to_remove_an_unclaimed_page(client, admin, login, db):
     a = login("cr_a")
     a.client.put("/api/creators/cr_a/dream-brands/br_unc_kokum", json={}, headers=a.headers)
     rid = admin.get("/api/admin/removal-requests").json()["items"][0]["_id"]
-    assert admin.post(f"/api/admin/removal-requests/{rid}", json={"action": "remove"}).json()["status"] == "removed"
+    assert admin.post(f"/api/admin/removal-requests/{rid}", json={"action": "remove"}).status_code == 422
+    assert admin.post(f"/api/admin/removal-requests/{rid}", json={"action": "remove", "reason": "Request came from the company."}).json()["status"] == "removed"
     assert client.get("/api/directory/brands/kokum-and-kesar-pantry").status_code == 404
     assert not db.wishlists.count_documents({"brand_id": "br_unc_kokum"})

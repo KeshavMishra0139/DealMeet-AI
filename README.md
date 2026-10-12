@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 28 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 29 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -424,11 +424,22 @@ Creators connect Instagram from **Connections** with the Instagram API with Inst
 7. Generate `TOKEN_ENC_KEY` once (command in `.env.example`) and set it on the server.
 8. Check the current Graph API version and the valid demographics `timeframe` values in Meta's changelog and the Instagram User Insights reference, and set `IG_GRAPH_VERSION` and `IG_DEMOGRAPHICS_TIMEFRAME` if they differ. The defaults (`v25.0`, `this_month`) were checked against secondary sources; Meta's own docs couldn't be opened from the environment this was built in.
 
+## Admin console and reports
+
+`/admin` is for accounts given the admin role on the server; there is no sign-up path to it and no admin password in the code. Every `/api/admin` route checks the role on the server, every action needs a written reason (5 to 300 characters), and every action is saved in the audit log with its reason.
+
+- **Grant an admin**: the account signs up as usual, then on the server: `python -m app.admin_cli grant <email>` (run in `backend/`; `revoke` and `list` too). Granting signs the account out, so its next sign-in starts as an admin.
+- **Overview**: accounts by role, suspended accounts, open reports, brand-page claims and removal requests waiting, sign-ins locked after 5 wrong passwords in 15 minutes, profiles with 2 or more open reports, payment statuses and webhook events, failing Instagram or YouTube connections, and system health (the same checks as `/api/health`).
+- **Actions**: suspend and restore accounts (suspending signs them out everywhere; admins can't be suspended from the console), close campaigns, resolve reports (action taken or no action), approve or reject brand-page claims, add unclaimed brands, and remove or keep brand pages on request.
+- **Reports**: any signed-in account can report a campaign, a profile, a pitch sent to their brand, or a deal they're a side of (`POST /api/reports`, with a fixed list of reasons and optional details). Five reports a day per account; repeating an open report returns it instead of adding another; you can't report your own profile or campaign.
+- **Audit log viewer**: filter by action prefix, account id and dates, newest first. Passwords, tokens and payment secrets are never written to the log, and any field whose name looks like one (`password`, `token`, `secret`, `signature`, `hash`, `otp`, `key`) is shown as `[redacted]`.
+- **Demo admin (local only)**: with `DEMO_MODE=1` and `DEMO_ADMIN=1` (`make dev` sets both), the demo sign-in lists a "Demo admin" persona so the console can be walked through. The API ignores `DEMO_ADMIN` outside demo mode and on a demo that resets itself (`DEMO_RESET_MINUTES` above 0, i.e. a shared URL), and the Docker image and `render.yaml` don't set it.
+
 ## Accounts and permissions
 
 Every private API route checks the signed-in account on the server, and that the account owns the creator profile, brand, campaign, deal, collective or invoice it touches. Nothing trusts a role or an owner id sent from the browser: a deal action's side (creator or brand) comes from the session.
 
-- **Accounts** are creators or brands, chosen at sign-up and fixed after that. Admin is granted only from the server: `python -m app.admin_cli grant <email>` (run in `backend/`).
+- **Accounts** are creators or brands, chosen at sign-up and fixed after that. Admin is granted only from the server: `python -m app.admin_cli grant <email>` (run in `backend/`). See [Admin console and reports](#admin-console-and-reports).
 - **Sign-in**: Google or phone OTP through Firebase, or email and password (hashed with scrypt). Both stay: email and password works with no Firebase project. Five wrong passwords in 15 minutes pause sign-in for that email.
 - **Firebase is verified on the server.** The browser sends the Firebase ID token once to `POST /api/auth/firebase`; the Admin SDK rejects forged, expired, revoked and other-project tokens, then the account is found or created by `firebase_uid` (unique) and the app starts its own session. A uid is never accepted without a verified token. The side (creator or brand) is picked at the first sign-in and can't change later; a verified Google email that matches an email-and-password account links to it.
 - **Sessions**: a random token in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), or a `Authorization: Bearer` header for API clients. Only the token's SHA-256 hash is stored. Sessions last 72 hours (`SESSION_HOURS`) and signing out revokes them.
@@ -458,6 +469,7 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 | **Senpai Supply Co.** | Anime merch store (fictional) | Matches with trust and safety notes; offers; deals |
 | **Thalam Foods** | Regional masala brand (fictional) | 20-creator South collective |
 | **New brand** | Brand onboarding | Campaign set-up |
+| **Demo admin** | Local demos only (`DEMO_ADMIN=1`, set by `make dev`) | The admin console at `/admin` |
 
 ## Data rules
 
@@ -480,9 +492,9 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 318 API tests (below), the copy rules on about 5,500 UI strings, and the TypeScript type check |
-| `make e2e` | 28 journeys in a real browser (below) |
-| `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 340 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
+| `make e2e` | 29 journeys in a real browser (below). `QA_ONLY="Admin" make e2e` runs only the journeys whose names contain that text |
+| `make shots` | 96 screenshots (48 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
@@ -502,6 +514,7 @@ The API tests cover:
 - YouTube Analytics: 28-day numbers, a token that's never stored, another account's channel refused, no channel, a declined permission, disconnect, and owner-only access.
 - YouTube data (against a fake Data API): median-views pricing per format, no `search.list`, the 12-hour cache, the per-IP limit, unknown handle, used-up quota, network failure, hidden subscribers, too few videos, linking with posts and a daily snapshot, unlinking, and owner-only access.
 - Firebase sign-in: a forged token, an expired or revoked token, a token from another Firebase project (checked by the real Admin SDK, offline), a first sign-in, a role that can't change, and linking a verified email.
+- The admin console: admin-only routes (401 and 403), a reason required for every action and saved in the audit log, suspending signing the account out, admins not suspendable, closing campaigns, reports (visible targets only, deals only by their sides, pitches only by their brand, not your own, duplicates, 5 a day), resolving once, audit filters and redaction, and the demo admin off unless the server turns it on (never on a shared demo).
 - Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.
 - Creator A's and Creator B's expected outputs.
 - Every engine.
@@ -518,6 +531,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- A deal's brand reporting a problem; the demo admin resolving it, suspending (the account can't sign in) and restoring an account, each with a reason, and finding both in the audit log.
 - Pausing a campaign through the Assistant: nothing changes until Confirm.
 - A brand adjusting a collective's fee and sending it; funding only after every member confirms.
 - A creator proposing new terms and the brand accepting that version.

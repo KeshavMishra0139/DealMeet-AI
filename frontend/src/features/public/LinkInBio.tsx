@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/shared/Bits";
 import { QrCode } from "@/components/shared/QrCode";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { KitCard } from "@/components/shared/KitCard";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,11 @@ export default function LinkInBio() {
           )}
           {q.data && <PageSections page={q.data} />}
           {q.data && <ShareCard name={q.data.name} handle={q.data.handle} />}
+          {q.data && (
+            <div className="mt-3 flex justify-center">
+              <ReportButton type="profile" id={q.data.creator_id} label="Report this profile" />
+            </div>
+          )}
         </main>
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-muted">
           <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">

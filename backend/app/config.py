@@ -72,6 +72,9 @@ class Settings:
     demo_reset_minutes: int = 0
     # Persona sign-in, seeded data and the reset button exist only in demo mode (DEMO_MODE=1).
     demo_mode: bool = False
+    # A seeded "Demo admin" persona for local walkthroughs of the admin console. Only with
+    # DEMO_MODE=1 and DEMO_ADMIN=1 on a demo that doesn't reset itself (not a shared URL).
+    demo_admin: bool = False
     session_hours: int = 72
     razorpay_webhook_secret: str | None = None
     # In-memory mongomock instead of MONGODB_URI (tests and the local demo). Never a silent fallback.
@@ -123,6 +126,7 @@ def get_settings() -> Settings:
         demo_today=date.fromisoformat(_env("DEMO_TODAY", "2026-10-08") or "2026-10-08"),
         demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
         demo_mode=_flag("DEMO_MODE"),
+        demo_admin=_flag("DEMO_MODE") and _flag("DEMO_ADMIN") and int(_env("DEMO_RESET_MINUTES", "0") or 0) == 0,
         session_hours=int(_env("SESSION_HOURS", "72") or 72),
         razorpay_webhook_secret=_env("RAZORPAY_WEBHOOK_SECRET"),
         use_mock_db=_flag("USE_MOCK_DB"),
