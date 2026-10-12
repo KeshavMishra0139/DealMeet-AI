@@ -2,8 +2,11 @@
 
 - OAuth with read-only scopes only: instagram_business_basic and
   instagram_business_manage_insights. No passwords, no scraping, no posting.
-- The OAuth `state` is random, HMAC-signed, valid for 10 minutes, single-use and
-  tied to the signed-in account that started the connection.
+- The OAuth `state` is random, HMAC-signed, valid for 10 minutes and single-use.
+  A "connect" state is tied to the signed-in account that started the connection;
+  a "signin" state ("Continue with Instagram" on the sign-in page) has no account yet.
+- One Instagram professional account is the sign-in identity of at most one DealMeet
+  account (users.instagram_uid), whether it was connected or used to sign in.
 - The long-lived token (about 60 days) is encrypted at rest (Fernet, TOKEN_ENC_KEY),
   never logged and never sent to the browser. A daily job refreshes tokens older
   than 24 hours that expire within 10 days.
@@ -73,6 +76,12 @@ def _version() -> str:
 
 
 # ------------------------------------------------------------------ OAuth state
+# Sign-in nonces start with this marker ("~" is outside token_urlsafe's alphabet), so a
+# callback with a broken state still knows whether to send the browser back to the
+# sign-in page or to Connections. The stored record's purpose is what's trusted.
+SIGNIN_MARK = "si~"
+
+
 def _state_key() -> bytes:
     s = get_settings()
     return hashlib.sha256(f"{s.token_enc_key}|{s.ig_app_secret}|ig-state".encode()).digest()
@@ -82,28 +91,51 @@ def _sign(nonce: str, user_id: str) -> str:
     return hmac.new(_state_key(), f"{nonce}.{user_id}".encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def new_state(user: dict, creator_id: str) -> str:
-    nonce = secrets.token_urlsafe(24)
+def new_state(user: dict | None, creator_id: str | None, purpose: str = "connect", next_path: str | None = None, binding: str | None = None) -> str:
+    """A state for one Instagram login. "connect": a signed-in creator links Instagram.
+    "signin": "Continue with Instagram" before anyone is signed in (no user yet); `binding`
+    is the hash of a cookie only the browser that started it holds."""
+    if purpose not in ("connect", "signin"):
+        raise ValueError(purpose)
+    nonce = (SIGNIN_MARK if purpose == "signin" else "") + secrets.token_urlsafe(24)
+    user_id = user["_id"] if user else None
     get_db().oauth_states.insert_one(
-        {"_id": nonce, "platform": "instagram", "user_id": user["_id"], "creator_id": creator_id, "expires": time.time() + STATE_TTL, "used": False}
+        {
+            "_id": nonce,
+            "platform": "instagram",
+            "purpose": purpose,
+            "user_id": user_id,
+            "creator_id": creator_id,
+            "next": next_path,
+            "binding": binding,
+            "expires": time.time() + STATE_TTL,
+            "used": False,
+        }
     )
-    return f"{nonce}.{_sign(nonce, user['_id'])}"
+    return f"{nonce}.{_sign(nonce, user_id or '')}"
 
 
-def consume_state(state: str, session_user: dict | None) -> dict:
-    """The state's record, once. Refuses a forged, expired, reused or someone else's state."""
+def state_purpose(state: str | None) -> str:
+    """Which flow a state claims to be, for choosing where to send the browser back."""
+    return "signin" if (state or "").startswith(SIGNIN_MARK) else "connect"
+
+
+def consume_state(state: str, session_user: dict | None, purpose: str = "connect") -> dict:
+    """The state's record, once. Refuses a forged, expired, reused or someone else's state,
+    and a state started for the other flow."""
+    what, where = ("sign-in", "the sign-in page") if purpose == "signin" else ("connection", "Connections")
     nonce, _, sig = (state or "").partition(".")
     db = get_db()
     doc = db.oauth_states.find_one({"_id": nonce, "platform": "instagram"}) if nonce else None
-    if not doc or not hmac.compare_digest(_sign(nonce, doc["user_id"]), sig):
-        raise HTTPException(400, "That Instagram connection link isn't valid. Start again from Connections.")
+    if not doc or doc.get("purpose", "connect") != purpose or not hmac.compare_digest(_sign(nonce, doc.get("user_id") or ""), sig):
+        raise HTTPException(400, f"That Instagram {what} link isn't valid. Start again from {where}.")
     if doc["expires"] < time.time():
-        raise HTTPException(400, "That Instagram connection took too long. Start again from Connections.")
-    if session_user and session_user["_id"] != doc["user_id"]:
+        raise HTTPException(400, f"That Instagram {what} took too long. Start again from {where}.")
+    if purpose == "connect" and session_user and session_user["_id"] != doc["user_id"]:
         raise HTTPException(403, "This Instagram connection was started by another account.")
     used = db.oauth_states.find_one_and_update({"_id": nonce, "used": False}, {"$set": {"used": True}}, return_document=ReturnDocument.AFTER)
     if not used:
-        raise HTTPException(400, "That Instagram connection link was already used. Start again from Connections.")
+        raise HTTPException(400, f"That Instagram {what} link was already used. Start again from {where}.")
     return doc
 
 
@@ -176,7 +208,45 @@ def exchange_code(code: str) -> dict:
     }
 
 
-def save_connection(user: dict, creator_id: str, grant: dict) -> dict:
+def identity(token: str) -> dict:
+    """The professional account a token belongs to. Its `user_id` is the stable id that
+    sync stores, so it's what sign-in matches on."""
+    me = _graph("me", token, fields="user_id,username,account_type")
+    ig_id = str(me.get("user_id") or me.get("id") or "")
+    if not ig_id:
+        raise IGError("api", "Instagram didn't say which account signed in.")
+    return {"ig_user_id": ig_id, "username": me.get("username"), "account_type": me.get("account_type")}
+
+
+def account_for(ig_user_id: str) -> dict | None:
+    """The DealMeet account this Instagram account signs in to, if any. Accounts that
+    connected Instagram before sign-in existed are found through their connection."""
+    db = get_db()
+    user = db.users.find_one({"instagram_uid": ig_user_id})
+    if user:
+        return user
+    conn = db.connections.find_one({"platform": "instagram", "ig_user_id": ig_user_id}, sort=[("connected_at", -1)])
+    return db.users.find_one({"_id": conn["user_id"]}) if conn else None
+
+
+def claim_identity(user: dict, ig_user_id: str) -> None:
+    """Makes this Instagram account `user`'s sign-in identity. One Instagram account signs
+    in to one DealMeet account, so a second account can't connect it."""
+    from pymongo.errors import DuplicateKeyError
+
+    db = get_db()
+    if db.users.count_documents({"instagram_uid": ig_user_id, "_id": {"$ne": user["_id"]}}):
+        raise IGError("taken", "This Instagram account is already linked to another DealMeet account. Sign in to that account, or disconnect Instagram there first.")
+    try:
+        db.users.update_one({"_id": user["_id"]}, {"$set": {"instagram_uid": ig_user_id}})
+    except DuplicateKeyError:  # claimed by another account a moment ago
+        raise IGError("taken", "This Instagram account is already linked to another DealMeet account.") from None
+    user["instagram_uid"] = ig_user_id
+
+
+def save_connection(user: dict, creator_id: str | None, grant: dict) -> dict:
+    """Stores the encrypted token. `creator_id` is None for a creator who signed in with
+    Instagram before onboarding; onboarding attaches the connection to the new profile."""
     db = get_db()
     now = time.time()
     doc = {
@@ -474,6 +544,10 @@ def disconnect(user: dict, creator_id: str) -> None:
     db = get_db()
     db.connections.delete_many({"user_id": user["_id"], "platform": "instagram"})
     db.connections.delete_many({"creator_id": creator_id, "platform": "instagram"})
+    # The Instagram account stays this account's sign-in only when it's the only way in;
+    # otherwise disconnecting frees it.
+    if user.get("password_hash") or user.get("firebase_uid"):
+        db.users.update_one({"_id": user["_id"]}, {"$unset": {"instagram_uid": ""}})
     db.posts.delete_many({"creator_id": creator_id, "platform": "instagram"})
     db.metric_snapshots.delete_many({"creator_id": creator_id, "platform": "instagram"})
     db.oauth_states.delete_many({"user_id": user["_id"], "platform": "instagram"})

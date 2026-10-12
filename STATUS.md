@@ -13,7 +13,7 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 
 | Check | Command | Result |
 | --- | --- | --- |
-| API tests | `make test` | 425 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
+| API tests | `make test` | 445 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
 | Copy rules on UI strings | `make test` | 5,922 strings, no promises |
 | Type check | `make test` | clean |
 | Demo journeys in a browser | `make e2e` | 30 of 30 pass |
@@ -41,6 +41,15 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | ID token verified with the Admin SDK (forged, expired, revoked, other project refused) | Tested | `test_firebase.py` (real Admin SDK, offline keys) |
 | Google and phone sign-in in the browser | Unverified | Needs a Firebase project (`VITE_FIREBASE_*`, service account); not run against one |
 | Role fixed at first sign-in; verified email links to an existing account | Tested | `test_firebase.py` |
+
+## 2a. Creator sign-in with Instagram or YouTube
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| Continue with Instagram: sign-in state, account found or created by Instagram id, encrypted token saved as the connection, one-time login code on the web app's origin | Tested | `test_social_signin.py` against a fake Graph API |
+| Continue with YouTube: verified Google sign-in, access token checked against the same Google account and scope, channel recorded and linked as owned, token not stored | Tested | `test_social_signin.py` against fake Google endpoints and a fake Data API |
+| One Instagram account or YouTube channel per DealMeet account; data attached at onboarding | Tested | `test_social_signin.py` |
+| Real Instagram and Google logins | Blocked | Need a Meta app with Instagram Testers, and a Firebase project with the YouTube scope and test users |
 
 ## 3. Honest payments, payouts and post checks
 

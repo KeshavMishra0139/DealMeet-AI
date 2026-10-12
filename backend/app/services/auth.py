@@ -202,7 +202,16 @@ def public_user(user: dict) -> dict:
         "creator_id": user.get("creator_id"),
         "brand_id": user.get("brand_id"),
         "demo": bool(user.get("demo")),
-        "providers": [k for k, present in (("password", user.get("password_hash")), ("firebase", user.get("firebase_uid"))) if present],
+        "providers": [
+            k
+            for k, present in (
+                ("password", user.get("password_hash")),
+                ("firebase", user.get("firebase_uid")),
+                ("instagram", user.get("instagram_uid")),
+                ("youtube", user.get("youtube_channel_id")),
+            )
+            if present
+        ],
     }
 
 

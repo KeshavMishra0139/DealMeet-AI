@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Instagram, Lock, Sparkles, Youtube } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ErrorState } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +83,7 @@ export default function Onboarding() {
   const demo = useDemoMode();
   const create = useMutation({
     mutationFn: () =>
-      post<{ id: string }>("/creators", {
+      post<{ id: string; notes?: string[] }>("/creators", {
         name: f.name.trim(),
         niche: f.niche,
         formats: f.formats,
@@ -99,9 +100,11 @@ export default function Onboarding() {
         discoverable: f.discoverable,
         consent_defaults: f.scopes,
       }),
-    onSuccess: async () => {
+    onSuccess: async ({ notes }) => {
       // The new profile is linked to this account on the server; re-read the session to pick it up.
       await qc.invalidateQueries({ queryKey: ["session"] });
+      // Signed in with Instagram or YouTube: say if that account's numbers couldn't be read yet.
+      notes?.forEach((n) => toast.info(n));
       navigate("/creator");
     },
   });
