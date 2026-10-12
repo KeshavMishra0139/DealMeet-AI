@@ -140,9 +140,29 @@ if (setupOnly) {
   process.exit(0);
 }
 
+/** A value from the repo-root .env, if the file sets it. */
+function dotenv(key) {
+  const file = join(root, ".env");
+  if (!existsSync(file)) return undefined;
+  for (const line of readFileSync(file, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+    if (m && m[1] === key) return m[2].trim().replace(/^["']|["']$/g, "") || undefined;
+  }
+  return undefined;
+}
+
+// The local runner starts the demo (seeded personas, demo sign-in, the Reset button) unless
+// DEMO_MODE=0 is set in the environment or .env. The API itself defaults to demo mode off.
+const DEMO_MODE = process.env.DEMO_MODE ?? dotenv("DEMO_MODE") ?? "1";
+// A "Demo admin" persona for walking through the admin console. Local only: the API turns it
+// off on a demo that resets itself (a shared URL) and outside demo mode.
+const DEMO_ADMIN = process.env.DEMO_ADMIN ?? dotenv("DEMO_ADMIN") ?? "1";
+// No MONGODB_URI: run on the in-memory database, said out loud (the API never falls back on its own).
+const USE_MOCK_DB = process.env.USE_MOCK_DB ?? dotenv("USE_MOCK_DB") ?? (process.env.MONGODB_URI ?? dotenv("MONGODB_URI") ? "0" : "1");
+
 const procs = [];
 function start(name, color, cmd, args, cwd) {
-  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, FORCE_COLOR: "1" } });
+  const p = spawn(cmd, args, { cwd, shell: needsShell(cmd), env: { ...process.env, DEMO_MODE, DEMO_ADMIN, USE_MOCK_DB, FORCE_COLOR: "1" } });
   const tag = color(name.padEnd(4));
   const pipe = (stream) => {
     let buf = "";

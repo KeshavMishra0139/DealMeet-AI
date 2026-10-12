@@ -15,7 +15,9 @@ if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE)) throw new Error("Q
 
 const results = [];
 let page;
+// QA_ONLY="Admin" runs only the journeys whose names contain that text.
 async function step(name, fn) {
+  if (process.env.QA_ONLY && !name.includes(process.env.QA_ONLY)) return;
   try {
     await fn();
     results.push(["PASS", name]);
@@ -41,14 +43,37 @@ async function launch() {
   }
 }
 
-await fetch(`${API}/api/demo/reset`, { method: "POST" });
+// Writes need the app's header (CSRF guard); private reads need a session.
+const reset = () => fetch(`${API}/api/demo/reset`, { method: "POST", headers: { "X-Requested-With": "qa" } });
+async function apiAs(persona, path, body) {
+  const login = await fetch(`${API}/api/auth/demo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Requested-With": "qa" },
+    body: JSON.stringify({ persona, cookie: false }),
+  }).then((r) => r.json());
+  const init = body
+    ? { method: "POST", headers: { Authorization: `Bearer ${login.token}`, "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify(body) }
+    : { headers: { Authorization: `Bearer ${login.token}` } };
+  return fetch(`${API}${path}`, init).then((r) => r.json());
+}
+
+await reset();
 const browser = await launch();
 page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+const mobile = page;
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 
+await step("Sign-in gate: Creator Studio sends you to sign in", async () => {
+  await page.goto(`${BASE}/creator`);
+  await page.waitForURL(/\/login\?role=creator/);
+  await page.getByRole("heading", { name: "Sign in", exact: true }).waitFor();
+});
+
 await step("Onboarding: 5 steps create a plan", async () => {
-  await page.goto(`${BASE}/creator/onboarding`);
+  await page.goto(`${BASE}/login?role=creator`);
+  await page.getByRole("button", { name: /New creator/ }).click();
+  await page.waitForURL(/\/creator\/onboarding/);
   await page.getByLabel("Your name or channel name").fill("Meera Test Kitchen");
   await page.getByRole("checkbox", { name: "Food and cooking" }).click();
   await page.getByRole("button", { name: "Next" }).click();
@@ -63,9 +88,8 @@ await step("Onboarding: 5 steps create a plan", async () => {
   await page.getByRole("button", { name: "Read my captions" }).click();
   await page.getByText("Brand safe").first().waitFor();
   await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: /Instagram/ }).click();
-  await page.getByRole("button", { name: "Allow" }).click();
-  await page.getByText("Connected (demo sandbox)").waitFor();
+  await page.getByText("Not connected yet. Connect after setup.").first().waitFor();
+  await page.getByRole("switch", { name: "Fill in sample insights (demo)" }).click();
   await page.getByRole("button", { name: "Build my plan" }).click();
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
   const cards = await page.getByRole("article").count();
@@ -86,7 +110,7 @@ await step("Creator A: mark a move done, then plan next week adapts", async () =
 });
 
 await step("Money: price changes per brand match", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await page.goto(`${BASE}/creator/money?as=cr_a`);
   await page.getByText("₹17K–18K").first().waitFor();
   await page.getByRole("radio", { name: /Thalam Foods/ }).click();
@@ -101,7 +125,7 @@ await step("Why? popovers open with reasons", async () => {
 });
 
 await step("Creator B opts in to the Thalam collective; the brand sees her in the pack", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await page.goto(`${BASE}/creator/opportunities?as=cr_b`);
   await page.getByRole("radio", { name: /Collectives/ }).click();
   await page.getByRole("button", { name: "Opt in" }).first().click();
@@ -112,13 +136,156 @@ await step("Creator B opts in to the Thalam collective; the brand sees her in th
   await row.getByText("Opted in").waitFor();
 });
 
+await step("Collective: the brand adjusts a fee and sends; it can be funded only after every member confirms", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/lst_thalam_collective?as=br_thalam`);
+  await page.getByText("How the builder picks").waitFor();
+  const fee = page.getByRole("textbox", { name: /^Fee for / }).first();
+  await fee.fill("3000");
+  await page.getByRole("button", { name: /^Send to \d+ creators$/ }).click();
+  await page.waitForURL(/\/brand\/collectives\/co_/);
+  await page.getByText(/0 of \d+ members confirmed/).waitFor();
+  const id = page.url().split("/collectives/")[1].split("?")[0];
+  const col = await apiAs("br_thalam", `/api/collectives/${id}`);
+  for (const m of col.members) await apiAs(m.creator_id, `/api/deals/${m.deal_id}/action`, { action: "accept" });
+  await page.getByText("Everyone confirmed.").waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: /Fund escrow/ }).click();
+  await page.getByRole("button", { name: /Pay .*simulated/ }).click();
+  await page.getByText(/Escrow funded \(simulated, no money moved\)/).waitFor();
+});
+
 await step("Brand sends an offer from matches; it lands in the creator's pipeline", async () => {
   await page.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
   await page.getByRole("button", { name: "Offer" }).first().click();
   await page.getByRole("button", { name: "Send offer" }).click();
   await page.getByText(/Offer sent to/).waitFor();
-  const r = await fetch(`${API}/api/creators/cr_g01/home`).then((x) => x.json());
+  const r = await apiAs("cr_g01", "/api/creators/cr_g01/home");
   if (!r.pipeline) throw new Error("no pipeline");
+});
+
+await step("Campaigns: a draft lists what's missing, then publish, pause and resume", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/new?as=br_senpai`);
+  await page.getByLabel("Title").fill("QA festive anime drop");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await page.waitForURL(/\/brand\/campaigns\/lst_/);
+  await page.getByText("Before it can go live").waitFor();
+  await page.getByRole("link", { name: "Edit" }).click();
+  await page.getByLabel("Brief", { exact: true }).fill("Two reels showing the festive drop, posted before Diwali.");
+  await page.getByRole("group", { name: "Objectives" }).getByRole("checkbox", { name: "Product launch" }).click();
+  await page.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Anime edits" }).click();
+  await page.getByRole("group", { name: "Languages" }).getByRole("checkbox", { name: /Hindi/ }).first().click();
+  await page.getByRole("group", { name: "Audience ages" }).getByRole("checkbox", { name: "18-24" }).click();
+  await page.getByLabel("Deadline").fill("2026-12-15");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByText("Campaign live").waitFor();
+  await page.getByRole("button", { name: "Pause" }).click();
+  await page.getByText(/Paused: no new applications/).first().waitFor();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await page.getByText("Live again.").waitFor();
+  await page.getByRole("tab", { name: "Applications" }).click();
+  await page.getByText(/No applications yet/).waitFor();
+});
+
+await step("Shortlist: save two matches with a note, compare them, then send a drafted offer only after confirming", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
+  await page.getByRole("button", { name: "Shortlist Kabir Malhotra" }).click();
+  await page.getByRole("button", { name: "Remove Kabir Malhotra from the shortlist" }).waitFor();
+  await page.getByRole("button", { name: "Shortlist Ishaan Mehta" }).click();
+  await page.getByRole("button", { name: "Remove Ishaan Mehta from the shortlist" }).waitFor();
+  await page.getByRole("button", { name: "Why ranked here" }).first().click();
+  await page.getByText("Limits of this data").waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Shortlist" }).click();
+  await page.getByLabel("Note about Kabir Malhotra").fill("Ask about the Diwali drop");
+  await page.getByLabel("Note about Kabir Malhotra").press("Enter");
+  await page.getByRole("checkbox", { name: "Compare Kabir Malhotra" }).click();
+  await page.getByRole("checkbox", { name: "Compare Ishaan Mehta" }).click();
+  await page.getByRole("button", { name: "Compare 2" }).click();
+  await page.getByRole("rowheader", { name: "Estimated price" }).waitFor();
+  await page.getByText("Ask about the Diwali drop").waitFor();
+  await page.getByRole("tab", { name: "Shortlist" }).click();
+  await page.locator("li", { hasText: "Kabir Malhotra" }).getByRole("button", { name: "Draft offer" }).click();
+  await page.getByText("Draft · not sent").waitFor();
+  await page.getByRole("button", { name: "Review and send" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm and send" }).click();
+  await page.getByText(/Offer sent to Kabir Malhotra/).waitFor();
+});
+
+await step("Brands: search the directory, save a Dream Brand, see it in the Studio; unclaimed pages say they aren't on JodiDar", async () => {
+  await reset();
+  await page.goto(`${BASE}/brands?as=cr_a`);
+  await page.getByLabel("Search").fill("senpai");
+  await page.getByRole("link", { name: /Senpai Supply Co\./ }).click();
+  await page.getByRole("heading", { name: "Senpai Supply Co." }).waitFor();
+  await page.getByText(/creators? with connected accounts want to work with this brand/).waitFor();
+  await page.getByRole("button", { name: "Save as Dream Brand" }).click();
+  await page.getByText(/saved to your Dream Brands/).waitFor();
+  await page.goto(`${BASE}/creator/brands?as=cr_a`);
+  await page.getByText("Senpai Supply Co.").first().waitFor();
+  await page.goto(`${BASE}/brands/notebook-nagar`);
+  await page.getByText("Not on JodiDar AI and not affiliated with us.").first().waitFor();
+  await page.getByRole("button", { name: "Request removal" }).waitFor();
+});
+
+await step("Pitch: a creator writes a pitch from their own numbers and sends it; the brand accepts it from the Fan Inbox", async () => {
+  await reset();
+  await page.goto(`${BASE}/brands/thalam-foods?as=cr_b`);
+  await page.getByRole("link", { name: "Pitch this brand" }).click();
+  await page.getByRole("button", { name: "Write my pitch to Thalam Foods" }).click();
+  await page.getByRole("heading", { name: /Pitch to Thalam Foods/ }).waitFor();
+  await page.getByText("Numbers it can use").waitFor();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await page.getByText("Sent to Thalam Foods").waitFor();
+  await page.goto(`${BASE}/brand/inbox?as=br_thalam`);
+  await page.getByRole("heading", { name: "Fan Inbox" }).waitFor();
+  await page.getByRole("button", { name: "Accept" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Send offer" }).click();
+  await page.getByText(/Offer sent to/).waitFor();
+});
+
+await step("Public page: write a positioning, show it on the page with badges, an estimate and a QR code", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/kit?as=cr_a`);
+  await page.getByRole("button", { name: "Write my positioning" }).click();
+  await page.getByText("Content pillars").waitFor();
+  await page.getByLabel("Positioning", { exact: true }).fill("Anime edits people rewatch, in Hindi and English");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText("Positioning saved").first().waitFor();
+  await page.getByRole("switch", { name: "Show the positioning on my public page" }).click();
+  await page.goto(`${BASE}/c/creator.a`);
+  await page.getByText("Anime edits people rewatch, in Hindi and English").waitFor();
+  await page.getByText(/Estimated range/).first().waitFor();
+  await page.getByRole("img", { name: /QR code for Creator A/ }).waitFor();
+  await page.getByRole("link", { name: "Download QR" }).waitFor();
+});
+
+await step("Assistant: pausing a campaign waits for Confirm, then runs once", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand?as=br_senpai`);
+  await page.getByRole("button", { name: "Assistant: do something for me" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("button", { name: "Pause the winter hoodie drop" }).click();
+  await dlg.getByText("Needs your confirmation").waitFor();
+  const before = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
+  if (before.status !== "live") throw new Error(`paused before confirming: ${before.status}`);
+  await dlg.getByRole("button", { name: "Confirm" }).click();
+  await page.getByText("Campaign paused").first().waitFor();
+  const after = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
+  if (after.status !== "paused") throw new Error(`not paused: ${after.status}`);
+});
+
+await step("TEE: the audience overlap says where it was computed, and the health check agrees", async () => {
+  const health = await fetch(`${API}/api/health`).then((r) => r.json());
+  if (health.modes.tee !== "not_configured") throw new Error(`QA expects no TEE configured, got ${health.modes.tee}`);
+  await page.goto(`${BASE}/brand/creators/cr_b?as=br_thalam`);
+  await page.getByRole("heading", { name: "Overlap with your target" }).waitFor();
+  await page.getByText(/No TEE configured/).waitFor();
+  await page.goto(`${BASE}/creator/privacy?as=cr_b`);
+  await page.getByText(/No TEE configured/).waitFor();
 });
 
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
@@ -128,8 +295,8 @@ await step("Privacy: revoking a brand logs it and hides the creator", async () =
   await page.getByText("access revoked").first().waitFor();
 });
 
-await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify, UPI payout", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+await step("Deal rail: counter a low offer, brand accepts, escrow, post, approve, simulated payout", async () => {
+  await reset();
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByText(/58% below the fair price/).waitFor();
   await page.getByRole("button", { name: /Counter at/ }).click();
@@ -140,16 +307,33 @@ await step("Deal rail: counter a low offer, brand accepts, escrow, post, verify,
   await page.getByRole("dialog").getByRole("button", { name: /Accept .* and sign/ }).click();
   await page.getByRole("button", { name: /Fund escrow/ }).click();
   await page.getByRole("button", { name: /Pay .*simulated/ }).click();
-  await page.getByText(/held in escrow/).first().waitFor();
+  await page.getByText(/in simulated escrow/).first().waitFor();
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByRole("button", { name: "Submit post link" }).click();
   await page.getByLabel(/Instagram reel or YouTube Short link/).fill("https://www.instagram.com/reel/DEMOA1/");
-  await page.getByRole("dialog").getByRole("button", { name: "Submit link" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Submit", exact: true }).click();
   await page.getByRole("button", { name: "Remind the brand" }).waitFor();
   await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
-  await page.getByRole("button", { name: /Confirm post and release payment/ }).click();
-  await page.getByText(/paid by UPI to/).first().waitFor();
+  await page.getByText("The post is public and live").waitFor(); // automatic checks: not checked without a connected account
+  await page.getByRole("button", { name: "Approve post" }).click();
+  await page.getByText(/Simulated payout of .* No money moved/).first().waitFor();
   await page.getByRole("link", { name: /Invoice JD-/ }).waitFor();
+});
+
+await step("Contract: the creator proposes new terms, the brand accepts that version, and both see it agreed with its hash", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/deals/dl_b_tiffin?as=cr_b`);
+  await page.getByRole("button", { name: "Propose changes" }).click();
+  await page.getByLabel("Fee (₹)").fill("2500");
+  await page.getByLabel("Stories").fill("2");
+  await page.getByRole("button", { name: "Send proposal" }).click();
+  await page.getByText("Negotiating").first().waitFor();
+  await page.goto(`${BASE}/brand/deals/dl_b_tiffin?as=pg_tiffin`);
+  await page.getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByText("Contract agreed").first().waitFor();
+  await page.getByText("Version 2", { exact: true }).waitFor();
+  await page.getByText("Agreed", { exact: true }).waitFor();
 });
 
 await step("Link-in-bio: a brand books from the public page; it lands in the creator's deals", async () => {
@@ -163,7 +347,61 @@ await step("Link-in-bio: a brand books from the public page; it lands in the cre
   await page.getByText("Otaku Threads").first().waitFor();
 });
 
+await step("Profile: edit the bio and preferences; completeness rises and it persists after a reload", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/profile?as=cr_b`);
+  const ring = page.locator("section[aria-labelledby=complete]");
+  const before = Number(await ring.locator(".num").first().innerText());
+  await page.getByLabel("Content categories").fill("quick breakfasts, ragi recipes");
+  await page.getByLabel("Minimum fee (₹)").fill("1500");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByText("Profile saved").waitFor();
+  await page.reload();
+  await page.getByLabel("Content categories").waitFor();
+  if ((await page.getByLabel("Content categories").inputValue()) !== "quick breakfasts, ragi recipes") throw new Error("categories didn't persist");
+  const after = Number(await ring.locator(".num").first().innerText());
+  if (!(after > before)) throw new Error(`completeness ${before} -> ${after}`);
+  await page.locator("section[aria-labelledby=ready]").getByText("connect to check").first().waitFor();
+});
+
+await step("Coach: ask about views, see the numbers used with their sources, then make a plan", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator?as=cr_a`);
+  await page.getByRole("button", { name: "Ask about your numbers" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("button", { name: "Are my views growing?" }).click();
+  await dlg.getByText("Numbers used").waitFor();
+  await dlg.getByText("What's uncertain:").waitFor();
+  await dlg.getByText(/Self-reported|Sample data|Live data/).first().waitFor();
+  await dlg.getByRole("button", { name: "Make me a plan" }).click();
+  await page.getByText(/Plan saved: 3 goals/).waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("heading", { name: "Your goals" }).waitFor();
+});
+
+await step("Rates and media kit: save your rate next to the estimate, save a Hindi kit version, show it on the public page", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/money?as=cr_a`);
+  await page.getByText("Missing, not guessed").or(page.getByText("Numbers used")).first().waitFor();
+  await page.getByLabel("Your rate (₹)").fill("21000");
+  await page.getByRole("button", { name: "Save as your rate" }).click();
+  await page.getByText("Estimated range", { exact: true }).first().waitFor();
+  await page.getByText("₹21,000").first().waitFor();
+  await page.goto(`${BASE}/creator/kit?as=cr_a`);
+  await page.getByRole("radio", { name: "हिंदी" }).click();
+  await page.getByText("फ़ॉलोअर्स").first().waitFor();
+  await page.getByLabel("Headline").fill("हिंदी और अंग्रेज़ी में एनिमे एडिट्स");
+  await page.getByRole("button", { name: /Save as version/ }).click();
+  await page.getByText("Version 1 saved").waitFor();
+  await page.getByRole("button", { name: "Show version 1 on your public page" }).click();
+  await page.getByText("On your public page").waitFor();
+  await page.goto(`${BASE}/c/creator.a`);
+  await page.getByText("हिंदी और अंग्रेज़ी में एनिमे एडिट्स", { exact: true }).waitFor();
+  await page.getByText(/वर्शन 1/).waitFor();
+});
+
 await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () => {
+  await reset();
   await page.goto(`${BASE}/creator?as=cr_a&lang=en`);
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
   await page.getByRole("button", { name: /Switch to Hindi/ }).click();
@@ -174,13 +412,98 @@ await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () =
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
 });
 
+await step("Accounts: sign up as a brand, set up the brand, sign out", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  p.on("pageerror", (e) => errors.push(String(e)));
+  page = p;
+  await p.goto(`${BASE}/login?role=brand`);
+  await p.getByRole("button", { name: "Create an account" }).click();
+  await p.getByLabel("Your name").fill("QA Brand Owner");
+  await p.getByLabel("Email").fill(`qa-${Date.now()}@example.test`);
+  await p.getByLabel("Password").fill("a long qa password");
+  await p.getByRole("button", { name: "Create account" }).click();
+  await p.waitForURL(/\/brand\/onboarding/);
+  await p.getByLabel("Brand name").fill("QA Snacks");
+  await p.getByLabel("Category").fill("Snacks");
+  await p.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Food and cooking" }).click();
+  await p.getByRole("group", { name: "Languages" }).getByRole("checkbox", { name: /Hindi/ }).first().click();
+  await p.getByRole("button", { name: "Continue to your first campaign" }).click();
+  await p.waitForURL(/\/brand\/campaigns\/new/);
+  await p.goto(`${BASE}/brand`);
+  await p.getByRole("heading", { name: "QA Snacks" }).waitFor(); // the session survives a reload (HttpOnly cookie)
+  // A brand account can't open the Creator Studio.
+  await p.goto(`${BASE}/creator`);
+  await p.getByRole("heading", { name: /for a creator account/ }).waitFor();
+  await p.getByRole("button", { name: "Sign out" }).click();
+  await p.waitForURL(/\/login/);
+  await p.goto(`${BASE}/brand`);
+  await p.waitForURL(/\/login\?role=brand/);
+  await ctx.close();
+});
+
+await step("Admin: a deal party reports a problem; the admin resolves it, suspends and restores an account, each with a reason", async () => {
+  await reset();
+  // Its own browser context: the admin's session is a cookie, kept apart from the other journeys.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  page = await ctx.newPage();
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
+  await page.getByRole("button", { name: "Report a problem with this deal" }).click();
+  await page.getByLabel("What's wrong").selectOption("harassment");
+  await page.getByRole("dialog").getByRole("button", { name: "Send report" }).click();
+  await page.getByText("Report sent").first().waitFor();
+  // Admin is never a sign-up option: locally, a demo admin persona signs in with a cookie.
+  await page.goto(`${BASE}/login`);
+  await page.getByRole("button", { name: /Demo admin/ }).click();
+  await page.waitForURL(/\/admin$/);
+  await page.getByRole("heading", { name: "Admin console" }).waitFor();
+  await page.getByText("Open reports").waitFor();
+  await page.getByRole("tab", { name: "Reports" }).click();
+  await page.getByRole("list", { name: "Reports" }).getByText("Harassment").waitFor();
+  await page.getByRole("button", { name: "Resolve" }).first().click();
+  const dlg = page.getByRole("dialog");
+  if (!(await dlg.getByRole("button", { name: "Resolve" }).isDisabled())) throw new Error("resolved without a reason");
+  await dlg.getByLabel("Reason").fill("Spoke to both sides; no further action.");
+  await dlg.getByRole("button", { name: "Resolve" }).click();
+  await page.getByText("No open reports").waitFor();
+  await page.getByRole("tab", { name: "Accounts" }).click();
+  await page.getByLabel("Search name, email or id").fill("us_cr_b");
+  await page.getByRole("button", { name: "Suspend Creator B" }).click();
+  await page.getByRole("dialog").getByLabel("Reason").fill("Two reports of fake numbers; checking.");
+  await page.getByRole("dialog").getByRole("button", { name: "Suspend account" }).click();
+  await page.getByRole("list", { name: "Accounts" }).getByText("Suspended", { exact: true }).waitFor();
+  const refused = await fetch(`${API}/api/auth/demo`, { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: false }) });
+  if (refused.status !== 403) throw new Error(`suspended account signed in: ${refused.status}`);
+  await page.getByRole("button", { name: "Restore Creator B" }).click();
+  await page.getByRole("dialog").getByLabel("Reason").fill("Numbers match the connected account.");
+  await page.getByRole("dialog").getByRole("button", { name: "Restore account" }).click();
+  await page.getByRole("button", { name: "Suspend Creator B" }).waitFor();
+  await page.getByRole("tab", { name: "Audit log" }).click();
+  await page.getByLabel("Action starts with").fill("admin_");
+  await page.getByRole("list", { name: "Audit events" }).getByText("admin_restore").first().waitFor();
+  await page.getByRole("list", { name: "Audit events" }).getByText("admin_suspend").first().waitFor();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.waitForURL(/\/login/);
+  await ctx.close();
+});
+
+await step("What am I worth?: public page says plainly when YouTube data isn't connected", async () => {
+  page = mobile;
+  await page.goto(`${BASE}/worth`);
+  await page.getByLabel("YouTube handle or channel link").fill("@somechannel");
+  await page.getByRole("button", { name: "Check my price" }).click();
+  // No YOUTUBE_API_KEY on the QA server: a clear "not connected" message, never made-up numbers.
+  await page.getByRole("alert").getByText(/YouTube data isn't connected on this server/).waitFor();
+});
+
 // Presenting on a laptop: compare, phone view and the live split.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 desk.on("pageerror", (e) => errors.push(String(e)));
 page = desk;
 
 await step("Compare: guided demo steps through both creators with captions", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await desk.goto(`${BASE}/demo/compare?phone=0`);
   await desk.getByText("Earning, underpriced").first().waitFor();
   await desk.getByText("Starting").first().waitFor();
@@ -210,7 +533,7 @@ await step("Phone view: P puts the app in a 390 x 844 phone and back", async () 
 });
 
 await step("Live demo: a counter on the phone appears in the brand console without a reload", async () => {
-  await fetch(`${API}/api/demo/reset`, { method: "POST" });
+  await reset();
   await desk.goto(`${BASE}/demo/live`);
   const phone = desk.frameLocator('iframe[title="Creator A\'s Creator Studio"]');
   const consoleFrame = desk.frameLocator('iframe[title="Senpai Supply Co. Brand Console"]');

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { ChipGroup, FieldHint, Input, Label, Segmented, Select, Slider } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
 import { inr } from "@/lib/format";
-import { setPersona } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 
 interface Meta {
@@ -36,6 +35,7 @@ export default function BrandOnboarding() {
     goal: "Awareness",
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
+  const qc = useQueryClient();
   const create = useMutation({
     mutationFn: () =>
       post<{ id: string }>("/brands", {
@@ -49,8 +49,9 @@ export default function BrandOnboarding() {
         budget_monthly: BUDGETS[f.budgetIdx],
         goal: f.goal,
       }),
-    onSuccess: ({ id }) => {
-      setPersona("brand", id);
+    onSuccess: async () => {
+      // The new profile is linked to this account on the server; re-read the session to pick it up.
+      await qc.invalidateQueries({ queryKey: ["session"] });
       navigate("/brand/campaigns/new");
     },
   });
@@ -74,6 +75,13 @@ export default function BrandOnboarding() {
         </p>
         <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">Tell us who you want to reach</h1>
         <p className="mt-1 text-sm text-fg-2">We use this to rank creators by audience fit and price each match. About a minute.</p>
+        <p className="mt-2 text-xs text-muted">
+          Already listed as unclaimed?{" "}
+          <Link to="/brands" className="text-accent underline underline-offset-2">
+            Find your brand's page and claim it
+          </Link>{" "}
+          instead.
+        </p>
 
         <form
           className="mt-6 space-y-5"

@@ -27,8 +27,11 @@ def _scan() -> dict[str, dict]:
     db = get_db()
     listings = list(db.listings.find({}))
     owners = {b["_id"]: b for b in db.brands.find({})}
-    texts = [f"{x['title']} {x['summary']}" for x in listings]
-    sim = cosine_similarity(TfidfVectorizer(ngram_range=(1, 2)).fit_transform(texts))
+    texts = [f"{x.get('title') or ''} {x.get('summary') or ''}" for x in listings]
+    try:
+        sim = cosine_similarity(TfidfVectorizer(ngram_range=(1, 2)).fit_transform(texts))
+    except ValueError:  # no listings or no words yet (a new marketplace): nothing to compare
+        sim = None
     out: dict[str, dict] = {}
     for i, x in enumerate(listings):
         reasons = [why for rx, why in PATTERNS if rx.search(texts[i])]
@@ -38,7 +41,7 @@ def _scan() -> dict[str, dict]:
             reasons.append("Lister is not verified")
         dup_of = None
         for j, y in enumerate(listings):
-            if i == j or x["owner_id"] == y["owner_id"] or sim[i, j] < 0.75:
+            if sim is None or i == j or x["owner_id"] == y["owner_id"] or sim[i, j] < 0.75:
                 continue
             y_owner = owners.get(y["owner_id"])
             if y_owner and y_owner.get("verified") and not verified:

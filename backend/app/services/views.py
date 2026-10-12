@@ -40,6 +40,19 @@ def provenance_of(c: dict, path: str) -> str:
     return c.get("provenance_default", "seed")
 
 
+def source_of(c: dict, path: str) -> str:
+    """The data source of a creator field, in the app's four labels: youtube_api or
+    instagram_api (Live data), manual (Self-reported) or synthetic (Sample data).
+    Built on the older real/simulated provenance map."""
+    prov = provenance_of(c, path)
+    if prov == "manual":
+        return "manual"
+    if prov == "real":
+        live = c.get("insights_source") in ("instagram_api", "youtube_api")
+        return c["insights_source"] if live and path.split(".")[0] in ("reels", "followers", "audience") else "manual"
+    return "synthetic"
+
+
 def any_simulated(c: dict, paths: list[str]) -> bool:
     return any(provenance_of(c, p) == "simulated" for p in paths)
 
@@ -52,6 +65,9 @@ def creator_view(c: dict) -> dict:
     d["language_labels"] = [LANGS[lang]["label"] for lang in d.get("languages", []) if lang in LANGS]
     d["audience_stage"] = audience_stage(d.get("followers", 0))
     d["median_views"] = median_views(c)
+    # Rule: every number says where it came from (Live data, Self-reported, Sample data).
+    d["sources"] = {k: source_of(c, k) for k in ("followers", "reels", "audience", "current_rate")}
+    d.pop("pre_instagram", None)
     return d
 
 

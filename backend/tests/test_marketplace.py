@@ -25,17 +25,17 @@ def test_consent_scopes_and_revocation(db, client):
     assert "revoked" in actions
 
 
-def test_undiscoverable_creator_is_hidden_everywhere(db, client):
-    client.post("/api/creators/cr_b/privacy", json={"discoverable": False})
+def test_undiscoverable_creator_is_hidden_everywhere(db, login):
+    login("cr_b").post("/api/creators/cr_b/privacy", json={"discoverable": False})
     thalam = _get(db, "brands", "br_thalam")
     listing = _get(db, "listings", "lst_thalam_collective")
     assert "cr_b" not in {m["id"] for m in matches(listing, thalam)["items"]}
     assert "cr_b" not in {m["id"] for m in build(listing, thalam)["members"]}
-    assert client.get("/api/brands/br_thalam/creators/cr_b").status_code == 404
+    assert login("br_thalam").get("/api/brands/br_thalam/creators/cr_b").status_code == 404
 
 
-def test_brand_view_respects_scopes_and_logs_views(db, client):
-    r = client.get("/api/brands/br_senpai/creators/cr_a?listing_id=lst_senpai_hoodie").json()
+def test_brand_view_respects_scopes_and_logs_views(db, login):
+    r = login("br_senpai").get("/api/brands/br_senpai/creators/cr_a?listing_id=lst_senpai_hoodie").json()
     assert r["stats"] is not None and r["rate_card"] is not None
     assert r["demographics"] is None
     # Without the demographics scope, reasons keep the conclusion but not the numbers.
@@ -66,13 +66,13 @@ def test_collective_builder_constraints(db):
     assert all(m["trust"]["score"] >= 85 for m in strict["members"])
 
 
-def test_opting_in_puts_creator_b_in_the_pack(db, client):
-    r = client.post(
+def test_opting_in_puts_creator_b_in_the_pack(db, login):
+    r = login("cr_b").post(
         "/api/creators/cr_b/apply",
         json={"listing_id": "lst_thalam_collective", "scopes": {"stats": True, "demographics": True, "rate_card": False}},
     )
     assert r.json()["status"] == "opted_in"
-    pack = client.post("/api/listings/lst_thalam_collective/collective", json={}).json()
+    pack = login("br_thalam").post("/api/listings/lst_thalam_collective/collective", json={}).json()
     assert pack["size"] == 20
     b = next(m for m in pack["members"] if m["id"] == "cr_b")
     assert b["opted_in"] and b["price"] >= 1_500
@@ -86,17 +86,22 @@ def test_matches_rank_and_summary(db):
     assert m["items"][-1]["trust"]["score"] < 50  # weak trust signals ranked last
 
 
-def test_brand_offer_reaches_creator(db, client):
-    r = client.post("/api/offers", json={"brand_id": "br_thalam", "creator_id": "cr_b", "listing_id": "lst_thalam_sambar", "amount": 1500})
+def test_brand_offer_reaches_creator(db, login):
+    thalam = login("br_thalam")
+    r = thalam.post("/api/offers", json={"creator_id": "cr_b", "listing_id": "lst_thalam_sambar", "amount": 1500})
     assert r.status_code == 200
+    # The sending brand comes from the session: another brand's id or campaign is refused.
+    assert thalam.post("/api/offers", json={"brand_id": "br_senpai", "creator_id": "cr_b", "amount": 1500}).status_code == 403
+    assert thalam.post("/api/offers", json={"creator_id": "cr_b", "listing_id": "lst_senpai_hoodie", "amount": 1500}).status_code == 403
     offers = cc.pipeline(_get(db, "creators", "cr_b"))["offers"]
     assert any(o["brand"] == "Thalam Foods" for o in offers)
 
 
-def test_booking_a_collective_creates_one_offer_per_member(db, client):
-    pack = client.post("/api/listings/lst_senpai_collective/collective", json={}).json()
+def test_booking_a_collective_creates_one_offer_per_member(db, login):
+    senpai = login("br_senpai")
+    pack = senpai.post("/api/listings/lst_senpai_collective/collective", json={}).json()
     ids = [m["id"] for m in pack["members"]]
-    r = client.post("/api/listings/lst_senpai_collective/collective/book", json={"member_ids": ids}).json()
+    r = senpai.post("/api/listings/lst_senpai_collective/collective/book", json={"member_ids": ids}).json()
     assert r["members"] == len(ids)
     col = db.collectives.find_one({"_id": r["id"]})
     assert abs(sum(m["split"] for m in col["members"]) - 1) < 0.01

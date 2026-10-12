@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { inr, inrShort, shortDate } from "@/lib/format";
 import type { Console } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
+import { CampaignStatusBadge } from "./CampaignStatus";
 import { cn } from "@/lib/utils";
 
 export const TYPE_LABEL: Record<string, string> = {
@@ -33,7 +34,7 @@ export default function BrandHome() {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   if (!q.data) return <ConsoleSkeleton />;
   const d = q.data;
-  const live = d.campaigns.filter((c) => c.status === "open");
+  const live = d.campaigns.filter((c) => c.status === "live");
   const maxCount = Math.max(1, ...d.stages.map((s) => s.count));
 
   return (
@@ -80,13 +81,13 @@ export default function BrandHome() {
             <TiltCard className="h-full rounded-xl" max={4}>
               <div className="card-surface h-full rounded-xl p-4">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-muted">
-                  <Lock className="size-3.5" aria-hidden /> Held in escrow
+                  <Lock className="size-3.5" aria-hidden /> Held in escrow{d.escrow.simulated && " (simulated)"}
                 </p>
                 <p className="num mt-2 font-display text-[28px] font-semibold leading-none">
                   <CountUp value={d.escrow.held} format={inr} />
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  Across {d.escrow.count} deal{d.escrow.count === 1 ? "" : "s"} · {inrShort(d.paid_total)} paid out so far
+                  Across {d.escrow.count} deal{d.escrow.count === 1 ? "" : "s"} · {inrShort(d.paid_total)} {d.paid_simulated ? "in simulated payouts" : "paid out"} so far
                 </p>
                 <ul className="mt-3 space-y-1.5 text-[13px]">
                   {d.escrow.items.slice(0, 3).map((e) => (
@@ -244,7 +245,10 @@ export function CampaignTable({ campaigns }: { campaigns: Console["campaigns"] }
                 <Link to={`/brand/campaigns/${c.id}`} className="font-medium text-fg group-hover:text-accent">
                   {c.title}
                 </Link>
-                <span className="block text-xs text-muted">{c.languages.join(", ")}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                  <CampaignStatusBadge status={c.status} />
+                  {c.languages.join(", ")}
+                </span>
               </td>
               <td className="hidden px-3 py-2.5 md:table-cell">
                 <Badge size="sm" variant={c.type === "collective" ? "accent" : "neutral"}>
@@ -297,7 +301,7 @@ function GrowBar({ pct }: { pct: number }) {
   );
 }
 
-/** The deal rail in 3D: where every deal sits, and money flowing from offer to UPI payout. */
+/** The deal rail in 3D: where every deal sits, and money flowing from offer to payout. */
 function DealFlow({ stages }: { stages: Console["stages"] }) {
   const reduce = useReducedMotion();
   const total = stages.reduce((n, s) => n + s.count, 0);
@@ -308,7 +312,7 @@ function DealFlow({ stages }: { stages: Console["stages"] }) {
     <Reveal as="section" aria-labelledby="flow" className="card-surface mt-3 overflow-hidden rounded-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <h2 id="flow" className="text-sm font-semibold">
-          Deal flow <span className="font-normal text-muted">· escrow before posting, UPI after verification</span>
+          Deal flow <span className="font-normal text-muted">· escrow before posting, payout after approval</span>
         </h2>
         <p className="num text-xs text-muted">
           {total} deal{total === 1 ? "" : "s"} on the rail

@@ -22,7 +22,7 @@ const ROUTES = [
   ["landing", "/"],
   ["login", "/login"],
   ["login-brand", "/login?role=brand"],
-  ["creator-onboarding", "/creator/onboarding"],
+  ["creator-onboarding", "/creator/onboarding?as=new_creator"],
   ["creator-home", "/creator?as=cr_a"],
   ["creator-home-b", "/creator?as=cr_b"],
   ["creator-roadmap", "/creator/roadmap?as=cr_a"],
@@ -33,14 +33,26 @@ const ROUTES = [
   ["creator-kit", "/creator/kit?as=cr_a"],
   ["creator-privacy", "/creator/privacy?as=cr_a"],
   ["link-in-bio", "/c/creator.a"],
-  ["brand-onboarding", "/brand/onboarding"],
+  ["worth", "/worth"],
+  ["creator-connections", "/creator/connections?as=cr_a"],
+  ["creator-profile", "/creator/profile?as=cr_a"],
+  ["brand-onboarding", "/brand/onboarding?as=new_brand"],
+  ["brands", "/brands"],
+  ["brand-page", "/brands/senpai-supply-co?as=cr_a"],
+  ["brand-page-unclaimed", "/brands/notebook-nagar"],
+  ["creator-dream-brands", "/creator/brands?as=cr_a"],
+  ["creator-pitches", "/creator/pitches?as=cr_b&brand=br_thalam&name=Thalam%20Foods"],
+  ["brand-fan-inbox", "/brand/inbox?as=br_thalam"],
   ["brand-home", "/brand?as=br_senpai"],
   ["brand-campaigns", "/brand/campaigns?as=br_senpai"],
   ["brand-new-campaign", "/brand/campaigns/new?as=br_senpai"],
   ["brand-campaign", "/brand/campaigns/lst_senpai_hoodie?as=br_senpai"],
+  ["brand-campaign-edit", "/brand/campaigns/lst_senpai_hoodie/edit?as=br_senpai"],
+  ["brand-profile", "/brand/profile?as=br_senpai"],
   ["brand-collective", "/brand/campaigns/lst_thalam_collective?as=br_thalam"],
   ["brand-creator", "/brand/creators/cr_a?as=br_senpai&listing=lst_senpai_hoodie"],
   ["brand-creator-locked", "/brand/creators/cr_b?as=br_senpai"],
+  ["brand-creator-audience", "/brand/creators/cr_b?as=br_thalam"],
   ["brand-deals", "/brand/deals?as=br_senpai"],
   ["brand-deal", "/brand/deals/dl_senpai_g11?as=br_senpai"],
   ["demo-compare", "/demo/compare?phone=0"],
@@ -50,6 +62,13 @@ const ROUTES = [
   ["demo-live", "/demo/live?phone=0"],
   ["creator-home-hi", "/creator?as=cr_a&lang=hi"],
   ["not-found", "/this-does-not-exist"],
+  // Admin screens sign in with the local demo admin's cookie, in a context of their own.
+  ["admin-overview", "/admin"],
+  ["admin-accounts", "/admin?tab=accounts"],
+  ["admin-campaigns", "/admin?tab=campaigns"],
+  ["admin-reports", "/admin?tab=reports"],
+  ["admin-brands", "/admin?tab=brands"],
+  ["admin-audit", "/admin?tab=audit"],
 ];
 const VIEWPORTS = [
   { name: "390", width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 },
@@ -86,8 +105,14 @@ for (const vp of VIEWPORTS) {
     hasTouch: vp.isMobile,
     reducedMotion: "reduce",
   });
+  let adminContext = null;
   for (const [name, path] of routes) {
-    const page = await context.newPage();
+    if (path.startsWith("/admin") && !adminContext) {
+      adminContext = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.deviceScaleFactor, isMobile: vp.isMobile, hasTouch: vp.isMobile, reducedMotion: "reduce" });
+      const r = await adminContext.request.post(`${BASE}/api/auth/demo`, { data: { persona: "demo_admin", cookie: true }, headers: { "X-Requested-With": "qa" } });
+      if (!r.ok()) throw new Error(`Demo admin sign-in failed (${r.status()}). Run the API with DEMO_MODE=1 and DEMO_ADMIN=1 (make dev does).`);
+    }
+    const page = await (path.startsWith("/admin") ? adminContext : context).newPage();
     const errors = [];
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
     page.on("pageerror", (e) => errors.push(String(e)));
@@ -121,6 +146,7 @@ for (const vp of VIEWPORTS) {
     await page.close();
   }
   await context.close();
+  await adminContext?.close();
 }
 await browser.close();
 mkdirSync(join(here, "report"), { recursive: true });

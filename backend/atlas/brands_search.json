@@ -1,0 +1,13 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "fields": {
+      "name": [
+        { "type": "autocomplete", "tokenization": "edgeGram", "minGrams": 2, "maxGrams": 15, "foldDiacritics": true },
+        { "type": "string" }
+      ],
+      "category": { "type": "string" },
+      "description": { "type": "string" }
+    }
+  }
+}

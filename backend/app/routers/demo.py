@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
+from ..config import get_settings
 from ..db import get_db
 from ..engines import metrics, money_paths, roadmap
 from ..engines.matching import possessive
@@ -12,10 +13,18 @@ from .creators import _summary
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 
 
+def _demo_only() -> None:
+    # Outside demo mode these routes don't exist: a reset would wipe real accounts' data.
+    if not get_settings().demo_mode:
+        raise HTTPException(404, "Not found")
+
+
 @router.post("/reset")
 def reset():
-    """Restore every seeded record. Used by the 'Reset demo' control."""
+    """Restore every seeded record. Used by the 'Reset demo' control (demo mode only)."""
     from ..services import cache
+
+    _demo_only()
 
     cache.clear_runtime()
     return seed_all(get_db(), force=True)
@@ -86,7 +95,7 @@ def _opportunity_line(side: dict) -> str:
         return f"{_name(side)} has no open matches yet."
     coll = next((o for o in opps if o["type"] == "collective"), None)
     if coll and side["creator"]["followers"] < 10_000:
-        return f"{_name(side)} can join {possessive(coll['lister']['name'])} {coll['collective_size']}-creator collective: one escrow payment, split by UPI."
+        return f"{_name(side)} can join {possessive(coll['lister']['name'])} {coll['collective_size']}-creator collective: one escrow payment, split among the members."
     top = opps[0]
     return f"{_name(side)} matches {top['title']} from {top['lister']['name']} (fit {top['fit']}/100)."
 
@@ -144,6 +153,7 @@ def guide(a: dict, b: dict) -> list[dict]:
 
 @router.get("/compare")
 def compare(a: str = "cr_a", b: str = "cr_b"):
-    """Creator A and Creator B side by side, plus captions for the guided demo."""
+    """Creator A and Creator B side by side, plus captions for the guided demo (demo mode only)."""
+    _demo_only()
     left, right = _side(a), _side(b)
     return {"a": left, "b": right, "guide": guide(left, right)}

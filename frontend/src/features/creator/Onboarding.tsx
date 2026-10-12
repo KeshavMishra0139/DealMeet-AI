@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Instagram, Lock, Sparkles, Youtube } from "lucide-react";
 import { useState } from "react";
@@ -8,10 +8,9 @@ import { Wordmark } from "@/components/shared/Wordmark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChipGroup, FieldHint, Input, Label, Progress, Select, Slider, Switch, Textarea } from "@/components/ui/form";
-import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import { inr } from "@/lib/format";
-import { setPersona } from "@/lib/session";
+import { useDemoMode } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +46,7 @@ type Form = {
   languages: string[];
   city: string;
   captions: string;
-  connected: { instagram: boolean; youtube: boolean };
+  sample: boolean;
   discoverable: boolean;
   scopes: { stats: boolean; demographics: boolean; rate_card: boolean };
 };
@@ -70,16 +69,17 @@ export default function Onboarding() {
     languages: [],
     city: "",
     captions: "",
-    connected: { instagram: false, youtube: false },
+    sample: false,
     discoverable: true,
     scopes: { stats: true, demographics: false, rate_card: false },
   });
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
-  const [oauth, setOauth] = useState<null | "instagram" | "youtube">(null);
 
   const tags = useMutation({
     mutationFn: () => post<TagResult>("/ai/tag", { captions: f.captions.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 8) }),
   });
+  const qc = useQueryClient();
+  const demo = useDemoMode();
   const create = useMutation({
     mutationFn: () =>
       post<{ id: string }>("/creators", {
@@ -95,12 +95,13 @@ export default function Onboarding() {
         city: f.city,
         expertise: f.expertise.trim() || null,
         captions: f.captions.split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 8),
-        connected: f.connected,
+        sample_insights: demo && f.sample,
         discoverable: f.discoverable,
         consent_defaults: f.scopes,
       }),
-    onSuccess: ({ id }) => {
-      setPersona("creator", id);
+    onSuccess: async () => {
+      // The new profile is linked to this account on the server; re-read the session to pick it up.
+      await qc.invalidateQueries({ queryKey: ["session"] });
       navigate("/creator");
     },
   });
@@ -319,33 +320,32 @@ export default function Onboarding() {
                 {step === 4 && (
                   <div className="mt-6 space-y-6">
                     <p className="text-[15px] text-fg-2">
-                      Optional. In this demo the sandbox login fills in sample insights, marked simulated. We never read accounts that haven't
-                      connected, and we never scrape.
+                      Connect Instagram or YouTube after setup, from your Studio: official login, read-only. Until then JodiDar uses only what you
+                      type. We never ask for passwords, and we never scrape.
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <ul className="grid gap-2 sm:grid-cols-2">
                       {(["instagram", "youtube"] as const).map((p) => {
                         const Icon = p === "instagram" ? Instagram : Youtube;
-                        const on = f.connected[p];
                         return (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => (on ? set("connected", { ...f.connected, [p]: false }) : setOauth(p))}
-                            className={cn(
-                              "flex min-h-14 items-center gap-3 rounded-2xl border px-4 text-left transition-colors",
-                              on ? "border-success/50 bg-success-soft" : "border-line-strong bg-surface hover:border-accent/60",
-                            )}
-                          >
+                          <li key={p} className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-surface px-4">
                             <Icon className="size-5" aria-hidden />
                             <span className="flex-1">
                               <span className="block text-sm font-medium">{p === "instagram" ? "Instagram" : "YouTube"}</span>
-                              <span className="block text-xs text-muted">{on ? "Connected (demo sandbox)" : "Connect via official login"}</span>
+                              <span className="block text-xs text-muted">Not connected yet. Connect after setup.</span>
                             </span>
-                            {on && <Check className="size-4 text-success" aria-hidden />}
-                          </button>
+                          </li>
                         );
                       })}
-                    </div>
+                    </ul>
+                    {demo && (
+                      <label className="flex items-center justify-between gap-4 rounded-2xl border border-dashed border-line-strong bg-surface p-4">
+                        <span>
+                          <span className="block font-medium">Fill in sample insights (demo)</span>
+                          <span className="block text-xs text-muted">Generated reels and audience numbers so you can explore. Labelled sample data everywhere.</span>
+                        </span>
+                        <Switch checked={f.sample} onCheckedChange={(v) => set("sample", v)} aria-label="Fill in sample insights (demo)" />
+                      </label>
+                    )}
                     <div className="rounded-2xl border border-line bg-surface p-4">
                       <label className="flex items-center justify-between gap-4">
                         <span>
@@ -406,44 +406,6 @@ export default function Onboarding() {
         </footer>
       </div>
 
-      <Dialog open={oauth !== null} onOpenChange={(o) => !o && setOauth(null)}>
-        <DialogContent
-          title={oauth === "youtube" ? "Sign in with Google" : "Log in with Instagram"}
-          description="Official login (demo sandbox). No password is shared with JodiDar AI."
-        >
-          <div className="rounded-2xl border border-line bg-surface p-4">
-            <p className="text-sm font-medium">JodiDar AI would like to:</p>
-            <ul className="mt-2 space-y-1.5 text-sm text-fg-2">
-              {(oauth === "youtube"
-                ? ["See your channel's basic info", "See analytics for your videos"]
-                : ["Read your profile info", "Read insights for your reels", "Read your audience summary"]
-              ).map((s) => (
-                <li key={s} className="flex gap-2">
-                  <Check className="mt-0.5 size-4 text-success" aria-hidden />
-                  {s}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-xs text-muted">It can't post, message or follow on your behalf. Disconnect any time.</p>
-          </div>
-          <div className="mt-5 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOauth(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                if (!oauth) return;
-                await post(`/oauth/${oauth}/authorize`);
-                set("connected", { ...f.connected, [oauth]: true });
-                setOauth(null);
-              }}
-            >
-              Allow
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

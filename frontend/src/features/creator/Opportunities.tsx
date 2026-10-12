@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, CalendarDays, Check, EyeOff, Lock, Plus, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
 import { Reveal } from "@/components/motion/Motion";
 import { RangeValue } from "@/components/shared/Estimate";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { ScopePicker } from "@/components/shared/ScopePicker";
 import { EstimateNote, WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +124,29 @@ export default function Opportunities() {
         </Popover>
       )}
 
+      {data.data && (data.data.hidden_by_prefs?.length ?? 0) > 0 && (
+        <Popover>
+          <PopoverTrigger className="ml-4 mt-6 inline-flex items-center gap-2 text-xs text-muted underline decoration-dotted underline-offset-4 hover:text-fg">
+            <EyeOff className="size-3.5" aria-hidden />
+            {data.data.hidden_by_prefs?.length} hidden by your preferences
+          </PopoverTrigger>
+          <PopoverContent>
+            <p className="font-display text-sm font-semibold">Outside your collaboration preferences</p>
+            <ul className="mt-2 space-y-2.5">
+              {data.data.hidden_by_prefs?.map((h) => (
+                <li key={h.id} className="text-[13px]">
+                  <p className="font-medium">{h.title}</p>
+                  <p className="text-xs text-muted">{h.reason}</p>
+                </li>
+              ))}
+            </ul>
+            <Link to="/creator/profile" className="mt-3 inline-block text-xs text-accent hover:underline">
+              Change preferences
+            </Link>
+          </PopoverContent>
+        </Popover>
+      )}
+
       {applyTo && <ApplyDialog o={applyTo} creatorId={id} onClose={() => setApplyTo(null)} />}
       <PostCollabDialog open={postOpen} onOpenChange={setPostOpen} creatorId={id} />
     </div>
@@ -129,7 +154,17 @@ export default function Opportunities() {
 }
 
 function OppCard({ o, onApply }: { o: Opportunity; onApply: () => void }) {
-  const done = o.application === "applied" || o.application === "opted_in" || o.applied;
+  const done = (o.application && o.application !== "withdrawn") || o.applied;
+  const state =
+    o.application === "opted_in"
+      ? "Opted in"
+      : o.application === "shortlisted"
+        ? "Shortlisted"
+        : o.application === "offered"
+          ? "Offer received"
+          : o.application === "declined"
+            ? "Not selected"
+            : "Applied";
   const cta = o.type === "collective" ? "Opt in" : o.type === "creator_collab" ? "Ask to collab" : "Apply";
   const deliv = o.deliverables?.map(deliverable);
   return (
@@ -197,8 +232,8 @@ function OppCard({ o, onApply }: { o: Opportunity; onApply: () => void }) {
           </span>
           <WhyPopover why={o.why} subject={o.title} />
           {done ? (
-            <Badge variant="success" className="h-9 px-3">
-              <Check aria-hidden /> {o.application === "opted_in" ? "Opted in" : "Applied"}
+            <Badge variant={o.application === "declined" ? "neutral" : "success"} className="h-9 px-3">
+              <Check aria-hidden /> {state}
             </Badge>
           ) : (
             <Button variant="primary" size="sm" className="h-9" onClick={onApply}>
@@ -256,6 +291,11 @@ function ApplyDialog({ o, creatorId, onClose }: { o: Opportunity; creatorId: str
         <Button variant="primary" size="lg" className="mt-5 w-full" loading={apply.isPending} onClick={() => apply.mutate()}>
           {o.type === "collective" ? "Opt in and share" : "Apply and share"}
         </Button>
+        {o.type !== "creator_collab" && (
+          <div className="mt-2 flex justify-center">
+            <ReportButton type="campaign" id={o.id} role="creator" />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

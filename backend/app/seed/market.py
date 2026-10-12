@@ -69,6 +69,9 @@ LISTERS: list[dict] = [
     {"_id": "pg_gamers", "kind": "page", "name": "Weekend Gamers India", "category": "Gaming page", "hue": 140, "description": "Clips and community for casual players.", "niches": ["gaming"], "target": {"ages": YOUTH, "gender": "any", "regions": PAN, "cities": [], "languages": ["hinglish", "en"]}, "verified": True},
     {"_id": "pg_humour", "kind": "page", "name": "Hinglish Humour Hub", "category": "Comedy page", "hue": 55, "description": "Relatable sketches.", "niches": ["comedy"], "target": {"ages": YOUTH, "gender": "any", "regions": PAN, "cities": [], "languages": ["hinglish", "hi"]}, "verified": True},
     {"_id": "pg_fitbharat", "kind": "page", "name": "Fit Bharat Daily", "category": "Fitness page", "hue": 100, "description": "Everyday fitness stories.", "niches": ["fitness"], "target": {"ages": ["18-24", "25-34", "35-44"], "gender": "any", "regions": PAN, "cities": [], "languages": ["hi", "hinglish", "en"]}, "verified": True},
+    # Unclaimed: fictional brands an admin listed, not on JodiDar AI (shown as unclaimed sample data)
+    {"_id": "br_unc_kokum", "kind": "brand", "name": "Kokum and Kesar Pantry", "category": "Spices and pantry", "claimed": False, "public_handles": {}, "verified": False},
+    {"_id": "br_unc_notebook", "kind": "brand", "name": "Notebook Nagar", "category": "Stationery", "claimed": False, "public_handles": {}, "verified": False},
     # Unverified listers (caught by the silent spam and duplicate checks)
     {"_id": "xx_fameboost", "kind": "page", "name": "Fame Boost Agency", "category": "Unverified", "hue": 0, "description": "", "niches": [], "target": {"ages": [], "gender": "any", "regions": PAN, "cities": [], "languages": []}, "verified": False},
     {"_id": "xx_senpai_official", "kind": "brand", "name": "Senpai Supply Official", "category": "Unverified", "hue": 0, "description": "", "niches": [], "target": {"ages": [], "gender": "any", "regions": PAN, "cities": [], "languages": []}, "verified": False},
@@ -86,9 +89,10 @@ def _l(id, type, owner, title, summary, niches, languages, regions, deal_kind, *
         "niches": niches, "languages": languages, "regions": regions, "deal_kind": deal_kind,
         "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 0, "exclusivity_days": 0,
         "min_followers": 0, "max_followers": None, "budget": {}, "posted_on": "2026-10-01",
-        "deadline": "2026-10-31", "status": "open",
+        "deadline": "2026-10-31", "status": "live", "objectives": ["awareness"], "cities": [],
     }
     base.update(kw)
+    base.setdefault("start_date", base["posted_on"])
     return base
 
 
@@ -275,7 +279,7 @@ DEALS: list[dict] = [
      "timeline": [
          _ev("offer", "2026-09-24T12:10:00+05:30", "Offer sent by Pixelforge Gear"),
          _ev("contract", "2026-09-26T19:20:00+05:30", "Contract signed by both sides"),
-         _ev("escrow_funded", "2026-09-27T12:00:00+05:30", "15,000 rupees held in escrow"),
+         _ev("escrow_funded", "2026-09-27T12:00:00+05:30", "15,000 rupees in simulated escrow. No money moved"),
          _ev("live", "2026-10-02T20:05:00+05:30", "Post link submitted"),
      ], "verify_due": "2026-10-06", "created_at": "2026-09-24T12:10:00+05:30"},
     # Creator B: a page feature offer.
@@ -288,13 +292,13 @@ DEALS: list[dict] = [
      "amount": 21_000, "deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}], "usage_rights_days": 30, "exclusivity_days": 0,
      "stage": "escrow_funded", "escrow": {"mode": "simulated", "ref": "esc_sim_3HJD", "funded_at": "2026-10-05T10:30:00+05:30"},
      "contract": {"signed_by_brand": "2026-10-04T11:00:00+05:30", "signed_by_creator": "2026-10-04T13:30:00+05:30"},
-     "timeline": [_ev("offer", "2026-10-03T15:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-04T13:30:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-05T10:30:00+05:30", "Escrow funded")],
+     "timeline": [_ev("offer", "2026-10-03T15:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-04T13:30:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-05T10:30:00+05:30", "Escrow funded (simulated)")],
      "created_at": "2026-10-03T15:00:00+05:30"},
     {"_id": "dl_senpai_g11", "kind": "single", "listing_id": "lst_senpai_hoodie", "brand_id": "br_senpai", "creator_id": "cr_g11",
      "amount": 12_500, "deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}], "usage_rights_days": 30, "exclusivity_days": 0,
      "stage": "live", "proof_url": "https://www.instagram.com/reel/DEMO-senpai-g11/", "escrow": {"mode": "simulated", "ref": "esc_sim_9PLM", "funded_at": "2026-10-04T09:00:00+05:30"},
      "contract": {"signed_by_brand": "2026-10-03T18:00:00+05:30", "signed_by_creator": "2026-10-03T21:10:00+05:30"},
-     "timeline": [_ev("offer", "2026-10-03T12:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-03T21:10:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-04T09:00:00+05:30", "Escrow funded"), _ev("live", "2026-10-07T19:00:00+05:30", "Post link submitted")],
+     "timeline": [_ev("offer", "2026-10-03T12:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-03T21:10:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-04T09:00:00+05:30", "Escrow funded (simulated)"), _ev("live", "2026-10-07T19:00:00+05:30", "Post link submitted")],
      "verify_due": "2026-10-10", "created_at": "2026-10-03T12:00:00+05:30"},
     {"_id": "dl_senpai_g05", "kind": "single", "listing_id": "lst_senpai_hoodie", "brand_id": "br_senpai", "creator_id": "cr_g05",
      "amount": 24_000, "deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}], "usage_rights_days": 30, "exclusivity_days": 0,
@@ -304,21 +308,21 @@ DEALS: list[dict] = [
     {"_id": "dl_senpai_g02", "kind": "single", "listing_id": "lst_senpai_hoodie", "brand_id": "br_senpai", "creator_id": "cr_g02",
      "amount": 9_500, "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 30, "exclusivity_days": 0,
      "stage": "paid", "proof_url": "https://www.instagram.com/reel/DEMO-senpai-g02/", "escrow": {"mode": "simulated", "ref": "esc_sim_1AZX", "funded_at": "2026-09-12T10:00:00+05:30"},
-     "payouts": [{"creator_id": "cr_g02", "amount": 9_500, "upi": "sneha@okbank", "utr": "SIM2609221145", "at": "2026-09-22T11:45:00+05:30"}],
-     "timeline": [_ev("offer", "2026-09-10T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-09-11T10:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-09-12T10:00:00+05:30", "Escrow funded"), _ev("live", "2026-09-18T19:00:00+05:30", "Post link submitted"), _ev("verified", "2026-09-21T12:00:00+05:30", "Brand confirmed; insights check passed"), _ev("paid", "2026-09-22T11:45:00+05:30", "Paid by UPI")],
+     "payouts": [{"creator_id": "cr_g02", "amount": 9_500, "mode": "simulated", "at": "2026-09-22T11:45:00+05:30"}], "payout": {"status": "simulated", "at": "2026-09-22T11:45:00+05:30"},
+     "timeline": [_ev("offer", "2026-09-10T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-09-11T10:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-09-12T10:00:00+05:30", "Escrow funded (simulated)"), _ev("live", "2026-09-18T19:00:00+05:30", "Post link submitted"), _ev("verified", "2026-09-21T12:00:00+05:30", "Brand approved the post"), _ev("paid", "2026-09-22T11:45:00+05:30", "Simulated payout. No money moved")],
      "created_at": "2026-09-10T10:00:00+05:30"},
     # Thalam's running deals.
     {"_id": "dl_thalam_f04", "kind": "single", "listing_id": "lst_thalam_sambar", "brand_id": "br_thalam", "creator_id": "cr_f04",
      "amount": 11_000, "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 30, "exclusivity_days": 0,
      "stage": "paid", "proof_url": "https://www.instagram.com/reel/DEMO-thalam-f04/", "escrow": {"mode": "simulated", "ref": "esc_sim_5TRE", "funded_at": "2026-09-20T10:00:00+05:30"},
-     "payouts": [{"creator_id": "cr_f04", "amount": 11_000, "upi": "karthik@okbank", "utr": "SIM2610011030", "at": "2026-10-01T10:30:00+05:30"}],
-     "timeline": [_ev("offer", "2026-09-18T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-09-19T10:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-09-20T10:00:00+05:30", "Escrow funded"), _ev("live", "2026-09-27T19:00:00+05:30", "Post link submitted"), _ev("verified", "2026-09-30T12:00:00+05:30", "Brand confirmed"), _ev("paid", "2026-10-01T10:30:00+05:30", "Paid by UPI")],
+     "payouts": [{"creator_id": "cr_f04", "amount": 11_000, "mode": "simulated", "at": "2026-10-01T10:30:00+05:30"}], "payout": {"status": "simulated", "at": "2026-10-01T10:30:00+05:30"},
+     "timeline": [_ev("offer", "2026-09-18T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-09-19T10:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-09-20T10:00:00+05:30", "Escrow funded (simulated)"), _ev("live", "2026-09-27T19:00:00+05:30", "Post link submitted"), _ev("verified", "2026-09-30T12:00:00+05:30", "Brand approved the post"), _ev("paid", "2026-10-01T10:30:00+05:30", "Simulated payout. No money moved")],
      "created_at": "2026-09-18T10:00:00+05:30"},
     {"_id": "dl_thalam_f06", "kind": "single", "listing_id": "lst_thalam_sambar", "brand_id": "br_thalam", "creator_id": "cr_f06",
      "amount": 8_000, "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 30, "exclusivity_days": 0,
      "stage": "escrow_funded", "escrow": {"mode": "simulated", "ref": "esc_sim_8WQA", "funded_at": "2026-10-06T10:00:00+05:30"},
      "contract": {"signed_by_brand": "2026-10-05T10:00:00+05:30", "signed_by_creator": "2026-10-05T14:00:00+05:30"},
-     "timeline": [_ev("offer", "2026-10-04T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-05T14:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-06T10:00:00+05:30", "Escrow funded")],
+     "timeline": [_ev("offer", "2026-10-04T10:00:00+05:30", "Offer sent"), _ev("contract", "2026-10-05T14:00:00+05:30", "Contract signed"), _ev("escrow_funded", "2026-10-06T10:00:00+05:30", "Escrow funded (simulated)")],
      "created_at": "2026-10-04T10:00:00+05:30"},
 ]
 

@@ -1,8 +1,11 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarCheck, Lock, ShieldCheck } from "lucide-react";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { CalendarCheck, Copy, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { ErrorState } from "@/components/shared/Bits";
+import { QrCode } from "@/components/shared/QrCode";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { KitCard } from "@/components/shared/KitCard";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -10,15 +13,17 @@ import { Input, Label, Segmented, Skeleton, Textarea } from "@/components/ui/for
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import { inr } from "@/lib/format";
-import type { Kit } from "@/lib/kit-types";
+import type { Kit, KitLang, PublicPage } from "@/lib/kit-types";
 import { useTheme } from "@/lib/theme";
 import NotFound from "./NotFound";
+import { PageIntro, PageSections } from "./PageExtras";
 
 export default function LinkInBio() {
   useTheme("creator");
   const { handle = "" } = useParams();
   const [open, setOpen] = useState(false);
-  const q = useQuery({ queryKey: ["public", handle], queryFn: () => api<Kit>(`/public/${handle}`), retry: false });
+  const [lang, setLang] = useState<KitLang>("en");
+  const q = useQuery({ queryKey: ["public", handle, lang], queryFn: () => api<PublicPage>(`/public/${handle}?lang=${lang}`, { role: null }), retry: false, placeholderData: keepPreviousData });
   if (q.isError && (q.error as { status?: number }).status === 404) return <NotFound />;
 
   return (
@@ -30,6 +35,21 @@ export default function LinkInBio() {
         <main id="main">
           {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
           {!q.data && !q.isError && <Skeleton className="h-[640px] rounded-[28px]" />}
+          {q.data && !q.data.version && (
+            <div className="mb-3 flex justify-end">
+              <Segmented
+                label="Media kit language"
+                size="sm"
+                value={lang}
+                onChange={setLang}
+                options={[
+                  { value: "en", label: "English" },
+                  { value: "hi", label: "हिंदी" },
+                ]}
+              />
+            </div>
+          )}
+          {q.data && <PageIntro page={q.data} />}
           {q.data && (
             <KitCard
               kit={q.data}
@@ -37,7 +57,7 @@ export default function LinkInBio() {
               footer={
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-1.5 text-xs text-muted">
-                    <ShieldCheck className="size-4 text-success" aria-hidden /> Payment held in escrow until the post is verified.
+                    <ShieldCheck className="size-4 text-success" aria-hidden /> Brands fund escrow before the post; it's released after they approve it.
                   </p>
                   <Button variant="primary" size="lg" onClick={() => setOpen(true)}>
                     <CalendarCheck aria-hidden /> Book {q.data.name.split(" ")[0]}
@@ -46,12 +66,19 @@ export default function LinkInBio() {
               }
             />
           )}
+          {q.data && <PageSections page={q.data} />}
+          {q.data && <ShareCard name={q.data.name} handle={q.data.handle} />}
+          {q.data && (
+            <div className="mt-3 flex justify-center">
+              <ReportButton type="profile" id={q.data.creator_id} label="Report this profile" />
+            </div>
+          )}
         </main>
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-muted">
           <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
             <Wordmark />
           </Link>
-          <span>· Fair prices, escrow, UPI payouts</span>
+          <span>· Fair prices and escrow</span>
         </footer>
       </div>
       {q.data && <BookDialog kit={q.data} open={open} onOpenChange={setOpen} />}
@@ -149,5 +176,35 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ShareCard({ name, handle }: { name: string; handle: string }) {
+  const url = `${window.location.origin}/c/${handle}`;
+  return (
+    <section aria-labelledby="share-page" className="card-surface mt-4 flex flex-wrap items-center gap-5 rounded-[var(--radius-card)] p-5">
+      <QrCode url={url} label={`QR code for ${name}'s JodiDar page`} size={128} fileName={`jodidar-${handle}.png`} />
+      <div className="min-w-0 flex-1">
+        <h2 id="share-page" className="text-sm font-semibold">
+          Share this page
+        </h2>
+        <p className="mt-1 break-all text-sm text-fg-2">{url}</p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-3"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(url);
+              toast.success("Link copied");
+            } catch {
+              toast(url);
+            }
+          }}
+        >
+          <Copy aria-hidden /> Copy link
+        </Button>
+      </div>
+    </section>
   );
 }

@@ -151,6 +151,9 @@ export interface PriceStep {
 }
 
 export interface FairPrice {
+  /** What the price is built from: "Estimate from Instagram data", "... from sample data", ... */
+  data_label?: string;
+  data_source?: "instagram_api" | "youtube_api" | "manual" | "synthetic";
   creator_id: string;
   lister_id: string | null;
   lister_name: string | null;

@@ -25,9 +25,9 @@ const SCENARIOS = {
     steps: [
       { who: "phone", text: "The offer is flagged as below fair price. Tap Counter: the fair price and its reasons are filled in." },
       { who: "console", text: "The counter arrives at the creator's fair price. Accept it; both e-signatures land on the contract." },
-      { who: "console", text: "Fund escrow. Test mode is simulated; no real money moves." },
+      { who: "console", text: "Fund escrow. In the demo this records a simulated payment; no money moves." },
       { who: "phone", text: "Escrow is funded, so it's safe to post. Paste the reel link once it's live." },
-      { who: "console", text: "Confirm the post. The payout goes out by UPI and the invoice is marked paid." },
+      { who: "console", text: "Review the post and approve it. The demo records a simulated payout, labelled so, and the invoice says simulated." },
     ] as { who: Who; text: string }[],
   },
   collective: {
@@ -38,7 +38,7 @@ const SCENARIOS = {
     steps: [
       { who: "phone", text: "Open the Thalam Foods collective and opt in, choosing exactly what the brand can see." },
       { who: "console", text: "Creator B appears as opted in inside the 20-creator pack, with overlap already removed." },
-      { who: "console", text: "Book the pack: one escrow payment, split to each creator by UPI once their post is verified." },
+      { who: "console", text: "Book the pack: one escrow payment, each creator's share released once their post is approved." },
     ] as { who: Who; text: string }[],
   },
 } as const;

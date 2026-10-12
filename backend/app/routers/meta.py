@@ -1,26 +1,42 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from ..config import get_settings, now_iso, today
-from ..db import db_mode
+from ..db import db_mode, ping
+from ..services import payments, tee
+from ..services.social import PROVIDERS
 from ..seed.catalog import CITIES, FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
 
 router = APIRouter(prefix="/api", tags=["meta"])
 
 
+def social_mode() -> str:
+    on = [k for k, (configured, _) in PROVIDERS.items() if configured()]
+    return ", ".join(sorted(on)) if on else "not_connected"
+
+
 @router.get("/health")
-def health():
+def health(response: Response):
     s = get_settings()
+    db_ok = ping()
+    if not db_ok:
+        response.status_code = 503  # the host's health check sees the database is down
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "database_unreachable",
         "today": today().isoformat(),
         "now": now_iso(),
         "modes": {
             "db": db_mode(),
+            "db_ok": db_ok,
             "ai": "live" if s.has_ai else "templates",
-            "payments": "razorpay-test" if s.has_razorpay else "simulated",
-            "auth": "firebase" if s.has_firebase else "demo",
+            "payments": payments.mode(),
+            "payouts": payments.payout_mode(),
+            "social": social_mode(),
+            "post_checks": "automatic when connected" if social_mode() != "not_connected" else "brand review (automatic checks not connected)",
+            "auth": ", ".join(["password"] + (["firebase"] if s.has_firebase else []) + (["demo"] if s.demo_mode else [])),
+            "tee": tee.status()["status"],  # not_configured, available or failed: never a container passed off as a TEE
         },
-        "shared_demo": s.demo_reset_minutes > 0,
+        "demo_mode": s.demo_mode,
+        "shared_demo": s.demo_mode and s.demo_reset_minutes > 0,
     }
 
 

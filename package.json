@@ -7,9 +7,11 @@
     "dev": "node scripts/dev.mjs",
     "demo": "node scripts/dev.mjs --single-port",
     "e2e": "npm install --no-audit --no-fund --silent && node qa/flows.mjs",
+    "accounts": "npm install --no-audit --no-fund --silent && node qa/accounts.mjs",
     "setup": "node scripts/dev.mjs --setup-only",
     "test": "node scripts/test.mjs",
-    "reset": "node -e \"fetch('http://localhost:8000/api/demo/reset',{method:'POST'}).then(r=>r.text()).then(console.log)\"",
+    "reset": "node -e \"fetch('http://localhost:8000/api/demo/reset',{method:'POST',headers:{'X-Requested-With':'npm'}}).then(r=>r.text()).then(console.log)\"",
+    "seed": "node scripts/seed.mjs",
     "shots": "npm install --no-audit --no-fund --silent && node qa/screenshots.mjs"
   },
   "devDependencies": {

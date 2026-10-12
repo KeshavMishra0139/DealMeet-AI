@@ -3,7 +3,7 @@ import type { Deal } from "@/lib/deal-types";
 import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Offer -> Contract -> Escrow -> Live -> Verified -> Paid, as a tracker. */
+/** Offer -> Contract -> Escrow -> Post submitted -> Approved -> Paid out, as a tracker. */
 export function Rail({ steps, declined = false }: { steps: Deal["steps"]; declined?: boolean }) {
   return (
     <ol aria-label="Deal progress" className="grid grid-cols-1 gap-0 sm:grid-cols-6">

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..db import get_db
 from ..seed.catalog import NICHES
+from ..services.campaigns import LIVE_QUERY
 from . import metrics
 from .common import estimate, inp, inr, inr_range, short, why
 from .fair_price import PRODUCTION_FLOOR, fair_price
@@ -94,14 +95,32 @@ def value_for(c: dict, listing: dict, lister: dict) -> dict | None:
     }
 
 
+def pref_conflict(c: dict, listing: dict, lister: dict) -> str | None:
+    """Why a listing doesn't fit the creator's collaboration preferences, or None."""
+    prefs = c.get("collab_prefs") or {}
+    kind = listing.get("deal_kind")
+    if prefs.get("accepts") == "paid" and kind in ("barter",):
+        return "Barter only, and you take paid deals"
+    if prefs.get("accepts") == "barter" and kind in ("paid", "retainer"):
+        return "A paid deal, and you take barter deals"
+    hi = (listing.get("budget") or {}).get("per_creator_max")
+    if prefs.get("min_fee") and hi and hi < prefs["min_fee"]:
+        return f"Pays up to {inr(hi)}, below your minimum of {inr(prefs['min_fee'])}"
+    text = " ".join([listing.get("title", ""), listing.get("summary", ""), lister.get("category", "") or ""]).lower()
+    for word in prefs.get("avoid") or []:
+        if word and word.lower() in text:
+            return f"Mentions '{word}', which you avoid"
+    return None
+
+
 def matched(c: dict, limit: int | None = None, include_flagged: bool = False) -> dict:
     db = get_db()
     listers = {b["_id"]: b for b in db.brands.find({})}
     creators = {x["_id"]: x for x in db.creators.find({"_id": {"$regex": "^cr_"}}, {"name": 1, "handle": 1, "niche": 1, "languages": 1, "region": 1, "audience": 1})}
     taken = {d["listing_id"] for d in db.deals.find({"creator_id": c["_id"]})}
     flags = scan()
-    items, hidden = [], []
-    for listing in db.listings.find({"status": "open"}):
+    items, hidden, by_prefs = [], [], []
+    for listing in db.listings.find({"status": LIVE_QUERY}):
         if listing["owner_id"] == c["_id"]:
             continue
         if is_flagged(listing["_id"]) and not include_flagged:
@@ -121,6 +140,10 @@ def matched(c: dict, limit: int | None = None, include_flagged: bool = False) ->
             continue
         fit = listing_fit(c, listing, lister)
         if fit["score"] < 45:
+            continue
+        conflict = pref_conflict(c, listing, lister)
+        if conflict and listing["_id"] not in taken:
+            by_prefs.append({"id": listing["_id"], "title": listing["title"], "reason": conflict})
             continue
         val = value_for(c, listing, lister)
         items.append(
@@ -155,4 +178,4 @@ def matched(c: dict, limit: int | None = None, include_flagged: bool = False) ->
     items.sort(key=lambda x: (x["applied"], -x["fit"]))
     if limit:
         items = items[:limit]
-    return {"items": items, "hidden": hidden}
+    return {"items": items, "hidden": hidden, "hidden_by_prefs": by_prefs}
