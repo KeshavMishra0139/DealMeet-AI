@@ -43,6 +43,7 @@ COLLECTIONS = [
     "metric_snapshots",
     "oauth_states",
     "fan_proof",
+    "coach_answers",
     "ai_cache",
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona

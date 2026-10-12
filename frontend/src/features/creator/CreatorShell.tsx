@@ -19,6 +19,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
+import { AskButton } from "./AskPanel";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
@@ -87,6 +88,7 @@ function Studio() {
           <Wordmark />
         </Link>
         <ProfileCard creator={creator.data} className="mx-1 mt-6" />
+        <AskButton className="mx-1 mt-3 justify-start" />
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
           {[...PRIMARY, ...SECONDARY].map((item, i) => (
             <div key={item.to}>
@@ -104,6 +106,7 @@ function Studio() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
+          <AskButton compact />
           <LangToggle compact />
           <Button variant="ghost" size="icon-sm" aria-label={t("nav.more")} onClick={() => setMoreOpen(true)}>
             {creator.data ? (

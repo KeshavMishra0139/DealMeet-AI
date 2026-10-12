@@ -15,6 +15,7 @@ import { api, post } from "@/lib/api";
 import type { Durable, Home as HomeData, Pipeline, Plan, RateGap, Stage } from "@/lib/api-types";
 import { count, inr, inrRange, inrShort, shortDate } from "@/lib/format";
 import { useCreatorId } from "@/lib/session";
+import { Goals } from "./Goals";
 import { cn } from "@/lib/utils";
 import { CountUp, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { MoveCard } from "./MoveCard";
@@ -93,6 +94,8 @@ export default function Home() {
           ))}
         </MovesCarousel>
       </section>
+
+      <Goals creatorId={id} />
 
       {context.has_reels && (
         <Reveal className="mt-8">

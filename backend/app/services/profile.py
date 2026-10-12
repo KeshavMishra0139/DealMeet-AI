@@ -160,6 +160,9 @@ def add_manual_metrics(c: dict, platform: str, followers: int, avg_views: int | 
         prov["followers"] = "manual"
         update = {"manual": {k: entry[k] for k in ("platform", "followers", "avg_views", "engagement_pct", "at")}, "followers": followers, "provenance": prov}
         db.creators.update_one({"_id": c["_id"]}, {"$set": update})
+        from . import coach
+
+        coach.on_new_data(c["_id"], "New self-reported numbers")
     return {"entry": {k: v for k, v in entry.items() if k not in ("_id", "ts")} | {"id": entry["_id"]}, "applied": applied,
             "note": None if applied else f"Saved. Your connected {platform.capitalize()} numbers stay in use: self-reported numbers never replace them."}
 

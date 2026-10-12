@@ -127,6 +127,13 @@ def _payout(d: dict) -> None:
     _event(d, "verified", "Payout isn't connected yet, so nothing has been paid out. The payment stays in escrow.")
 
 
+def _finished(d: dict) -> None:
+    """A deal was approved: the creator's plan is recalculated with it."""
+    from . import coach
+
+    coach.on_new_data(d["creator_id"], "A deal was approved")
+
+
 POST_CHECKS = ("The post is public and live", "Posted after the contract was signed", "The caption mentions the brand", "Paid-partnership label added")
 
 
@@ -258,6 +265,8 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         d["stage"] = "verified"
         _event(d, "verified", f"{brand.get('name')} approved the post")
         _payout(d)
+        _save(d)
+        _finished(d)
     elif role == "brand" and action == "request_revision":
         need(stage == "live")
         reason = (payload.get("note") or "").strip()
