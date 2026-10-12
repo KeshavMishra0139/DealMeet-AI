@@ -19,7 +19,7 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | Demo journeys in a browser | `make e2e` | 30 of 30 pass |
 | Real accounts, demo mode off, 390 px and 1280 px | `make accounts` | 16 of 16 pass |
 | Screens at 390 px and 1440 px with axe-core, copy rules, console errors, sideways scroll | `make shots` | 98 screenshots, 0 need attention |
-| CI | `.github/workflows/test.yml` | runs `make test`, then `make e2e` and `make accounts`, on every push |
+| CI | `.github/workflows/test.yml` | runs `make test`, then `make e2e` and `make accounts`, on every push; passing on GitHub |
 
 ---
 
@@ -181,7 +181,7 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | Backend tests per area: happy path, invalid input, 401, 403, expired session, failed external call, duplicates | Tested | Area suites plus `test_acceptance.py` |
 | Pure-function tests on the in-memory database: median-views pricing, Fan Proof matching, pitch rate limit | Tested | `test_pure.py`, and `test_pitches.py` for Fan Proof matching |
 | Browser journeys with demo mode off at 390 px and 1280 px, reloading after writes | Tested | `qa/accounts.mjs` (`make accounts`) |
-| GitHub Actions on every push | Unverified | `.github/workflows/test.yml`; see the Actions tab for the latest run |
+| GitHub Actions on every push and pull request | Tested | `.github/workflows/test.yml`; first runs on GitHub passed all three stages (`make test`, 30 demo journeys, 16 real-account steps): [push run](https://github.com/KeshavMishra0139/JodiDar-AI/actions/runs/38201960078), [pull request run](https://github.com/KeshavMishra0139/JodiDar-AI/actions/runs/38201961092) |
 | README setup section, every env var, seed, switching mock and real data | Done | README: "Setup: from the demo to real services", "Environment variables" |
 | `DEMO_SCRIPT.md` | Done | Click paths match the browser journeys named in it |
 
