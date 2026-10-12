@@ -59,8 +59,8 @@ The demo needs nothing. To run with real accounts and live data, set these up in
 3. **Sample data (optional)**: `make seed` loads the synthetic sample data into empty collections, every record marked `source: "synthetic"` and shown as "Sample data". `make seed ARGS="--reset --confirm-reset"` replaces only synthetic records.
 4. **YouTube API key**: follow [Google Cloud setup](#real-youtube-data-and-what-am-i-worth) and set `YOUTUBE_API_KEY`. Turns on `/worth` and linking a channel by @handle.
 5. **Firebase (Google and phone sign-in)**: follow [Firebase setup](#firebase-setup-one-time) and set the four `VITE_FIREBASE_*` values (build-time) and `FIREBASE_SERVICE_ACCOUNT_JSON` (server).
-6. **Google OAuth test users (YouTube Analytics)**: in the Firebase project's Google Cloud console, enable the YouTube Analytics API, add the `youtube.readonly` and `yt-analytics.readonly` scopes to the OAuth consent screen, keep the app in **Testing** and add each creator's Google account as a **test user** ([details](#youtube-analytics-optional)).
-7. **Meta app with Instagram Testers**: follow the [Meta dashboard steps](#connecting-instagram); set `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` (HTTPS), `FRONTEND_URL` and `TOKEN_ENC_KEY`. Each creator who connects must be an Instagram Tester with a Creator or Business account while the app is in development mode.
+6. **Google OAuth test users (YouTube Analytics and "Continue with YouTube")**: in the Firebase project's Google Cloud console, enable the YouTube Analytics API, add the `youtube.readonly` and `yt-analytics.readonly` scopes to the OAuth consent screen, keep the app in **Testing** and add each creator's Google account as a **test user** ([details](#youtube-analytics-optional)). With Firebase and `YOUTUBE_API_KEY` both set, creators also get **Continue with YouTube** on the sign-in page.
+7. **Meta app with Instagram Testers**: follow the [Meta dashboard steps](#connecting-instagram); set `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` (HTTPS), `FRONTEND_URL` and `TOKEN_ENC_KEY`. Each creator who connects must be an Instagram Tester with a Creator or Business account while the app is in development mode. The same settings turn on **Continue with Instagram** on the sign-in page.
 8. **Payments (optional)**: Razorpay test keys `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and the webhook secret `RAZORPAY_WEBHOOK_SECRET` (webhook URL: `/api/payments/razorpay/webhook`).
 9. **Live AI (optional)**: `ANTHROPIC_API_KEY` and `AI_MODEL`, with `AI_MAX_CALLS_PER_HOUR` as a cap.
 10. **An admin**: sign up, then on the server `python -m app.admin_cli grant <email>` (in `backend/`).
@@ -83,8 +83,8 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google and phone (OTP) sign-in in the browser, through Firebase | Email and password only; the page says Google and phone sign-in aren't configured |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_PROJECT_ID` | Server-side check of every Firebase ID token (Admin SDK): signature, expiry, this project, not revoked | `POST /api/auth/firebase` answers 503 |
-| `YOUTUBE_API_KEY` | Real YouTube channel numbers: the public "What am I worth?" page (`/worth`) and linking a channel by @handle | Both say YouTube data isn't connected |
-| `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI`, `FRONTEND_URL`, `TOKEN_ENC_KEY` | Connecting Instagram with its official login (read-only), real post checks on deals | Instagram shows "not available"; post checks read "not checked" |
+| `YOUTUBE_API_KEY` | Real YouTube channel numbers: the public "What am I worth?" page (`/worth`), linking a channel by @handle and, with Firebase, **Continue with YouTube** | Both say YouTube data isn't connected; no YouTube button on the sign-in page |
+| `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI`, `FRONTEND_URL`, `TOKEN_ENC_KEY` | Connecting Instagram with its official login (read-only), **Continue with Instagram** for creators, real post checks on deals | Instagram shows "not available" and the sign-in page has no Instagram button; post checks read "not checked" |
 | `IG_GRAPH_VERSION`, `IG_DEMOGRAPHICS_TIMEFRAME` | Meta Graph API version and the audience-demographics window | `v25.0`, `this_month` |
 | `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
 | `DEMO_ADMIN` | `1`: a "Demo admin" persona for walking through `/admin` locally. Ignored outside demo mode and on a demo that resets itself. `make dev` sets it | No demo admin; admins only via `python -m app.admin_cli grant <email>` |
@@ -98,7 +98,7 @@ Every AI call goes through one function with a fallback: if the key is missing, 
 
 ## Database
 
-`backend/app/db.py` is the only place that connects to MongoDB. It creates its indexes on every start (safe to repeat): unique `users.email`, `users.firebase_uid`, `creators.handle`, `brands.slug`, `connections (user_id, platform)` and `posts (creator_id, platform, post_id)`, plus `metric_snapshots (creator_id, platform, date)` and indexes on owner ids, deal stage and campaign status. `/api/health` pings it and reports `mock`, `atlas` or `mongodb` (503 when the ping fails).
+`backend/app/db.py` is the only place that connects to MongoDB. It creates its indexes on every start (safe to repeat): unique `users.email`, `users.firebase_uid`, `users.instagram_uid`, `users.youtube_channel_id`, `creators.handle`, `brands.slug`, `connections (user_id, platform)` and `posts (creator_id, platform, post_id)`, plus `metric_snapshots (creator_id, platform, date)` and indexes on owner ids, deal stage and campaign status. One-time sign-in codes live in `login_codes` (stored hashed, 2 minutes). `/api/health` pings it and reports `mock`, `atlas` or `mongodb` (503 when the ping fails).
 
 Load the sample data, every record marked `source: "synthetic"`:
 
@@ -220,7 +220,7 @@ Motion is there to explain, not decorate. Every effect checks reduced motion fir
 
 | Where | What it does |
 | --- | --- |
-| Landing (1280 px and wider) | A 3D "creator core" with brand cards and rupee coins in orbit, following the pointer and the scroll |
+| Landing | A light hero card over a looping background video (paused on its first frame with reduced motion). Over it, a **deal mosaic** (`features/public/DealMosaic.tsx`): three columns of grainy tiles drifting forever in alternating directions, each tile one DealMeet idea (connect Instagram or YouTube, next 3 moves, fair price, audience fit, collectives, escrow, paid on approval, media kit, English or हिंदी), with no numbers or names, and black-and-white photo tiles between them once photos are added to `frontend/src/assets/mosaic/photos.ts` (six slots; an empty slot is left out, so it works with none). Pure CSS loops; the columns ease in once, pause while the hero is off-screen and stand still with reduced motion. Then a floating pill navigation with **Check your worth** emphasised, and a "Works with" logo scroller in pure CSS that pauses on hover and becomes a still, wrapped list with reduced motion. The landing loads no 3D |
 | Creator Studio home | **Reach vs followers in 3D**: the last 6 reels rise as bars through a glass plane set at the follower count, so "reach is about 7x followers" is visible at a glance. Hover a bar for its views |
 | Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to payout |
 | Brand Console campaign | **Match space**: matched creators placed by fair price, reach and trust, coloured and sized by fit. Drag to turn it, hover for details, click to open a profile |
@@ -284,6 +284,20 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - In the Studio, **Connections** links the creator's own channel: the summary goes to `creators.channels.youtube` (`creators.platforms` was already the list of platforms a creator says they use), each video to `posts` and one `metric_snapshots` row per day, all with `source: "youtube_api"` and `fetched_at`. Unlinking deletes them. A channel linked by handle is public data, so it's marked "Ownership not verified" until YouTube Analytics is connected, and one channel can't be linked to two profiles.
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
+
+## Weekly report and "Check your worth"
+
+The top of the Creator Studio home is a **Weekly report**: the 7 days ending today against the 7 before, as a light card on the dark Studio. Code: `backend/app/services/weekly_report.py`, `frontend/src/features/creator/WeeklyReport.tsx`; tests: `backend/tests/test_weekly_report.py`.
+
+- **Aggregated in MongoDB** (`GET /api/creators/{creator_id}/weekly-report`, the creator only) from records the app already keeps; nothing is estimated:
+  - **Brand views**: brands opening the creator's profile (`consent_audit` "viewed" events), and how many brands.
+  - **New offers**: deals offered to the creator (`deals.created_at`), and their total value.
+  - **Paid out**: deals that reached "paid" (their timeline), with the amount; simulated payouts say so.
+  - **Views on new reels**: views on reels posted each week, and how many reels. With no reels at all, the tile asks the creator to connect Instagram or YouTube instead of showing a zero.
+  - **Followers**: the change between Instagram or YouTube snapshots (`metric_snapshots`), only when there's one in both weeks.
+- Each tile shows last week's figure with an up, down or same marker, and its data label (Sample data, Self-reported, Live data). In English and हिंदी. The loading state is the same size as the loaded card, so the page doesn't jump.
+
+**Check your worth** (`/worth`) is emphasised wherever navigation shows it: the landing page's floating nav, the Studio sidebar (after the main tabs) and the Studio's mobile menu. One component (`frontend/src/components/shared/WorthLink.tsx`): a signature-gradient pill with a soft glow that breathes (opacity only; still with reduced motion) and a sparkle that turns on hover.
 
 ## Creator profile, completeness and brand-readiness
 
@@ -359,6 +373,15 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 **Dream Brands**: creators save brands (Studio → Dream Brands, or the brand's page). A brand's page shows "N creators with connected accounts want to work with you": a count only, with names only for creators who switched on "Let this brand see my name", and only to that brand. When a saved brand publishes a campaign or collective, each creator who saved it gets one notification.
 
+## Creator search for brands
+
+The top of the Brand Console has **Find creators**: a search box with filters for **followers**, **reach per reel** and **niche**, and a sort (highest reach first, or by name). Filters live in the address (`?q=&niche=&followers=&reach=&sort=&page=`), so a search can be shared and the back button works. Code: `backend/app/services/creator_search.py`, `frontend/src/features/brand/CreatorSearch.tsx`; tests: `backend/tests/test_creator_search.py`.
+
+- **One MongoDB query** (`GET /api/brands/{brand_id}/creators`, the signed-in brand only): the text is a case-insensitive partial match (an escaped regex, so `(` or `.*` are just characters) on name, handle, bio, city and sub-niches, plus any niche whose label matches; niche is an exact match; followers and reach are ranges. 24 results a page.
+- **Only what the brand may see.** Creators who aren't discoverable, or who revoked this brand, never appear. Niche and the follower band ("1K to 10K") are public, so anyone can filter on them. Exact followers and reach belong to the creator's "stats" scope: they come back only for creators who share stats with this brand, and the reach filter and sort only ever consider those creators, otherwise narrowing the filter would reveal hidden numbers. The response says how many creators a reach filter left out for that reason, never which.
+- **Reach is measured, never guessed**: `creators.reach_views` is the median views of the last six reels, or the creator's self-reported average views, stored with its source (`services/reach.py`). It's updated by onboarding, Instagram sync and disconnect, and self-reported numbers, and filled for every creator after seeding and on start. A creator with neither has no reach, rather than the estimate from followers the fair price falls back to.
+- Indexes: `creators (niche, followers)`, `followers` and `reach_views`. For full-text relevance at a larger scale, an Atlas Search index on creators would replace the regex, as the brand directory does.
+
 ## Matches, shortlist, compare and draft offers
 
 **How matches are ranked** (`engines/brand_matching.py`). Each part is scored from 0 to 1, then weighted; the criteria and each creator's scores come back with every result ("Why ranked here").
@@ -423,7 +446,7 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 ## YouTube Analytics (optional)
 
-After linking a channel, a creator can click **Connect YouTube Analytics**. Only then does the app ask Google (through Firebase) for `youtube.readonly` and `yt-analytics.readonly`; ordinary sign-in never asks, so brands are never asked for YouTube access. The same plain-language consent comes first.
+After linking a channel, a creator can click **Connect YouTube Analytics**. Only then does the app ask Google (through Firebase) for `youtube.readonly` and `yt-analytics.readonly`. "Continue with Google" never asks; **Continue with YouTube** (creators only) asks for `youtube.readonly` alone, so brands are never asked for YouTube access. The same plain-language consent comes first.
 
 - The browser reads the access token with `GoogleAuthProvider.credentialFromResult(result).accessToken` and sends it once to `POST /api/connect/youtube/analytics`. The server uses it immediately and doesn't store or log it (Firebase gives no refresh token), so **Refresh** repeats the consent.
 - `reports.query` with `ids=channel==MINE` for the last 28 days: views, estimated minutes watched and average view duration; `ageGroup,gender` with `viewerPercentage`; and `country` with `views`. Stored as a snapshot with `source: "youtube_api"` and `fetched_at`, shown with the date it was taken.
@@ -489,11 +512,23 @@ Every private API route checks the signed-in account on the server, and that the
 
 - **Accounts** are creators or brands, chosen at sign-up and fixed after that. Admin is granted only from the server: `python -m app.admin_cli grant <email>` (run in `backend/`). See [Admin console and reports](#admin-console-and-reports).
 - **Sign-in**: Google or phone OTP through Firebase, or email and password (hashed with scrypt). Both stay: email and password works with no Firebase project. Five wrong passwords in 15 minutes pause sign-in for that email.
+- **Creators can also sign in with Instagram or YouTube.** See [Creator sign-in with Instagram or YouTube](#creator-sign-in-with-instagram-or-youtube).
 - **Firebase is verified on the server.** The browser sends the Firebase ID token once to `POST /api/auth/firebase`; the Admin SDK rejects forged, expired, revoked and other-project tokens, then the account is found or created by `firebase_uid` (unique) and the app starts its own session. A uid is never accepted without a verified token. The side (creator or brand) is picked at the first sign-in and can't change later; a verified Google email that matches an email-and-password account links to it.
 - **Sessions**: a random token in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), or a `Authorization: Bearer` header for API clients. Only the token's SHA-256 hash is stored. Sessions last 72 hours (`SESSION_HOURS`) and signing out revokes them.
 - **CSRF**: a write sent with only the cookie must carry an `X-Requested-With` header, which a cross-site form can't add. The web app always sends it.
 - **Audit log**: sign-ups, sign-ins, sign-outs and every write (who, route, result) go to an append-only `audit` collection. Request bodies, passwords and tokens are never stored there.
 - **401 and 403**: the app sends you to sign in when a session ends, and says plainly when a page belongs to another account or the other side.
+
+### Creator sign-in with Instagram or YouTube
+
+On the creator side of the sign-in page, **Continue with Instagram** and **Continue with YouTube** each appear only when the server is set up for them (`/api/health` lists `instagram` and `youtube` in `modes.auth`). Code: `backend/app/services/social_signin.py`; tests: `backend/tests/test_social_signin.py`.
+
+- **Instagram**: the same Business Login and read-only scopes as [Connecting Instagram](#connecting-instagram), started by `GET /api/auth/instagram/start` before anyone is signed in. Its state is single-use, signed, 10 minutes, and marked as a sign-in, so it can never finish a connection for someone else. Instagram returns to the same `IG_REDIRECT_URI`; the callback finds the account by the Instagram professional account id (`users.instagram_uid`, or an older connection with that id) or creates a creator account, and saves the encrypted token as that creator's Instagram connection.
+- **One-time code, not a cookie, on the callback**: the callback may run on a different origin from the web app (an ngrok URL locally), so it sends the browser to `/login/complete?code=…`. The page posts the code to `POST /api/auth/oauth/complete`, which starts the session on the web app's origin. Codes are random, stored as a SHA-256 hash, valid for 2 minutes and deleted on first use, and they only work in the browser that started the sign-in (a short-lived HttpOnly cookie set by the start request), so a login link sent to someone else can't sign them in to the sender's account.
+- **YouTube**: a Google sign-in through Firebase that also asks for `youtube.readonly`. The browser sends the ID token and the access token once to `POST /api/auth/youtube`. The server verifies the ID token (as for Google), checks with Google's `tokeninfo` that the access token belongs to that same Google account and carries the YouTube scope, then reads `channels?mine=true`. The access token is never stored. The channel is recorded as the account's verified channel (`users.youtube_channel_id`, unique) and linked with ownership confirmed. A Google account with no channel still signs in, and is told so.
+- **One identity, one account**: an Instagram account or a YouTube channel belongs to one DealMeet account. Connecting an Instagram account that already signs in to another account is refused. A second Google account that manages the same channel signs in to its own account without the channel, with a note.
+- **First sign-in** creates a creator account (the side can't change later). Onboarding then attaches what the creator signed in with: it syncs the Instagram account and links the YouTube channel, so the profile starts on real numbers. Anything that can't be read is listed as a note, and the profile is created either way.
+- **Disconnecting Instagram** deletes the token and data as before. The Instagram account stays the account's sign-in only when there's no other way in (no password, no Google or phone); signing in with it again reconnects.
 
 ### Firebase setup (one time)
 
@@ -636,6 +671,6 @@ scripts/           cross-platform dev, demo and test runners
 
 ## Stack
 
-- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, three.js with React Three Fiber and drei, Recharts, Lucide, React Router, TanStack Query; Sora and Inter.
+- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, three.js with React Three Fiber and drei, Recharts, Lucide, Simple Icons, React Router, TanStack Query; Outfit and Inter (self-hosted).
 - **API**: FastAPI, Pydantic, scikit-learn, ReportLab, httpx.
 - **Data and services**: MongoDB or mongomock; optional Firebase Auth, Razorpay test mode and a language model.

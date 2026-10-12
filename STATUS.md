@@ -13,7 +13,7 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 
 | Check | Command | Result |
 | --- | --- | --- |
-| API tests | `make test` | 425 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
+| API tests | `make test` | 459 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
 | Copy rules on UI strings | `make test` | 5,922 strings, no promises |
 | Type check | `make test` | clean |
 | Demo journeys in a browser | `make e2e` | 30 of 30 pass |
@@ -41,6 +41,15 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | ID token verified with the Admin SDK (forged, expired, revoked, other project refused) | Tested | `test_firebase.py` (real Admin SDK, offline keys) |
 | Google and phone sign-in in the browser | Unverified | Needs a Firebase project (`VITE_FIREBASE_*`, service account); not run against one |
 | Role fixed at first sign-in; verified email links to an existing account | Tested | `test_firebase.py` |
+
+## 2a. Creator sign-in with Instagram or YouTube
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| Continue with Instagram: sign-in state, account found or created by Instagram id, encrypted token saved as the connection, one-time login code on the web app's origin | Tested | `test_social_signin.py` against a fake Graph API |
+| Continue with YouTube: verified Google sign-in, access token checked against the same Google account and scope, channel recorded and linked as owned, token not stored | Tested | `test_social_signin.py` against fake Google endpoints and a fake Data API |
+| One Instagram account or YouTube channel per DealMeet account; data attached at onboarding | Tested | `test_social_signin.py` |
+| Real Instagram and Google logins | Blocked | Need a Meta app with Instagram Testers, and a Firebase project with the YouTube scope and test users |
 
 ## 3. Honest payments, payouts and post checks
 
@@ -83,6 +92,15 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | --- | --- | --- |
 | Token used once and never stored; channel must match the linked one; disconnect deletes snapshots | Tested | `test_youtube_analytics.py` against a fake API |
 | Real Google OAuth with test users | Blocked | Needs the Analytics API enabled and test users on the OAuth consent screen |
+
+## 7a. Brand creator search and the creator's weekly report
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| Brand search: escaped partial text match, exact niche, follower band and reach ranges as MongoDB queries; stats only for creators who share them; reach filter can't reveal hidden numbers | Tested | `test_creator_search.py`; checked in a browser at 390 and 1440 px |
+| Stored measured reach kept current by onboarding, Instagram sync and disconnect, self-reported numbers, seeding and start | Tested | `test_creator_search.py` |
+| Weekly report aggregated from profile views, offers, payouts, reels and platform snapshots, each labelled by source | Tested | `test_weekly_report.py`; demo and real-account journeys |
+| Aggregations and indexes on a real Atlas cluster | Unverified | Tests run on mongomock; needs `TEST_MONGODB_URI` |
 
 ## 8. Creator profile, completeness and brand-readiness
 

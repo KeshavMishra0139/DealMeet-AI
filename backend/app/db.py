@@ -58,7 +58,7 @@ COLLECTIONS = [
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
 # accounts (and their sessions) and never touches the audit log.
-ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "audit"]
+ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit"]
 
 
 class DatabaseNotConfigured(RuntimeError):
@@ -134,16 +134,26 @@ def ensure_indexes(db) -> None:
     text = {"$type": "string"}
     db.users.create_index("firebase_uid", unique=True, partialFilterExpression={"firebase_uid": text})
     db.users.create_index("email", unique=True, partialFilterExpression={"email": text})
+    # Social sign-in identities: one Instagram professional account or one YouTube channel
+    # signs in to one DealMeet account.
+    db.users.create_index("instagram_uid", unique=True, partialFilterExpression={"instagram_uid": text})
+    db.users.create_index("youtube_channel_id", unique=True, partialFilterExpression={"youtube_channel_id": text})
     db.users.create_index("creator_id")
     db.users.create_index("brand_id")
     db.sessions.create_index("user_id")
     db.login_failures.create_index([("email", 1), ("at", 1)])
+    db.login_codes.create_index("expires")
     db.audit.create_index([("ts", -1)])
     db.audit.create_index("user_id")
     db.creators.create_index("handle", unique=True, partialFilterExpression={"handle": text})
+    # Brand search (services/creator_search.py): exact niche, follower and reach ranges.
+    db.creators.create_index([("niche", 1), ("followers", 1)])
+    db.creators.create_index("followers")
+    db.creators.create_index("reach_views")
     db.brands.create_index("slug", unique=True, partialFilterExpression={"slug": text})
     db.connections.create_index([("user_id", 1), ("platform", 1)], unique=True)
     db.connections.create_index([("creator_id", 1), ("platform", 1)])
+    db.connections.create_index([("platform", 1), ("ig_user_id", 1)])
     db.metric_snapshots.create_index([("creator_id", 1), ("platform", 1), ("date", 1)])
     db.posts.create_index([("creator_id", 1), ("platform", 1), ("post_id", 1)], unique=True)
     db.listings.create_index("owner_id")

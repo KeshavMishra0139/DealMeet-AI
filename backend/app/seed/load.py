@@ -62,6 +62,9 @@ def seed_all(db, force: bool = False, sandbox: bool = True) -> dict:
         # Every seeded record is sample data, and says so.
         db[name].insert_many([{**copy.deepcopy(d), "source": SYNTHETIC} for d in docs])
     seed_users(db, creators, drop_sandbox_accounts=sandbox)
+    from ..services import reach
+
+    reach.backfill(db)
     counts = {name: db[name].count_documents({}) for name in COLLECTIONS}
     log.info("Seeded demo data: %s", counts)
     return {"seeded": True, "counts": counts}

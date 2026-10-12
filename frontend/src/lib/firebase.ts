@@ -57,7 +57,27 @@ export async function confirmPhoneCode(confirmation: ConfirmationResult, code: s
   return result.user.getIdToken();
 }
 
-const YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"];
+const YOUTUBE_READONLY = "https://www.googleapis.com/auth/youtube.readonly";
+const YOUTUBE_SCOPES = [YOUTUBE_READONLY, "https://www.googleapis.com/auth/yt-analytics.readonly"];
+
+/**
+ * "Continue with YouTube" (creators): a Google sign-in that also asks for read-only YouTube
+ * access, so the server can see which channel this Google account owns. Returns the ID token
+ * (who you are) and the access token, which the server uses once and never keeps.
+ */
+export async function youtubeSignIn(): Promise<{ idToken: string; accessToken: string }> {
+  const { auth, instance } = await load();
+  const provider = new auth.GoogleAuthProvider();
+  provider.addScope(YOUTUBE_READONLY);
+  provider.setCustomParameters({ prompt: "select_account" });
+  const result = await auth.signInWithPopup(instance, provider);
+  const accessToken = auth.GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+  if (!accessToken) {
+    await auth.signOut(instance);
+    throw new Error("Google didn't return YouTube access. Try again and allow DealMeet to see your YouTube account.");
+  }
+  return { idToken: await result.user.getIdToken(), accessToken };
+}
 
 /**
  * Asks Google for read-only YouTube access, only when a creator clicks "Connect YouTube

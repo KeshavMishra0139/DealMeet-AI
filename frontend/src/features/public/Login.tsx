@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConfirmationResult } from "firebase/auth";
-import { ArrowRight, Building2, Phone, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowRight, Building2, Instagram, Phone, ShieldCheck, Sparkles, UserPlus, Youtube } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext } from "@/components/shared/AuthGate";
@@ -11,28 +10,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Segmented, Skeleton } from "@/components/ui/form";
 import { api } from "@/lib/api";
-import { confirmPhoneCode, firebaseEnabled, firebaseMessage, googleIdToken, sendPhoneCode, signOutFirebase } from "@/lib/firebase";
-import { forgetAllTokens, rememberDemoToken, type Role, type SessionUser } from "@/lib/session";
+import { confirmPhoneCode, firebaseEnabled, firebaseMessage, googleIdToken, sendPhoneCode, signOutFirebase, youtubeSignIn } from "@/lib/firebase";
+import { rememberDemoToken, type Role, type SessionUser } from "@/lib/session";
 import { useHealth } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import type { Persona } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useFinishSignIn } from "./signin";
 
 const HUES: Record<string, number> = { cr_a: 268, cr_b: 24, br_senpai: 268, br_thalam: 24 };
-
-function homeFor(user: SessionUser) {
-  if (user.role === "admin") return "/admin";
-  if (user.role === "brand") return user.brand_id ? "/brand" : "/brand/onboarding";
-  return user.creator_id ? "/creator" : "/creator/onboarding";
-}
 
 export default function Login() {
   useTheme("creator");
   const [params] = useSearchParams();
   const [role, setRole] = useState<Role>(params.get("role") === "brand" ? "brand" : "creator");
   const next = safeNext(params.get("next"));
+  // Set by the Instagram callback when a sign-in didn't finish (cancelled, expired, refused).
+  const returnedError = params.get("error");
   const health = useHealth();
   const demo = !!health.data?.demo_mode;
+  const authModes = health.data?.modes.auth.split(", ") ?? [];
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
@@ -64,8 +61,21 @@ export default function Login() {
             ]}
           />
 
-          <FirebaseSignIn role={role} next={next} serverReady={!!health.data?.modes.auth.includes("firebase")} loaded={!!health.data} />
-          <AccountForm role={role} next={next} demo={demo} />
+          {returnedError && (
+            <p role="alert" className="mt-5 rounded-2xl border border-danger/40 bg-danger-soft p-3.5 text-sm text-danger">
+              {returnedError}
+            </p>
+          )}
+          {role === "creator" && (
+            <CreatorSocialSignIn
+              next={next}
+              instagram={authModes.includes("instagram")}
+              youtube={firebaseEnabled && authModes.includes("youtube")}
+              loaded={!!health.data}
+            />
+          )}
+          <FirebaseSignIn role={role} next={next} serverReady={authModes.includes("firebase")} loaded={!!health.data} />
+          <AccountForm role={role} next={next} demo={demo} startWithSignup={params.get("mode") === "signup"} />
           {demo && <DemoProfiles role={role} next={next} />}
 
           {demo && (
@@ -92,16 +102,75 @@ export default function Login() {
   );
 }
 
-/** Where to go after signing in: back where you came from if it's your side of the app. */
-function destination(user: SessionUser, next: string | null) {
-  const home = homeFor(user);
-  const side = home.split("/").slice(0, 2).join("/");
-  return next && next.startsWith(side) ? next : home;
+/**
+ * "Continue with Instagram" and "Continue with YouTube", for creators. Each button appears only
+ * when the server is set up for it; the provider proves who you are and shares read-only numbers.
+ */
+function CreatorSocialSignIn({ next, instagram, youtube, loaded }: { next: string | null; instagram: boolean; youtube: boolean; loaded: boolean }) {
+  const finish = useFinishSignIn();
+  const [busy, setBusy] = useState<null | "instagram" | "youtube">(null);
+  const [error, setError] = useState("");
+
+  if (!loaded) return null;
+  if (!instagram && !youtube)
+    return <p className="mt-5 text-xs text-muted">Instagram and YouTube sign-in aren't set up on this server yet.</p>;
+
+  const startInstagram = async () => {
+    setBusy("instagram");
+    setError("");
+    try {
+      // The server makes a single-use login address; Instagram sends the browser back to /login/complete.
+      const { url } = await api<{ url: string }>(`/auth/instagram/start${next ? `?next=${encodeURIComponent(next)}` : ""}`, { role: null });
+      window.location.assign(url);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(null);
+    }
+  };
+  const startYouTube = async () => {
+    setBusy("youtube");
+    setError("");
+    try {
+      const { idToken, accessToken } = await youtubeSignIn();
+      const r = await api<{ user: SessionUser; note?: string }>("/auth/youtube", {
+        method: "POST",
+        json: { id_token: idToken, access_token: accessToken },
+        role: null,
+      });
+      await signOutFirebase();
+      await finish(r.user, next, r.note);
+    } catch (e) {
+      await signOutFirebase();
+      const msg = firebaseMessage(e);
+      if (msg) setError(msg);
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section aria-label="Sign in with Instagram or YouTube" className="mt-5 space-y-2.5">
+      {instagram && (
+        <Button variant="outline" className="w-full" loading={busy === "instagram"} disabled={!!busy} onClick={() => void startInstagram()}>
+          {busy !== "instagram" && <Instagram aria-hidden />} Continue with Instagram
+        </Button>
+      )}
+      {youtube && (
+        <Button variant="outline" className="w-full" loading={busy === "youtube"} disabled={!!busy} onClick={() => void startYouTube()}>
+          {busy !== "youtube" && <Youtube aria-hidden />} Continue with YouTube
+        </Button>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <p className="text-xs text-muted">Read-only: we see your numbers, never your password, and we can't post for you.</p>
+    </section>
+  );
 }
 
 function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next: string | null; serverReady: boolean; loaded: boolean }) {
-  const qc = useQueryClient();
-  const navigate = useNavigate();
+  const finish = useFinishSignIn();
   const [busy, setBusy] = useState<null | "google" | "send" | "verify">(null);
   const [error, setError] = useState("");
   const [phoneOpen, setPhoneOpen] = useState(false);
@@ -117,10 +186,7 @@ function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next:
     // The server verifies the token with Firebase and starts the app's own session.
     const r = await api<{ user: SessionUser; note?: string }>("/auth/firebase", { method: "POST", json: { id_token: idToken, role }, role: null });
     await signOutFirebase();
-    forgetAllTokens();
-    await qc.invalidateQueries({ queryKey: ["session"] });
-    if (r.note) toast.info(r.note);
-    navigate(destination(r.user, next));
+    await finish(r.user, next, r.note);
   };
   const attempt = async (step: "google" | "send" | "verify", fn: () => Promise<void>) => {
     setBusy(step);
@@ -189,24 +255,18 @@ function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next:
   );
 }
 
-function AccountForm({ role, next, demo }: { role: Role; next: string | null; demo: boolean }) {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: string | null; demo: boolean; startWithSignup: boolean }) {
+  const [mode, setMode] = useState<"signin" | "signup">(startWithSignup ? "signup" : "signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const qc = useQueryClient();
-  const navigate = useNavigate();
+  const finish = useFinishSignIn();
   const submit = useMutation({
     mutationFn: () =>
       mode === "signup"
         ? api<{ user: SessionUser }>("/auth/signup", { method: "POST", json: { name, email, password, role }, role: null })
         : api<{ user: SessionUser }>("/auth/login", { method: "POST", json: { email, password }, role: null }),
-    onSuccess: async ({ user }) => {
-      // The cookie session now speaks for this browser; demo tokens would shadow it.
-      forgetAllTokens();
-      await qc.invalidateQueries({ queryKey: ["session"] });
-      navigate(destination(user, next));
-    },
+    onSuccess: ({ user }) => finish(user, next),
   });
 
   return (

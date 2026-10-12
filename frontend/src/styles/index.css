@@ -2,14 +2,15 @@
 
 /* ------------------------------------------------------------------------
    DealMeet AI design tokens
-   One brand, two moods: .theme-creator (dark aurora, mobile-first) and
-   .theme-brand (light, calm, desktop-first). Components only use semantic
-   tokens, so the same component reads correctly in both.
+   One brand, three moods: .theme-site (light public pages, the landing),
+   .theme-creator (dark aurora, mobile-first) and .theme-brand (light, calm,
+   desktop-first). Light pages sit on #f9fafb. Components only use semantic
+   tokens, so the same component reads correctly in each.
    Text colours are checked for WCAG AA against their surfaces.
    ------------------------------------------------------------------------ */
 
 @theme {
-  --font-display: "Sora", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter Variable", "Noto Sans Devanagari", "Noto Sans Tamil", "Noto Sans Telugu",
     "Noto Sans Kannada", "Noto Sans Malayalam", "Noto Sans Bengali", "Noto Sans Gujarati", ui-sans-serif,
     system-ui, sans-serif;
@@ -24,6 +25,12 @@
   --animate-drift-a: drift-a 26s ease-in-out infinite alternate;
   --animate-drift-b: drift-b 32s ease-in-out infinite alternate;
   --animate-shimmer: shimmer 1.6s linear infinite;
+  /* Logo scroller: the track holds the list twice, so -50% lands on an identical frame. */
+  --animate-marquee: marquee 40s linear infinite;
+  /* Hero mosaic columns: each holds its tiles twice and drifts by half its height,
+     about a third of a tile a second. Neighbouring columns run opposite ways. */
+  --animate-tiles-up: tiles-up 18s linear infinite;
+  --animate-tiles-down: tiles-down 18s linear infinite;
 
   @keyframes drift-a {
     from { transform: translate3d(-4%, -2%, 0) scale(1); }
@@ -36,6 +43,18 @@
   @keyframes shimmer {
     from { background-position: -200% 0; }
     to { background-position: 200% 0; }
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes tiles-up {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(0, -50%, 0); }
+  }
+  @keyframes tiles-down {
+    from { transform: translate3d(0, -50%, 0); }
+    to { transform: translate3d(0, 0, 0); }
   }
 }
 
@@ -98,10 +117,45 @@
   --chart-grid: rgb(255 255 255 / 0.08);
 }
 
+/* Public pages (the landing): neutral light, slate text on #f9fafb. */
+.theme-site {
+  color-scheme: light;
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --fg: #0a1b33;
+  --fg-2: #334155;
+  /* Slate, a step darker than #64748b: AA (5:1+) on tinted cards as well as white. */
+  --muted: #5b6a80;
+  --accent: #6d28d9;
+  --accent-strong: #5b21b6;
+  --accent-soft: #f1ecfd;
+  --accent-fg: #ffffff;
+  --success: #047857;
+  --success-soft: #e6f6ef;
+  --warn: #b45309;
+  --warn-soft: #fdf3e2;
+  --danger: #be123c;
+  --danger-soft: #fdecef;
+  --ring: #7c3aed;
+  --grad-text: linear-gradient(100deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
+  --card-shadow: 0 1px 2px rgb(10 27 51 / 0.04), 0 1px 1px rgb(10 27 51 / 0.03);
+  --card-blur: 0px;
+  --chart-base: #7c3aed;
+  --chart-up: #0d9488;
+  --chart-down: #c2410c;
+  --chart-muted: #cbd5e1;
+  --chart-grid: #e2e8f0;
+}
+
 /* Brand Console: crisp and light; gradient only as an accent. */
 .theme-brand {
   color-scheme: light;
-  --bg: #f8f7fc;
+  --bg: #f9fafb;
   --surface: #ffffff;
   --surface-solid: #ffffff;
   --surface-2: #f3f1fa;
@@ -137,10 +191,11 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
-    background: var(--bg);
+    background: var(--bg, #f9fafb);
   }
   body {
-    background: var(--bg);
+    /* #f9fafb on every light page; the dark Creator Studio sets its own --bg. */
+    background: var(--bg, #f9fafb);
     color: var(--fg);
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
@@ -201,6 +256,22 @@
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(var(--card-blur));
   -webkit-backdrop-filter: blur(var(--card-blur));
+}
+
+/* Grain on a single tile (the hero mosaic). Multiplied into light tiles; dark tiles
+   set --grain-blend: screen and a lower --grain-opacity. */
+@utility tile-grain {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: var(--noise);
+    background-size: 160px;
+    opacity: var(--grain-opacity, 0.13);
+    mix-blend-mode: var(--grain-blend, multiply);
+  }
 }
 
 @utility skeleton {
@@ -265,6 +336,9 @@
   animation-delay: -9s;
 }
 /* Film grain: an inline SVG noise texture, so it works offline. */
+:root {
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 .grain::after {
   content: "";
   position: fixed;
@@ -272,7 +346,7 @@
   pointer-events: none;
   z-index: 1;
   opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: var(--noise);
 }
 
 @media (prefers-reduced-motion: reduce) {

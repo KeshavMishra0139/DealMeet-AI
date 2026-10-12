@@ -17,7 +17,7 @@ from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
 from ..services import auth as au
-from ..services import cache
+from ..services import cache, reach, social_signin
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
 
@@ -242,11 +242,14 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         doc["avg_comments"] = int(sum(r["comments"] for r in doc["reels"]) / len(doc["reels"]))
     if AGE_PROFILES.get(body.niche) is None:
         raise HTTPException(422, "Unknown niche")
+    doc.update(reach.measured(doc))  # brand search filters on it
     db.creators.insert_one(doc)
     au.link_profile(user, cid)
+    # Signed in with Instagram or YouTube: their real numbers replace what was typed.
+    notes = social_signin.attach_pending(user, cid)
     cache.invalidate("trust:")  # per-creator scores; the trained model stays
     cache.invalidate("spam")
-    return {"id": cid, "handle": doc["handle"]}
+    return {"id": cid, "handle": doc["handle"], "notes": notes}
 
 
 class TagIn(BaseModel):
@@ -256,6 +259,16 @@ class TagIn(BaseModel):
 @router.post("/ai/tag")
 def ai_tag(body: TagIn, _: dict = Depends(au.current_user)):
     return tag_captions(body.captions)
+
+
+@router.get("/creators/{creator_id}/weekly-report")
+def weekly_report(creator_id: str, _: dict = Depends(au.own_creator)):
+    """This week against last week: brand views, offers, payouts, reach and followers,
+    aggregated from the database (services/weekly_report.py)."""
+    from ..services import weekly_report as wr
+
+    cc.load_creator(creator_id)
+    return wr.build(creator_id)
 
 
 @router.get("/creators/{creator_id}/connections")
