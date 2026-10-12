@@ -27,7 +27,7 @@ from ..config import now_iso, today
 from ..db import get_db
 from ..engines.common import day_month, inr, inr_full
 from ..engines.fair_price import deliverables_label, fair_price
-from . import contracts, payments
+from . import collectives, contracts, payments
 
 RAIL = [
     ("offer", "Offer"),
@@ -613,15 +613,20 @@ def collective_view(collective_id: str, viewer: str | None = None) -> dict:
                 "stage": d.get("stage"),
                 "proof_url": d.get("proof_url"),
                 "paid": d.get("stage") == "paid",
+                "confirmed": d.get("stage") in ("contract", "escrow_funded", "live", "verified", "paid"),
+                "deliverables": deliverables_label({"deliverables": m.get("deliverables") or d.get("deliverables")}),
+                "payment_status": collectives.payment_status(d, col) if d else None,
+                "fair": m.get("fair"),
             }
         )
     stages: dict[str, int] = {}
     for m in members:
         stages[m["stage"] or "offer"] = stages.get(m["stage"] or "offer", 0) + 1
     if viewer:
+        # Members see the pack's progress, but never each other's terms.
         for m in members:
             if m["creator_id"] != viewer:
-                m.update({"price": None, "split": None, "deal_id": None, "proof_url": None})
+                m.update({"price": None, "split": None, "deal_id": None, "proof_url": None, "deliverables": None, "payment_status": None, "fair": None})
     return {
         "id": col["_id"],
         "brand": {"id": brand.get("_id"), "name": brand.get("name")},
@@ -635,6 +640,7 @@ def collective_view(collective_id: str, viewer: str | None = None) -> dict:
         "refunded": (sum(m["price"] or 0 for m in members if m["stage"] == "declined") if col.get("funded") else 0) if not viewer else None,
         "members": members,
         "stages": stages,
+        "confirmations": collectives.confirmations(col),
         "created_at": col.get("created_at"),
         "payments_mode": payments.mode(),
     }

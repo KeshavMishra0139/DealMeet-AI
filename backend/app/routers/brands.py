@@ -19,6 +19,7 @@ from ..services import auth as au
 from ..services import brand_profile as bp
 from ..services import cache
 from ..services import campaigns as camp
+from ..services import collectives
 from ..services import consent as cs
 from ..services import fan_proof, offers, payments
 from ..services.deals import auto_release_due, sweep
@@ -471,62 +472,31 @@ def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
     return offers.create_offer(brand, c, listing, body.amount, body.message, user["_id"])
 
 
+class DeliverableIn(BaseModel):
+    kind: Literal["reel", "story", "short", "carousel", "live", "link_in_bio"]
+    count: int = Field(ge=0, le=20)
+
+
+class MemberTerms(BaseModel):
+    price: int | None = Field(default=None, ge=500, le=10_000_000)
+    deliverables: list[DeliverableIn] | None = Field(default=None, max_length=6)
+
+
 class BookIn(BaseModel):
     member_ids: list[Short] = Field(min_length=2, max_length=50)
     # The de-duplicated reach the builder showed; booking re-prices the chosen members as a fixed pack.
     combined_reach: int | None = Field(default=None, ge=0)
+    # The brand's adjustments before sending: a member's fee and deliverables.
+    adjust: dict[Short, MemberTerms] = Field(default={}, max_length=50)
 
 
 @router.post("/listings/{listing_id}/collective/book")
 def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.current_user)):
-    db = get_db()
+    """Sends the collective. Each member then confirms their own terms."""
     x = _own_listing(listing_id, user)
-    camp.require_live(x, "taking bookings")
     brand = _brand(x["owner_id"])
-    pack = collective.build(x, brand, must_include=body.member_ids, size_max=len(body.member_ids))
-    members = [m for m in pack["members"] if m["id"] in body.member_ids]
-    total = sum(m["price"] for m in members)
-    # Pack reach only when the brand may see every member's stats; never more than the raw sum.
-    visible = all(m["effective_reach"] is not None for m in members)
-    raw = sum(m["reach"] for m in members) if visible else 0
-    reach = min(body.combined_reach or raw, raw) if visible else None
-    cid = f"co_{uuid.uuid4().hex[:8]}"
-    at = now_iso()
-    db.collectives.insert_one(
-        {
-            "_id": cid,
-            "listing_id": listing_id,
-            "brand_id": brand["_id"],
-            "members": [{"creator_id": m["id"], "price": m["price"], "split": round(m["price"] / total, 4)} for m in members],
-            "total": total,
-            "combined_reach": reach,
-            "status": "offered",
-            "created_at": at,
-        }
-    )
-    for m in members:
-        did = f"dl_{uuid.uuid4().hex[:10]}"
-        camp.mark_offered(listing_id, m["id"], did)
-        db.deals.insert_one(
-            {
-                "_id": did,
-                "kind": "collective",
-                "collective_id": cid,
-                "listing_id": listing_id,
-                "brand_id": brand["_id"],
-                "creator_id": m["id"],
-                "amount": m["price"],
-                "fair_at_offer": m["price"],
-                "deliverables": x.get("deliverables"),
-                "usage_rights_days": x.get("usage_rights_days") or 0,
-                "exclusivity_days": x.get("exclusivity_days") or 0,
-                "stage": "offer",
-                "message": f"You're part of a {len(members)}-creator collective for {brand['name']}. One escrow payment, split automatically.",
-                "timeline": [{"stage": "offer", "at": at, "note": f"Collective offer from {brand['name']}"}],
-                "created_at": at,
-            }
-        )
-    return {"id": cid, "members": len(members), "total": total}
+    adjust = {k: v.model_dump(exclude_none=True) for k, v in body.adjust.items()}
+    return collectives.book(x, brand, list(dict.fromkeys(body.member_ids)), adjust, body.combined_reach, user)
 
 
 class BrandIn(BaseModel):

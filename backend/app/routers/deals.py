@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from ..config import now_iso, today
 from ..db import get_db
 from ..services import auth as au
+from ..services import collectives
 from ..services import deals as rail
 from ..services import payments
 from ..services.creator_ctx import load_creator
@@ -195,6 +196,7 @@ def fund_collective(collective_id: str, user: dict = Depends(au.current_user)):
     col = _own_collective(collective_id, user)
     if col.get("funded"):
         raise HTTPException(409, "Already funded")
+    collectives.require_active(col)  # every member has confirmed their terms
     order = payments.create_order(col["total"], "collective", collective_id)
     if order["mode"] == "simulated":
         return rail.fund_collective(collective_id, "simulated", order["ref"])
@@ -233,6 +235,26 @@ def _fund_from(p: dict) -> None:
         col = db.collectives.find_one({"_id": p["ref_id"]})
         if col and not col.get("funded") and col["total"] == p["amount"]:
             rail.fund_collective(col["_id"], "razorpay-test", p["payment_id"])
+
+
+@router.get("/collectives/{collective_id}/replacements")
+def replacements(collective_id: str, user: dict = Depends(au.current_user)):
+    """Creators who could take a declined member's place, with why each fits."""
+    col = _own_collective(collective_id, user)
+    return {"items": collectives.candidates(col, get_db().brands.find_one({"_id": col["brand_id"]}))}
+
+
+class ReplaceIn(BaseModel):
+    out_id: str = Field(min_length=3, max_length=40)
+    in_id: str = Field(min_length=3, max_length=40)
+    price: int | None = Field(default=None, ge=500, le=10_000_000)
+
+
+@router.post("/collectives/{collective_id}/replace")
+def replace_member(collective_id: str, body: ReplaceIn, user: dict = Depends(au.current_user)):
+    col = _own_collective(collective_id, user)
+    collectives.replace(col, get_db().brands.find_one({"_id": col["brand_id"]}), body.out_id, body.in_id, body.price, user)
+    return rail.collective_view(collective_id)
 
 
 @router.post("/collectives/{collective_id}/release")

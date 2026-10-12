@@ -161,6 +161,9 @@ export interface CollectiveMember {
   trust: TrustInfo | null;
   engagement: number | null;
   opted_in: boolean;
+  /** Why the builder picked them: reach, fit, trust and price. */
+  why: string[];
+  deliverables: { kind: string; count: number }[];
 }
 
 export interface Collective {
@@ -177,6 +180,7 @@ export interface Collective {
   avg_engagement: number | null;
   cost_per_1k: number | null;
   trust_min: number;
+  method: { objective: string; effective_reach: string; overlap: string; thresholds: string[]; privacy: string };
   members: CollectiveMember[];
   excluded: { id: string; name: string; reason: string }[];
   notes: string[];

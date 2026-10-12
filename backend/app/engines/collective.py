@@ -22,6 +22,7 @@ from .trust import trust_score
 
 OVERLAP_WEIGHT = 0.7
 TRUST_MIN = 60  # below this the trust score itself is a warning sign
+FIT_MIN = 55
 
 
 def _either(ways: list[str]) -> str:
@@ -83,7 +84,7 @@ def build(
             kind = "trust_warning" if t["score"] < TRUST_MIN else "trust_minimum"
             excluded.append({"id": c["_id"], "name": c["name"], "kind": kind, "reason": f"Trust {t['score']} is below {trust_min}{why}"})
             continue
-        if fit["score"] < 55:
+        if fit["score"] < FIT_MIN:
             excluded.append({"id": c["_id"], "name": c["name"], "kind": "fit", "reason": f"Audience fit {fit['score']} is too low for this brief"})
             continue
         fp = fair_price(c, brand, terms, with_model=False)
@@ -148,6 +149,21 @@ def build(
         stats = r["scopes"]["stats"]
         other = r.get("overlap_with")
         exact_overlap = r["scopes"]["demographics"] and (other is None or other["scopes"]["demographics"])
+        ov = r.get("overlap", 0)
+        if not stats:
+            reach_why = "Reach isn't shared with you: it was used to pick them, but isn't shown."
+        elif ov >= 0.01 and other:
+            reach_why = f"{short(r['reach'])} median views, counted as {short(r.get('effective_reach', r['reach']))} after audience overlap with {other['creator']['name']}."
+        else:
+            reach_why = f"{short(r['reach'])} median views, with little audience overlap with the others."
+        why = [
+            reach_why,
+            f"Audience fit {r['fit']['score']}/100 (at least {FIT_MIN} needed).",
+            f"Trust {r['trust']['score']}/100 (at least {trust_min} needed)." if r["trust"] else "Trust Score not measured yet.",
+            f"Estimated fair price {inr(r['price'])} for the campaign's deliverables.",
+        ]
+        if c["_id"] in must_include:
+            why.insert(0, "Opted in to this collective, so they always get a place.")
         members.append(
             {
                 "id": c["_id"],
@@ -171,6 +187,8 @@ def build(
                 "trust": r["trust"],
                 "engagement": round(r["ss"], 4) if stats else None,
                 "opted_in": c["_id"] in must_include,
+                "why": why,
+                "deliverables": terms.get("deliverables") or [{"kind": "reel", "count": 1}],
             }
         )
     dedup = [r for r in selected if r.get("overlap", 0) >= 0.15]
@@ -207,6 +225,13 @@ def build(
         "avg_engagement": (round(sum(r["ss"] for r in selected) / len(selected), 4) if selected else 0) if all_stats else None,
         "cost_per_1k": (round(total / combined * 1000) if combined else None) if all_stats else None,
         "trust_min": trust_min,
+        "method": {
+            "objective": "Adds one creator at a time: the one with the most effective reach × audience fit per rupee, until the budget or the pack size is reached.",
+            "effective_reach": f"Median views × (1 − {OVERLAP_WEIGHT} × overlap with the most similar creator already picked).",
+            "overlap": "Estimated from shared top cities and languages, higher for the same niche and city, capped at 60%.",
+            "thresholds": [f"Trust Score at least {trust_min}", f"Audience fit at least {FIT_MIN}", f"{size_min} to {size_max} creators", f"Budget {inr(budget)}"],
+            "privacy": "Creators who aren't discoverable or have revoked you are never considered. Reach is shown only where a creator shares stats with you.",
+        },
         "members": members,
         "excluded": excluded,
         "notes": notes,

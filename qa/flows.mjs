@@ -43,13 +43,16 @@ async function launch() {
 
 // Writes need the app's header (CSRF guard); private reads need a session.
 const reset = () => fetch(`${API}/api/demo/reset`, { method: "POST", headers: { "X-Requested-With": "qa" } });
-async function apiAs(persona, path) {
+async function apiAs(persona, path, body) {
   const login = await fetch(`${API}/api/auth/demo`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Requested-With": "qa" },
     body: JSON.stringify({ persona, cookie: false }),
   }).then((r) => r.json());
-  return fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${login.token}` } }).then((r) => r.json());
+  const init = body
+    ? { method: "POST", headers: { Authorization: `Bearer ${login.token}`, "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify(body) }
+    : { headers: { Authorization: `Bearer ${login.token}` } };
+  return fetch(`${API}${path}`, init).then((r) => r.json());
 }
 
 await reset();
@@ -129,6 +132,24 @@ await step("Creator B opts in to the Thalam collective; the brand sees her in th
   await page.goto(`${BASE}/brand/campaigns/lst_thalam_collective?as=br_thalam`);
   const row = page.getByRole("row", { name: /Creator B/ });
   await row.getByText("Opted in").waitFor();
+});
+
+await step("Collective: the brand adjusts a fee and sends; it can be funded only after every member confirms", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/lst_thalam_collective?as=br_thalam`);
+  await page.getByText("How the builder picks").waitFor();
+  const fee = page.getByRole("textbox", { name: /^Fee for / }).first();
+  await fee.fill("3000");
+  await page.getByRole("button", { name: /^Send to \d+ creators$/ }).click();
+  await page.waitForURL(/\/brand\/collectives\/co_/);
+  await page.getByText(/0 of \d+ members confirmed/).waitFor();
+  const id = page.url().split("/collectives/")[1].split("?")[0];
+  const col = await apiAs("br_thalam", `/api/collectives/${id}`);
+  for (const m of col.members) await apiAs(m.creator_id, `/api/deals/${m.deal_id}/action`, { action: "accept" });
+  await page.getByText("Everyone confirmed.").waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: /Fund escrow/ }).click();
+  await page.getByRole("button", { name: /Pay .*simulated/ }).click();
+  await page.getByText(/Escrow funded \(simulated, no money moved\)/).waitFor();
 });
 
 await step("Brand sends an offer from matches; it lands in the creator's pipeline", async () => {

@@ -65,13 +65,18 @@ def test_collective_one_payment_and_split(login, db):
     thalam = login("br_thalam")
     pack = thalam.post("/api/listings/lst_thalam_collective/collective", json={}).json()
     booked = thalam.post("/api/listings/lst_thalam_collective/collective/book", json={"member_ids": [m["id"] for m in pack["members"]]}).json()
-    col = thalam.post(f"/api/collectives/{booked['id']}/fund").json()
-    assert col["funded"]
+    col = thalam.get(f"/api/collectives/{booked['id']}").json()
     member = col["members"][0]
     m = login(member["creator_id"])
     # Collective splits are fixed: no counters.
     assert _act(m, member["deal_id"], "counter", amount=99999).status_code == 409
-    v = _act(m, member["deal_id"], "accept").json()
+    # Every member confirms their own terms before the pack can be funded.
+    assert thalam.post(f"/api/collectives/{booked['id']}/fund").status_code == 409
+    for x in col["members"]:
+        assert _act(login(x["creator_id"]), x["deal_id"], "accept").status_code == 200
+    col = thalam.post(f"/api/collectives/{booked['id']}/fund").json()
+    assert col["funded"] and col["confirmations"]["status"] == "funded"
+    v = m.get(f"/api/deals/{member['deal_id']}").json()
     assert v["stage"] == "escrow_funded" and v["escrow"]["collective"]
     _act(m, member["deal_id"], "submit_post", url="https://www.instagram.com/reel/COL1/")
     col = thalam.post(f"/api/collectives/{booked['id']}/release").json()
