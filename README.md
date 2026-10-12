@@ -359,6 +359,15 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 **Dream Brands**: creators save brands (Studio → Dream Brands, or the brand's page). A brand's page shows "N creators with connected accounts want to work with you": a count only, with names only for creators who switched on "Let this brand see my name", and only to that brand. When a saved brand publishes a campaign or collective, each creator who saved it gets one notification.
 
+## Creator search for brands
+
+The top of the Brand Console has **Find creators**: a search box with filters for **followers**, **reach per reel** and **niche**, and a sort (highest reach first, or by name). Filters live in the address (`?q=&niche=&followers=&reach=&sort=&page=`), so a search can be shared and the back button works. Code: `backend/app/services/creator_search.py`, `frontend/src/features/brand/CreatorSearch.tsx`; tests: `backend/tests/test_creator_search.py`.
+
+- **One MongoDB query** (`GET /api/brands/{brand_id}/creators`, the signed-in brand only): the text is a case-insensitive partial match (an escaped regex, so `(` or `.*` are just characters) on name, handle, bio, city and sub-niches, plus any niche whose label matches; niche is an exact match; followers and reach are ranges. 24 results a page.
+- **Only what the brand may see.** Creators who aren't discoverable, or who revoked this brand, never appear. Niche and the follower band ("1K to 10K") are public, so anyone can filter on them. Exact followers and reach belong to the creator's "stats" scope: they come back only for creators who share stats with this brand, and the reach filter and sort only ever consider those creators, otherwise narrowing the filter would reveal hidden numbers. The response says how many creators a reach filter left out for that reason, never which.
+- **Reach is measured, never guessed**: `creators.reach_views` is the median views of the last six reels, or the creator's self-reported average views, stored with its source (`services/reach.py`). It's updated by onboarding, Instagram sync and disconnect, and self-reported numbers, and filled for every creator after seeding and on start. A creator with neither has no reach, rather than the estimate from followers the fair price falls back to.
+- Indexes: `creators (niche, followers)`, `followers` and `reach_views`. For full-text relevance at a larger scale, an Atlas Search index on creators would replace the regex, as the brand directory does.
+
 ## Matches, shortlist, compare and draft offers
 
 **How matches are ranked** (`engines/brand_matching.py`). Each part is scored from 0 to 1, then weighted; the criteria and each creator's scores come back with every result ("Why ranked here").

@@ -14,6 +14,7 @@ import { inr, inrShort, shortDate } from "@/lib/format";
 import type { Console } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
 import { CampaignStatusBadge } from "./CampaignStatus";
+import { CreatorSearch } from "./CreatorSearch";
 import { cn } from "@/lib/utils";
 
 export const TYPE_LABEL: Record<string, string> = {
@@ -50,6 +51,10 @@ export default function BrandHome() {
             <Plus aria-hidden /> New campaign
           </Link>
         </Button>
+      </div>
+
+      <div className="mt-5">
+        <CreatorSearch brandId={id} />
       </div>
 
       <section aria-label="Key numbers" className="mt-6">

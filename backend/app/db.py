@@ -146,6 +146,10 @@ def ensure_indexes(db) -> None:
     db.audit.create_index([("ts", -1)])
     db.audit.create_index("user_id")
     db.creators.create_index("handle", unique=True, partialFilterExpression={"handle": text})
+    # Brand search (services/creator_search.py): exact niche, follower and reach ranges.
+    db.creators.create_index([("niche", 1), ("followers", 1)])
+    db.creators.create_index("followers")
+    db.creators.create_index("reach_views")
     db.brands.create_index("slug", unique=True, partialFilterExpression={"slug": text})
     db.connections.create_index([("user_id", 1), ("platform", 1)], unique=True)
     db.connections.create_index([("creator_id", 1), ("platform", 1)])

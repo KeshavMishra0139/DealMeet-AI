@@ -74,6 +74,10 @@ async def lifespan(_: FastAPI):
     if settings.demo_mode:
         seed_all(db)
     _warm_models()
+    # Creators saved before brand search existed get their measured reach.
+    from .services import reach
+
+    reach.backfill(db)
     # Instagram long-lived tokens: an in-process daily job refreshes those that expire within
     # 10 days (each sync also refreshes first, for hosts that sleep).
     from .services import instagram
