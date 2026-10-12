@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -51,6 +51,11 @@ def deal(deal_id: str, user: dict = Depends(au.current_user)):
     return rail.view(d, side)
 
 
+class Deliverable(BaseModel):
+    kind: Literal["reel", "story", "short", "carousel", "live", "link_in_bio"]
+    count: int = Field(ge=0, le=20)
+
+
 class ActionIn(BaseModel):
     # The acting side comes from the session. A role sent here must match it.
     role: Literal["creator", "brand"] | None = None
@@ -58,7 +63,15 @@ class ActionIn(BaseModel):
     amount: int | None = Field(default=None, ge=0, le=50_000_000)
     note: str | None = Field(default=None, max_length=300)
     url: str | None = Field(default=None, max_length=300)
+    links: list[Annotated[str, Field(max_length=300)]] | None = Field(default=None, max_length=5)
     name: str | None = Field(default=None, max_length=80)
+    # Proposed terms ("propose"): only the ones that change.
+    deliverables: list[Deliverable] | None = Field(default=None, max_length=6)
+    post_by: str | None = Field(default=None, max_length=10)
+    usage_rights_days: int | None = Field(default=None, ge=0, le=365)
+    exclusivity_days: int | None = Field(default=None, ge=0, le=365)
+    # The same key on a repeated request (double-click, retry) makes it a no-op.
+    request_key: str | None = Field(default=None, max_length=80)
 
 
 @router.post("/deals/{deal_id}/action")
@@ -66,7 +79,12 @@ def deal_action(deal_id: str, body: ActionIn, user: dict = Depends(au.current_us
     _, side = _party(deal_id, user)
     if body.role and body.role != side:
         raise HTTPException(403, f"You're the {side} on this deal.")
-    return rail.act(deal_id, side, body.action, body.model_dump())
+    payload = body.model_dump()
+    if body.deliverables is not None:
+        payload["deliverables"] = [x.model_dump() for x in body.deliverables]
+    if body.action == "propose" and body.amount is not None:
+        payload["amount"] = body.amount
+    return rail.act(deal_id, side, body.action, payload, user)
 
 
 class RatingIn(BaseModel):

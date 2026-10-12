@@ -46,12 +46,16 @@ export default function DealView({ role }: { role: Role }) {
   const { id = "" } = useParams();
   const q = useDeal(id, role);
   const qc = useQueryClient();
-  const [dialog, setDialog] = useState<null | "counter" | "url" | "pay" | "sign" | "revision">(null);
+  const [dialog, setDialog] = useState<null | "counter" | "url" | "pay" | "sign" | "revision" | "terms">(null);
   const [pending, setPending] = useState<DealAction | null>(null);
 
   const act = useMutation({
     // The server takes the acting side from the session.
-    mutationFn: (body: Record<string, unknown>) => post<Deal>(`/deals/${id}/action`, body),
+    mutationFn: (body: Record<string, unknown>) => {
+      // One key per deal state and action: a double-click or retry sends the same key, and the server ignores the repeat.
+      const now = qc.getQueryData<Deal>(["deal", id, role]);
+      return post<Deal>(`/deals/${id}/action`, { ...body, request_key: `${id}:${now?.timeline.length ?? 0}:${String(body.action)}` });
+    },
     onSuccess: (d) => {
       qc.setQueryData(["deal", id, role], d);
       qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "deal" });
@@ -71,6 +75,7 @@ export default function DealView({ role }: { role: Role }) {
     if (a.needs === "url") return setDialog("url");
     if (a.needs === "payment") return setDialog("pay");
     if (a.needs === "note") return setDialog("revision");
+    if (a.needs === "terms") return setDialog("terms");
     if (a.id === "sign" || a.id === "accept" || a.id === "accept_counter") {
       setPending(a);
       return setDialog("sign");
@@ -106,7 +111,7 @@ export default function DealView({ role }: { role: Role }) {
         <div className="text-right">
           <p className="num font-display text-2xl font-semibold">{inr(d.amount)}</p>
           <p className="text-xs text-muted">
-            {STAGE_LABEL[d.stage]}
+            {d.status_label ?? STAGE_LABEL[d.stage]}
             {d.fair_total ? ` · fair ${inr(d.fair_total)}` : ""}
           </p>
         </div>
@@ -262,8 +267,10 @@ export default function DealView({ role }: { role: Role }) {
             <Sig who={d.creator.name} at={d.contract.signed_by_creator} name={d.contract.creator_signature} />
             <Sig who={d.brand.name} at={d.contract.signed_by_brand} name={d.contract.brand_signature} />
           </div>
+          {d.versions && d.versions.length > 0 && <Versions deal={d} />}
         </section>
       )}
+      {d.submissions && d.submissions.length > 0 && <Submissions deal={d} />}
 
       <section aria-labelledby="tl" className="card-surface rounded-2xl p-5">
         <h2 id="tl" className="text-sm font-semibold">
@@ -288,7 +295,8 @@ export default function DealView({ role }: { role: Role }) {
       )}
 
       {dialog === "counter" && <CounterDialog deal={d} onClose={() => setDialog(null)} onSubmit={(amount, note) => act.mutate({ action: "counter", amount, note })} pending={act.isPending} />}
-      {dialog === "url" && <PostDialog onClose={() => setDialog(null)} onSubmit={(url) => act.mutate({ action: "submit_post", url })} pending={act.isPending} />}
+      {dialog === "url" && <PostDialog onClose={() => setDialog(null)} onSubmit={(links, note) => act.mutate({ action: "submit_post", links, note: note || null })} pending={act.isPending} />}
+      {dialog === "terms" && <TermsDialog deal={d} onClose={() => setDialog(null)} onSubmit={(body) => act.mutate({ action: "propose", ...body })} pending={act.isPending} />}
       {dialog === "revision" && (
         <RevisionDialog deal={d} onClose={() => setDialog(null)} onSubmit={(note) => act.mutate({ action: "request_revision", note })} pending={act.isPending} />
       )}
@@ -503,19 +511,169 @@ function RevisionDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onCl
   );
 }
 
-function PostDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSubmit: (url: string) => void; pending: boolean }) {
-  const [url, setUrl] = useState("https://www.instagram.com/reel/");
+function PostDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSubmit: (links: string[], note: string) => void; pending: boolean }) {
+  const [links, setLinks] = useState(["https://www.instagram.com/reel/"]);
+  const [note, setNote] = useState("");
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent sheet title="Submit your post link" description="The brand reviews your post and approves it or asks for a revision.">
-        <Label htmlFor="post-url">Instagram reel or YouTube Short link</Label>
-        <Input id="post-url" type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} />
+      <DialogContent sheet title="Submit your deliverables" description="The brand reviews them and approves or asks for a revision.">
+        <div className="space-y-2">
+          {links.map((l, i) => (
+            <div key={i}>
+              <Label htmlFor={`post-url-${i}`}>{i === 0 ? "Instagram reel or YouTube Short link" : `Link ${i + 1}`}</Label>
+              <Input id={`post-url-${i}`} type="url" inputMode="url" value={l} onChange={(e) => setLinks((all) => all.map((x, j) => (j === i ? e.target.value : x)))} />
+            </div>
+          ))}
+        </div>
+        {links.length < 5 && (
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setLinks((all) => [...all, "https://www.instagram.com/"])}>
+            Add another link
+          </Button>
+        )}
+        <Label htmlFor="post-note" className="mt-3">
+          Note for the brand (optional)
+        </Label>
+        <Textarea id="post-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-16" />
         <p className="mt-2 text-xs text-muted">The brand has 3 days to review it. If they don't respond, it's approved automatically a few days later.</p>
-        <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(url)}>
-          Submit link
+        <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={() => onSubmit(links.map((x) => x.trim()).filter(Boolean), note.trim())}>
+          Submit
         </Button>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const KIND_LABEL: Record<string, string> = { reel: "Reels", story: "Stories", short: "Shorts", carousel: "Carousels", live: "Live sessions", link_in_bio: "Link in bio" };
+
+function termsLine(t: Deal["terms"]) {
+  const parts = t.deliverables.map((x) => `${x.count} ${KIND_LABEL[x.kind]?.toLowerCase() ?? x.kind}`);
+  return [inr(t.amount), parts.join(" + "), t.post_by ? `post by ${shortDate(t.post_by)}` : null, t.usage_rights_days ? `${t.usage_rights_days} days usage` : null, t.exclusivity_days ? `${t.exclusivity_days} days exclusivity` : null]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Propose changes to any term. The proposal becomes a new contract version. */
+function TermsDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClose: () => void; onSubmit: (body: Record<string, unknown>) => void; pending: boolean }) {
+  const t = deal.terms;
+  const count = (k: string) => String(t.deliverables.find((x) => x.kind === k)?.count ?? 0);
+  const [amount, setAmount] = useState(String(t.amount));
+  const [reels, setReels] = useState(count("reel"));
+  const [stories, setStories] = useState(count("story"));
+  const [postBy, setPostBy] = useState(t.post_by ?? "");
+  const [usage, setUsage] = useState(String(t.usage_rights_days));
+  const [excl, setExcl] = useState(String(t.exclusivity_days));
+  const [note, setNote] = useState("");
+  const n = (x: string) => Number(x.replace(/[^\d]/g, "")) || 0;
+  const others = t.deliverables.filter((x) => x.kind !== "reel" && x.kind !== "story");
+  const submit = () =>
+    onSubmit({
+      amount: n(amount),
+      deliverables: [...(n(reels) ? [{ kind: "reel", count: n(reels) }] : []), ...(n(stories) ? [{ kind: "story", count: n(stories) }] : []), ...others],
+      post_by: postBy || null,
+      usage_rights_days: n(usage),
+      exclusivity_days: n(excl),
+      note: note || null,
+    });
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent sheet title="Propose changes" description={`Now on the table: ${termsLine(t)}. Your proposal becomes a new contract version the other side can accept.`}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Label htmlFor="tp-amount">Fee (₹)</Label>
+            <Input id="tp-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="tp-reels">Reels</Label>
+            <Input id="tp-reels" inputMode="numeric" value={reels} onChange={(e) => setReels(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="tp-stories">Stories</Label>
+            <Input id="tp-stories" inputMode="numeric" value={stories} onChange={(e) => setStories(e.target.value)} />
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="tp-postby">Post by</Label>
+            <Input id="tp-postby" type="date" value={postBy} onChange={(e) => setPostBy(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="tp-usage">Usage rights (days)</Label>
+            <Input id="tp-usage" inputMode="numeric" value={usage} onChange={(e) => setUsage(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="tp-excl">Exclusivity (days)</Label>
+            <Input id="tp-excl" inputMode="numeric" value={excl} onChange={(e) => setExcl(e.target.value)} />
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="tp-note">Why (optional)</Label>
+            <Textarea id="tp-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-16" />
+          </div>
+        </div>
+        <Button variant="primary" size="lg" className="mt-5 w-full" loading={pending} onClick={submit}>
+          Send proposal
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Every version of the terms, with its hash and who accepted it. */
+function Versions({ deal }: { deal: Deal }) {
+  const side = (s: string) => (s === "brand" ? deal.brand.name : deal.creator.name);
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="text-xs font-semibold text-muted">Contract versions</p>
+      <ol className="mt-2 space-y-2">
+        {[...deal.versions].reverse().map((v) => (
+          <li key={v.number} className="rounded-xl border border-line px-3 py-2 text-xs">
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Version {v.number}</span>
+              {deal.agreed_version === v.number && <Badge size="sm" variant="success">Agreed</Badge>}
+              <span className="text-muted">
+                by {side(v.author)} · {shortDate(v.at)}, {timeOfDay(v.at)}
+              </span>
+            </p>
+            <p className="mt-1 text-fg-2">{termsLine(v.terms)}</p>
+            {v.note && <p className="mt-0.5 text-fg-2">“{v.note}”</p>}
+            <p className="mt-1 text-muted">
+              Accepted by {v.accepted_by.map((a) => `${side(a.side)} (${shortDate(a.at)})`).join(", ") || "nobody yet"} ·{" "}
+              <span className="font-mono" title={v.hash}>
+                {v.hash.slice(0, 12)}
+              </span>
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** What the creator submitted, round by round, and the revisions asked for. */
+function Submissions({ deal }: { deal: Deal }) {
+  return (
+    <section aria-labelledby="subs" className="card-surface rounded-2xl p-5">
+      <h2 id="subs" className="text-sm font-semibold">
+        Submissions {deal.revision_round > 0 && <span className="font-normal text-muted">· {deal.revision_round} revision round{deal.revision_round === 1 ? "" : "s"}</span>}
+      </h2>
+      <ol className="mt-2 space-y-2">
+        {deal.submissions.map((s) => (
+          <li key={s.round} className="text-[13px]">
+            <p className="font-medium">
+              Round {s.round} · {shortDate(s.at)}, {timeOfDay(s.at)}
+            </p>
+            <ul className="mt-0.5 space-y-0.5">
+              {s.links.map((l) => (
+                <li key={l}>
+                  <a href={l} target="_blank" rel="noreferrer" className="break-all text-accent hover:underline">
+                    {l}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {s.note && <p className="text-fg-2">“{s.note}”</p>}
+            {deal.revisions[s.round - 1] && <p className="mt-0.5 text-xs text-warn">Revision asked: {deal.revisions[s.round - 1].reason}</p>}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -523,7 +681,7 @@ function SignDialog({ deal, role, action, onClose, onSubmit, pending }: { deal: 
   const [name, setName] = useState(role === "creator" ? deal.creator.name : deal.brand.name);
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent sheet title="E-sign the contract" description={`${deal.deliverables} for ${inr(action.id === "accept_counter" && deal.counter ? deal.counter.amount : deal.amount)}`}>
+      <DialogContent sheet title="E-sign the contract" description={`${deal.terms ? termsLine(deal.terms) : `${deal.deliverables} for ${inr(deal.amount)}`}${deal.versions?.length ? ` · version ${deal.versions.length}` : ""}`}>
         <ol className="max-h-48 list-decimal space-y-1 overflow-y-auto rounded-xl bg-surface-2 p-3 pl-7 text-xs leading-relaxed text-fg-2">
           {(deal.contract?.terms ?? []).map((t) => (
             <li key={t}>{t}</li>

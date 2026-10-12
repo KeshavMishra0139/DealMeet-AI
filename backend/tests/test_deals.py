@@ -39,13 +39,16 @@ def test_low_offer_counter_and_full_rail(login, db):
     assert login("br_thalam").get(f"/api/invoices/{inv['_id']}.pdf").status_code == 403
 
 
-def test_escrow_needs_both_signatures(login, db):
+def test_escrow_needs_both_sides_on_the_same_version(login, db):
     b, tiffin = login("cr_b"), login("pg_tiffin")
     _act(b, "dl_b_tiffin", "accept")
     d = db.deals.find_one({"_id": "dl_b_tiffin"})
-    assert d["stage"] == "contract" and d["contract"]["signed_by_creator"] and not d["contract"]["signed_by_brand"]
-    assert _act(tiffin, "dl_b_tiffin", "fund").status_code == 409
-    _act(tiffin, "dl_b_tiffin", "sign")
+    # The brand's offer is its acceptance of version 1; the creator's acceptance completes the contract.
+    assert d["stage"] == "contract" and d["agreed_version"] == 1
+    assert {a["side"] for a in d["acceptances"] if a["version"] == 1} == {"brand", "creator"}
+    assert d["contract"]["signed_by_creator"] and d["contract"]["signed_by_brand"] and d["contract"]["hash"] == d["versions"][0]["hash"]
+    assert _act(tiffin, "dl_b_tiffin", "fund").status_code == 409  # only a verified payment funds escrow
+    assert _act(tiffin, "dl_b_tiffin", "sign").status_code == 200  # signing again changes nothing
     assert tiffin.post("/api/deals/dl_b_tiffin/pay").json()["deal"]["stage"] == "escrow_funded"
 
 

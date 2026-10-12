@@ -27,7 +27,7 @@ from ..config import now_iso, today
 from ..db import get_db
 from ..engines.common import day_month, inr, inr_full
 from ..engines.fair_price import deliverables_label, fair_price
-from . import payments
+from . import contracts, payments
 
 RAIL = [
     ("offer", "Offer"),
@@ -191,53 +191,104 @@ def sweep(d: dict) -> dict:
     return d
 
 
-def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
+def _signatures(d: dict, creator: dict, brand: dict, payload: dict, role: str) -> None:
+    """The agreed version's acceptances are the e-signatures."""
+    _ensure_contract(d)
+    acc = {a["side"]: a for a in d["acceptances"] if a["version"] == d["agreed_version"]}
+    d["contract"].update({
+        "signed_by_creator": acc["creator"]["at"],
+        "signed_by_brand": acc["brand"]["at"],
+        "creator_signature": (payload.get("name") if role == "creator" else None) or d["contract"].get("creator_signature") or creator.get("name"),
+        "brand_signature": (payload.get("name") if role == "brand" else None) or d["contract"].get("brand_signature") or brand.get("name"),
+        "version": d["agreed_version"],
+        "hash": contracts.latest(d)["hash"],
+    })
+
+
+def _links(payload: dict) -> list[str]:
+    raw = payload.get("links") or ([payload["url"]] if payload.get("url") else [])
+    return [x.strip() for x in raw if x and x.strip()]
+
+
+def act(deal_id: str, role: str, action: str, payload: dict, user: dict | None = None) -> dict:
     d = sweep(_get(deal_id))
+    contracts.ensure(d)
     creator, brand = _names(d)
     stage = d["stage"]
+    uid = (user or {}).get("_id")
+    # A repeated request (double-click, retry) carries the same key: it changes nothing.
+    key = payload.get("request_key")
+    if key and key in (d.get("ops") or []):
+        return view(d, role)
+    before = contracts.status_of(d)
 
     def need(cond: bool, msg: str = "That isn't possible at this stage") -> None:
         if not cond:
             raise HTTPException(409, msg)
 
+    def unchanged() -> dict:
+        return view(d, role)
+
     if role == "creator" and action == "accept":
-        need(stage == "offer" and not d.get("counter"))
-        _ensure_contract(d)
-        d["contract"]["signed_by_creator"] = now_iso()
-        d["contract"]["creator_signature"] = payload.get("name") or creator.get("name")
-        if d.get("kind") == "collective":
-            d["contract"]["signed_by_brand"] = d["contract"].get("signed_by_brand") or d.get("created_at")
+        if stage != "offer" and d.get("agreed_version"):
+            return unchanged()  # already accepted
+        need(stage == "offer" and contracts.awaiting(d) == "creator", "Wait for the brand to answer your proposal")
+        contracts.accept_latest(d, "creator", uid)
         d["stage"] = "contract"
+        _signatures(d, creator, brand, payload, role)
         _predict(d)
-        _event(d, "contract", f"{creator.get('name')} accepted and e-signed the contract")
+        _event(d, "contract", f"{creator.get('name')} accepted version {d['agreed_version']} and e-signed the contract")
         _invoice_for(d, "pending")
         _maybe_fund_from_collective(d)
     elif role == "creator" and action == "counter":
         need(stage == "offer" and d.get("kind") != "collective", "Collective splits are fixed; accept or decline")
+        need(contracts.awaiting(d) == "creator", "Wait for the brand to answer your last proposal")
         amount = int(payload.get("amount") or 0)
         need(amount >= 500, "Enter a counter amount")
-        d["counter"] = {"amount": amount, "by": "creator", "at": now_iso(), "note": payload.get("note")}
-        _event(d, "offer", f"{creator.get('name')} countered at {inr(amount)}")
+        v = contracts.propose(d, "creator", uid, {"amount": amount}, payload.get("note"))
+        d["counter"] = {"amount": amount, "by": "creator", "at": v["at"], "note": payload.get("note"), "version": v["number"]}
+        _event(d, "offer", f"{creator.get('name')} countered at {inr(amount)} (version {v['number']})")
+    elif action == "propose":
+        need(stage == "offer" and d.get("kind") != "collective", "Collective terms are fixed; accept or decline")
+        need(contracts.awaiting(d) == role, "Wait for the other side to answer the last proposal")
+        changes = {k: payload.get(k) for k in contracts.TERM_KEYS if payload.get(k) is not None}
+        need(bool(changes), "Change at least one term")
+        v = contracts.propose(d, role, uid, changes, payload.get("note"))
+        if role == "creator":
+            d["counter"] = {"amount": v["terms"]["amount"], "by": "creator", "at": v["at"], "note": payload.get("note"), "version": v["number"]}
+        else:
+            d.pop("counter", None)
+        who = creator if role == "creator" else brand
+        _event(d, "offer", f"{who.get('name')} proposed new terms (version {v['number']})")
     elif role == "creator" and action == "decline":
+        if stage == "declined":
+            return unchanged()
         need(stage == "offer")
         d["stage"] = "declined"
         _event(d, "declined", f"{creator.get('name')} declined")
-    elif role == "brand" and action == "accept_counter":
-        need(stage == "offer" and d.get("counter"))
-        d["amount"] = d["counter"]["amount"]
-        _ensure_contract(d)
-        d["contract"].update({"signed_by_creator": d["counter"]["at"], "signed_by_brand": now_iso(), "brand_signature": payload.get("name") or brand.get("name"), "creator_signature": creator.get("name")})
-        d["counter"]["accepted_at"] = now_iso()
+    elif role == "brand" and action in ("accept_counter", "accept"):
+        if stage != "offer" and d.get("agreed_version"):
+            return unchanged()
+        need(stage == "offer" and contracts.awaiting(d) == "brand", "There's no proposal from the creator to accept")
+        contracts.accept_latest(d, "brand", uid)
+        if d.get("counter"):
+            d["counter"]["accepted_at"] = now_iso()
         d["stage"] = "contract"
+        _signatures(d, creator, brand, payload, role)
         _predict(d)
-        _event(d, "contract", f"{brand.get('name')} accepted the counter at {inr(d['amount'])}; contract signed by both")
+        _event(d, "contract", f"{brand.get('name')} accepted version {d['agreed_version']} at {inr(d['amount'])}; contract signed by both")
         _invoice_for(d, "pending")
     elif role == "brand" and action == "decline_counter":
-        need(stage == "offer" and d.get("counter"))
-        d["counter"]["declined_at"] = now_iso()
+        if stage == "declined":
+            return unchanged()
+        need(stage == "offer" and contracts.awaiting(d) == "brand")
+        if d.get("counter"):
+            d["counter"]["declined_at"] = now_iso()
         d["stage"] = "declined"
-        _event(d, "declined", f"{brand.get('name')} declined the counter")
+        _event(d, "declined", f"{brand.get('name')} declined the proposal")
     elif action == "withdraw":
+        if stage == "declined":
+            return unchanged()
         # Before escrow is funded either side may cancel at no cost (contract term); the brand
         # may also withdraw an offer. A collective's funding is managed for the whole pack.
         cancel = stage == "contract" and not d.get("escrow") and (role == "creator" or d.get("kind") != "collective")
@@ -248,9 +299,10 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
     elif action == "sign":
         need(stage == "contract")
         _ensure_contract(d)
-        key = "signed_by_creator" if role == "creator" else "signed_by_brand"
-        need(not d["contract"].get(key), "Already signed")
-        d["contract"][key] = now_iso()
+        sig = "signed_by_creator" if role == "creator" else "signed_by_brand"
+        if d["contract"].get(sig):
+            return unchanged()  # signing twice changes nothing
+        d["contract"][sig] = now_iso()
         d["contract"][f"{role}_signature"] = payload.get("name") or (creator if role == "creator" else brand).get("name")
         _event(d, "contract", f"{(creator if role == 'creator' else brand).get('name')} e-signed the contract")
         _maybe_fund_from_collective(d)
@@ -271,16 +323,25 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
             else f"{inr(d['amount'])} in simulated escrow. No money moved (demo payment {ref}).",
         )
     elif role == "creator" and action == "submit_post":
+        links = _links(payload)
+        last = (d.get("submissions") or [None])[-1]
+        if stage == "live" and last and last["links"] == links:
+            return unchanged()  # the same submission again
         need(stage == "escrow_funded", "Wait until escrow is funded before posting")
-        url = (payload.get("url") or "").strip()
-        need(bool(POST_URL.match(url)), "Paste the link to your Instagram reel or YouTube Short")
-        d["proof_url"] = url
+        need(1 <= len(links) <= 5, "Add the link to your post (up to 5 links)")
+        need(all(POST_URL.match(x) for x in links), "Paste the link to your Instagram reel or YouTube Short")
+        note = (payload.get("note") or "").strip() or None
+        d["proof_url"] = links[0]
         d["stage"] = "live"
         d["submitted_at"] = now_iso()
         d["verify_due"] = (today() + timedelta(days=VERIFY_DAYS)).isoformat()
         d["post_check"] = post_check(d)
-        _event(d, "live", "Post link submitted" + (f" (revision {len(d.get('revisions') or [])})" if d.get("revisions") else ""))
+        rnd = len(d.get("submissions") or []) + 1
+        d.setdefault("submissions", []).append({"round": rnd, "links": links, "note": note, "at": d["submitted_at"], "check": d["post_check"]})
+        _event(d, "live", "Post link submitted" + (f" (revision round {rnd - 1})" if rnd > 1 else ""))
     elif role == "brand" and action in ("approve", "confirm"):
+        if stage in ("verified", "paid"):
+            return unchanged()
         need(stage == "live")
         d["verification"] = {**(d.get("post_check") or post_check(d)), "approved_by": "brand", "approved_at": now_iso()}
         d["stage"] = "verified"
@@ -289,19 +350,30 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         _save(d)
         _finished(d)
     elif role == "brand" and action == "request_revision":
-        need(stage == "live")
         reason = (payload.get("note") or "").strip()
+        revs = d.get("revisions") or []
+        if stage == "escrow_funded" and revs and revs[-1]["reason"] == reason:
+            return unchanged()  # the same request again
+        need(stage == "live")
         need(len(reason) >= 3, "Say what needs to change")
-        d.setdefault("revisions", []).append({"reason": reason, "at": now_iso(), "post": d.get("proof_url")})
+        d.setdefault("revisions", []).append({"reason": reason, "at": now_iso(), "post": d.get("proof_url"), "round": len(revs) + 1})
         d["stage"] = "escrow_funded"
         d.pop("verify_due", None)
-        _event(d, "escrow_funded", f"{brand.get('name')} asked for a revision: {reason}")
+        _event(d, "escrow_funded", f"{brand.get('name')} asked for a revision (round {len(revs) + 1}): {reason}")
     elif role == "creator" and action == "nudge":
         need(stage == "live")
         _event(d, "live", f"{creator.get('name')} sent a reminder to confirm")
     else:
         raise HTTPException(400, "Unknown action")
+    after = contracts.status_of(d)
+    contracts.check_transition(before, after)
+    if key:
+        d["ops"] = [*(d.get("ops") or []), key][-50:]
     _save(d)
+    if after != before:
+        from . import auth as au
+
+        au.audit("deal_status", uid, role, deal_id=d["_id"], deal_action=action, **{"from": before, "to": after}, version=d.get("agreed_version"))
     return view(d, role)
 
 
@@ -309,11 +381,15 @@ def actions_for(d: dict, role: str) -> list[dict]:
     s = d["stage"]
     c = d.get("contract") or {}
     out: list[dict] = []
+    contracts.ensure(d)
+    on_table = contracts.latest(d)["terms"]
+    turn = s == "offer" and contracts.awaiting(d) == role
     if role == "creator":
-        if s == "offer" and not d.get("counter"):
-            out = [{"id": "accept", "label": f"Accept {inr(d['amount'])} and sign", "kind": "primary"}]
+        if turn:
+            out = [{"id": "accept", "label": f"Accept {inr(on_table['amount'])} and sign", "kind": "primary"}]
             if d.get("kind") != "collective":  # a collective's split is fixed and already priced on reach
                 out.append({"id": "counter", "label": "Counter", "kind": "secondary", "needs": "amount"})
+                out.append({"id": "propose", "label": "Propose changes", "kind": "secondary", "needs": "terms"})
             out.append({"id": "decline", "label": "Decline", "kind": "ghost"})
         elif s == "contract" and not c.get("signed_by_creator"):
             out = [{"id": "sign", "label": "E-sign contract", "kind": "primary"}]
@@ -324,9 +400,10 @@ def actions_for(d: dict, role: str) -> list[dict]:
         elif s == "live":
             out = [{"id": "nudge", "label": "Remind the brand", "kind": "secondary"}]
     else:
-        if s == "offer" and d.get("counter") and not d["counter"].get("declined_at"):
+        if turn:
             out = [
-                {"id": "accept_counter", "label": f"Accept {inr(d['counter']['amount'])} and sign", "kind": "primary"},
+                {"id": "accept_counter", "label": f"Accept {inr(on_table['amount'])} and sign", "kind": "primary"},
+                {"id": "propose", "label": "Propose changes", "kind": "secondary", "needs": "terms"},
                 {"id": "decline_counter", "label": "Decline", "kind": "ghost"},
             ]
         elif s == "offer":
@@ -347,6 +424,7 @@ def actions_for(d: dict, role: str) -> list[dict]:
 
 def view(d: dict, role: str) -> dict:
     d = sweep(d)
+    contracts.ensure(d)
     db = get_db()
     creator, brand = _names(d)
     listing = db.listings.find_one({"_id": d.get("listing_id")}) if d.get("listing_id") else None
@@ -413,6 +491,15 @@ def view(d: dict, role: str) -> dict:
         "steps": steps,
         "timeline": list(reversed(d.get("timeline") or [])),
         "counter": d.get("counter"),
+        "status": contracts.status_of(d),
+        "status_label": contracts.STATUS_LABELS[contracts.status_of(d)],
+        "versions": contracts.versions_view(d),
+        "agreed_version": d.get("agreed_version"),
+        "awaiting": contracts.awaiting(d) if d["stage"] == "offer" else None,
+        "terms": contracts.latest(d)["terms"],
+        "post_by": d.get("post_by"),
+        "submissions": d.get("submissions") or [],
+        "revision_round": len(d.get("revisions") or []),
         "contract": {**(d.get("contract") or {}), "terms": contract_terms(d, creator, brand)} if d.get("contract") or d["stage"] == "offer" else None,
         "escrow": d.get("escrow"),
         "proof_url": d.get("proof_url"),
@@ -445,6 +532,8 @@ def contract_terms(d: dict, creator: dict, brand: dict) -> list[str]:
         "The fee is released to the creator after approval, through JodiDar's payout partner.",
         "The post carries a paid-partnership label and stays up for at least 30 days.",
     ]
+    if d.get("post_by"):
+        t.insert(1, f"Post by {day_month(d['post_by'])}.")
     if d.get("usage_rights_days"):
         t.append(f"The brand may use the post in paid ads for {d['usage_rights_days']} days.")
     if d.get("exclusivity_days"):

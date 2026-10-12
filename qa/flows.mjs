@@ -263,13 +263,29 @@ await step("Deal rail: counter a low offer, brand accepts, escrow, post, approve
   await page.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
   await page.getByRole("button", { name: "Submit post link" }).click();
   await page.getByLabel(/Instagram reel or YouTube Short link/).fill("https://www.instagram.com/reel/DEMOA1/");
-  await page.getByRole("dialog").getByRole("button", { name: "Submit link" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Submit", exact: true }).click();
   await page.getByRole("button", { name: "Remind the brand" }).waitFor();
   await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
   await page.getByText("The post is public and live").waitFor(); // automatic checks: not checked without a connected account
   await page.getByRole("button", { name: "Approve post" }).click();
   await page.getByText(/Simulated payout of .* No money moved/).first().waitFor();
   await page.getByRole("link", { name: /Invoice JD-/ }).waitFor();
+});
+
+await step("Contract: the creator proposes new terms, the brand accepts that version, and both see it agreed with its hash", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/deals/dl_b_tiffin?as=cr_b`);
+  await page.getByRole("button", { name: "Propose changes" }).click();
+  await page.getByLabel("Fee (₹)").fill("2500");
+  await page.getByLabel("Stories").fill("2");
+  await page.getByRole("button", { name: "Send proposal" }).click();
+  await page.getByText("Negotiating").first().waitFor();
+  await page.goto(`${BASE}/brand/deals/dl_b_tiffin?as=pg_tiffin`);
+  await page.getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Accept .* and sign/ }).click();
+  await page.getByText("Contract agreed").first().waitFor();
+  await page.getByText("Version 2", { exact: true }).waitFor();
+  await page.getByText("Agreed", { exact: true }).waitFor();
 });
 
 await step("Link-in-bio: a brand books from the public page; it lands in the creator's deals", async () => {

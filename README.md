@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 25 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 26 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -206,7 +206,7 @@ The 3D scenes:
 
 ### The deal rail
 
-Offer → Contract (both sides e-sign) → Escrow funded → Post submitted → Approved → Paid out.
+Offer → Contract (both sides accept the same version) → Escrow funded → Post submitted → Approved → Paid out.
 
 - A creator posts only once escrow is funded: a verified Razorpay test payment, or in demo mode a simulated one (labelled "simulated, no money moved").
 - The brand reviews the post link and approves it or asks for a revision with a reason. If the brand doesn't respond within 3 days of the review deadline, the post is approved automatically.
@@ -214,6 +214,12 @@ Offer → Contract (both sides e-sign) → Escrow funded → Post submitted → 
 - **There is no payout integration.** A deal funded through Razorpay stops at "Approved, payout not connected". In demo mode a simulated payment gets a simulated payout, labelled so, with no bank reference. Nothing is called paid unless it was.
 - Collectives fund once for the whole pack; each member's share is released after their post is approved.
 - `/api/health` reports the real modes of payments, payouts, social data and post checks.
+
+**Contract versions** (`services/contracts.py`). An offer carries full terms: deliverables, a posting deadline, the fee, usage rights and exclusivity. Each set of terms is an immutable version with a SHA-256 hash of its terms, its author and time; the brand's offer is version 1, accepted by the brand. Either side can **propose changes** to any term on their turn (the creator's "Counter" changes just the fee); every proposal is a new version, never an edit. Each acceptance records who, when and which version, and the contract is agreed only when both sides accept the same, latest version. The agreed version's hash is on the contract.
+
+**Status machine**: offer → negotiating → contract agreed → in progress → submitted ⇄ revision requested → approved → payment pending → paid, and cancelled. Every action is checked against the allowed transitions on the server and each change is written to the audit log. Escrow funding and payment statuses change only from verified payment events (or, in demo mode, a labelled simulated payment); a real payment with no payout partner stays at "payment pending".
+
+**Deliverables**: the creator submits up to 5 links and a note; automatic post checks run when an account is connected; the brand approves or asks for a revision with a reason, and each revision round is tracked. Repeated submissions, double-clicked approvals and retried requests are no-ops: each action carries a key for the deal's current state, and actions that are already done return the deal unchanged.
 
 ## 3-minute demo script
 
@@ -448,14 +454,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 297 API tests (below), the copy rules on about 5,200 UI strings, and the TypeScript type check |
-| `make e2e` | 25 journeys in a real browser (below) |
+| `make test` | 304 API tests (below), the copy rules on about 5,300 UI strings, and the TypeScript type check |
+| `make e2e` | 26 journeys in a real browser (below) |
 | `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Contracts: version 1 from the brand, proposals as new versions with hashes, agreement only on the same version, refused proposals (same terms, not your turn, bad terms, collectives), audited status transitions, multi-link submissions with revision rounds, and idempotent repeats and request keys.
 - The public creator page: sharing settings, no private fields, badges only with data (connected, on time, completed, brand rating once per approved deal), case studies with predicted views and labelled actual views, positioning that shows only when chosen, and escaped link-preview tags.
 - Fan Proof and pitches: handle and hashtag matching with the paid-post exclusions, only API posts, recompute and delete on disconnect; pitch drafts from the creator's facts, a price range that never comes from the model, model answers with invented numbers, promises or over 150 words falling back, checked edits, the inbox for on-platform brands, revocable share links with no private data, the weekly limit, and accept (an offer) and decline (a polite note).
 - The brand directory: search filters, escaped input, Atlas Search on Atlas and the fallback when its index is missing, live-only campaigns on brand pages, unclaimed pages showing only public basics, admin-only listing, claims approved by an admin, removal requests (rate-limited) and Dream Brand counts, consent for names and notifications.
@@ -483,6 +490,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- A creator proposing new terms and the brand accepting that version.
 - Writing a positioning and showing it on the public page with badges, an estimate and a QR code.
 - Writing a pitch from the creator's own numbers, sending it, and the brand accepting it from the Fan Inbox.
 - Searching the brand directory, saving a Dream Brand and seeing it in the Studio; an unclaimed page's notice.
