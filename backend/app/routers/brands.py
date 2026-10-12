@@ -468,7 +468,7 @@ def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
     listing = db.listings.find_one({"_id": body.listing_id}) if body.listing_id else None
     if body.listing_id and (not listing or listing["owner_id"] != body.brand_id):
         raise HTTPException(403, "That campaign belongs to another account.")
-    return offers.create_offer(brand, c, listing, body.amount, body.message)
+    return offers.create_offer(brand, c, listing, body.amount, body.message, user["_id"])
 
 
 class BookIn(BaseModel):

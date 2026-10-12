@@ -43,6 +43,15 @@ export interface Deal {
   auto_release_on: string | null;
   verification: (PostCheck & { auto?: boolean; approved_by?: "brand" | "auto"; approved_at?: string }) | null;
   post_check: PostCheck | null;
+  status: "offer" | "negotiating" | "contract_agreed" | "in_progress" | "submitted" | "revision_requested" | "approved" | "payment_pending" | "paid" | "cancelled";
+  status_label: string;
+  terms: DealTerms;
+  versions: { number: number; terms: DealTerms; hash: string; author: "brand" | "creator"; note: string | null; at: string; accepted_by: { side: "brand" | "creator"; at: string }[] }[];
+  agreed_version: number | null;
+  awaiting: "brand" | "creator" | null;
+  post_by: string | null;
+  submissions: { round: number; links: string[]; note: string | null; at: string }[];
+  revision_round: number;
   /** Views expected when the offer was accepted, for the case study. */
   predicted: { views: number; basis: string; source: string; at: string } | null;
   /** The creator's own view count after the deal (self-reported). */
@@ -112,6 +121,14 @@ export interface CollectiveView {
   stages: Record<string, number>;
   created_at: string;
   payments_mode: PaymentsMode;
+}
+
+export interface DealTerms {
+  amount: number;
+  deliverables: { kind: string; count: number }[];
+  post_by: string | null;
+  usage_rights_days: number;
+  exclusivity_days: number;
 }
 
 export const STAGE_LABEL: Record<Stage, string> = {

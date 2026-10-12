@@ -353,7 +353,7 @@ def accept(p: dict, brand: dict, amount: int | None, user: dict) -> dict:
     if not res.modified_count:
         return {**view(db.pitches.find_one({"_id": p["_id"]}), for_brand=True), "duplicate": True}
     try:
-        made = offers.create_offer(brand, c, None, amt, f"Re: your pitch, “{p['subject']}”")
+        made = offers.create_offer(brand, c, None, amt, f"Re: your pitch, “{p['subject']}”", user["_id"])
     except Exception:
         db.pitches.update_one({"_id": p["_id"]}, {"$set": {"status": "sent"}})
         raise

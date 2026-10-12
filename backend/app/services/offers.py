@@ -15,6 +15,7 @@ from ..engines.fair_price import fair_price
 from . import auth as au
 from . import campaigns as camp
 from . import consent as cs
+from . import contracts
 
 CLOSED_STAGES = ("paid", "declined", "cancelled", "expired")
 
@@ -25,7 +26,7 @@ def open_offer(brand_id: str, creator_id: str, listing_id: str | None) -> dict |
     return get_db().deals.find_one({"brand_id": brand_id, "creator_id": creator_id, "listing_id": listing_id, "stage": {"$nin": list(CLOSED_STAGES)}})
 
 
-def create_offer(brand: dict, creator: dict, listing: dict | None, amount: int, message: str | None) -> dict:
+def create_offer(brand: dict, creator: dict, listing: dict | None, amount: int, message: str | None, user_id: str | None = None) -> dict:
     """Creates the deal. Checks consent, that the campaign is live and that no open
     offer exists for this creator and campaign."""
     db = get_db()
@@ -41,8 +42,7 @@ def create_offer(brand: dict, creator: dict, listing: dict | None, amount: int, 
     fp = fair_price(creator, brand, terms, with_model=False)
     did = f"dl_{uuid.uuid4().hex[:10]}"
     at = now_iso()
-    db.deals.insert_one(
-        {
+    deal = {
             "_id": did,
             "kind": "single",
             "listing_id": listing["_id"] if listing else None,
@@ -55,10 +55,12 @@ def create_offer(brand: dict, creator: dict, listing: dict | None, amount: int, 
             "exclusivity_days": terms.get("exclusivity_days") or 0,
             "stage": "offer",
             "message": message,
+            "post_by": (listing or {}).get("deadline"),
             "timeline": [{"stage": "offer", "at": at, "note": f"Offer sent by {brand['name']}"}],
             "created_at": at,
         }
-    )
+    contracts.start(deal, user_id)  # the brand's terms are version 1
+    db.deals.insert_one(deal)
     camp.mark_offered(listing["_id"] if listing else None, creator["_id"], did)
     below = 1 - amount / fp["total"] if fp["total"] else 0
     return {"id": did, "fair": fp["total"], "below_pct": round(below * 100)}
@@ -164,7 +166,7 @@ def send_draft(d: dict, user: dict) -> dict:
         listing = db.listings.find_one({"_id": d["listing_id"]})
         if not (brand and creator and listing):
             raise HTTPException(404, "The campaign or creator is no longer available.")
-        made = create_offer(brand, creator, listing, d["amount"], d.get("message"))
+        made = create_offer(brand, creator, listing, d["amount"], d.get("message"), user["_id"])
     except Exception:
         db.offer_drafts.update_one({"_id": d["_id"]}, {"$set": {"status": "draft"}})
         raise
