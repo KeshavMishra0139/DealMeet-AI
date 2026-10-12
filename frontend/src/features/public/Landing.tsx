@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Play, Scale, ShieldCheck, Youtube } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { siClaude, siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
+import { siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
 import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { WorthLink } from "@/components/shared/WorthLink";
@@ -29,7 +29,6 @@ const INTEGRATIONS: { icon: SimpleIcon; label: string }[] = [
   { icon: siFirebase, label: "Firebase" },
   { icon: siMongodb, label: "MongoDB" },
   { icon: siRazorpay, label: "Razorpay" },
-  { icon: siClaude, label: "Claude" },
 ];
 
 export default function Landing() {
