@@ -3,26 +3,44 @@
 // next moves, a fair price, audience fit, escrow, getting paid). Decorative: no numbers,
 // no names, nothing a visitor could mistake for data.
 //
-// Motion is CSS (`--animate-tiles-up/down`): each column holds its five tiles twice and
-// slides by half its height, so the loop has no seam. Columns ease in once on load, pause
-// while the hero is off-screen, and stand still with reduced motion.
+// Between them sit black-and-white photo tiles, from assets/mosaic/photos.ts; a photo slot
+// with no photo there is left out.
+//
+// Motion is CSS (`--animate-tiles-up/down`): each column holds its tiles twice and slides by
+// half its height, so the loop has no seam, at the same speed whatever the column holds.
+// Columns ease in once on load, pause while the hero is off-screen, and stand still with
+// reduced motion.
 import { motion, useInView } from "framer-motion";
 import { BadgeCheck, FileText, ShieldCheck } from "lucide-react";
 import { useRef } from "react";
 import { siInstagram, siYoutube, type SimpleIcon } from "simple-icons";
+import { MOSAIC_PHOTOS, type MosaicPhoto } from "@/assets/mosaic/photos";
 import { LogoMark } from "@/components/shared/Wordmark";
 import { cn } from "@/lib/utils";
 
 type Kind = "instagram" | "youtube" | "moves" | "price" | "brand" | "escrow" | "fit" | "collective" | "hindi" | "kit" | "paid";
+/** An idea tile, or photo slot N (MOSAIC_PHOTOS[N]). */
+type Slot = Kind | { photo: number };
 
-/** Five tiles per column; the content runs up in the outer columns and down in the middle. */
-const COLUMNS: { tiles: Kind[]; dir: "up" | "down"; offset: string }[] = [
-  { tiles: ["instagram", "moves", "brand", "escrow", "fit"], dir: "up", offset: "" },
-  { tiles: ["price", "collective", "youtube", "hindi", "paid"], dir: "down", offset: "-translate-y-[3.5%]" },
-  // Moves in step with the first column: no tile here matches the first column's tile in the
+/** The content runs up in the outer columns and down in the middle. */
+const COLUMNS: { tiles: Slot[]; dir: "up" | "down"; offset: string }[] = [
+  { tiles: ["instagram", { photo: 0 }, "moves", "brand", { photo: 3 }, "escrow", "fit"], dir: "up", offset: "" },
+  { tiles: ["price", { photo: 1 }, "collective", "youtube", { photo: 4 }, "hindi", "paid"], dir: "down", offset: "-translate-y-[3.5%]" },
+  // Moves in step with the first column: no idea tile here matches the first column's in the
   // same row or a neighbouring one, and repeats are light tiles only.
-  { tiles: ["kit", "fit", "youtube", "moves", "paid"], dir: "up", offset: "-translate-y-[1.5%]" },
+  { tiles: ["kit", { photo: 2 }, "fit", "youtube", "moves", { photo: 5 }, "paid"], dir: "up", offset: "-translate-y-[1.5%]" },
 ];
+
+const SECONDS_PER_TILE = 3.6; // about a third of a tile a second
+
+/** A column's tiles, leaving out photo slots that have no photo. */
+function fill(tiles: Slot[]): (Kind | MosaicPhoto)[] {
+  return tiles.flatMap<Kind | MosaicPhoto>((t) => {
+    if (typeof t === "string") return [t];
+    const photo = MOSAIC_PHOTOS[t.photo];
+    return photo ? [photo] : [];
+  });
+}
 
 const EXPO_OUT = [0.16, 1, 0.3, 1] as const;
 
@@ -34,29 +52,33 @@ export function DealMosaic({ className }: { className?: string }) {
     <div ref={ref} aria-hidden className={cn("pointer-events-none overflow-hidden [contain:paint]", className)}>
       <div className="grid h-full grid-cols-3 gap-2.5 lg:gap-3">
         {COLUMNS.map((col, i) => (
-          <motion.div
-            key={i}
-            className={col.offset}
-            initial={{ opacity: 0, y: col.dir === "up" ? 72 : -72 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.6, ease: EXPO_OUT, delay: 0.2 + i * 0.12 }}
-          >
-            {/* pb matches the gap, so each copy is exactly half the column. */}
-            <div
-              className={cn(
-                "flex flex-col gap-2.5 pb-2.5 will-change-transform lg:gap-3 lg:pb-3 motion-reduce:animate-none",
-                col.dir === "up" ? "animate-tiles-up" : "animate-tiles-down",
-                !onScreen && "[animation-play-state:paused]",
-              )}
-            >
-              {[...col.tiles, ...col.tiles].map((kind, j) => (
-                <Tile key={j} kind={kind} />
-              ))}
-            </div>
-          </motion.div>
+          <Column key={i} index={i} dir={col.dir} offset={col.offset} tiles={fill(col.tiles)} paused={!onScreen} />
         ))}
       </div>
     </div>
+  );
+}
+
+function Column({ index, dir, offset, tiles, paused }: { index: number; dir: "up" | "down"; offset: string; tiles: (Kind | MosaicPhoto)[]; paused: boolean }) {
+  return (
+    <motion.div
+      className={offset}
+      initial={{ opacity: 0, y: dir === "up" ? 72 : -72 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.6, ease: EXPO_OUT, delay: 0.2 + index * 0.12 }}
+    >
+      {/* pb matches the gap, so each copy is exactly half the column. */}
+      <div
+        className={cn(
+          "flex flex-col gap-2.5 pb-2.5 will-change-transform lg:gap-3 lg:pb-3 motion-reduce:animate-none",
+          dir === "up" ? "animate-tiles-up" : "animate-tiles-down",
+          paused && "[animation-play-state:paused]",
+        )}
+        style={{ animationDuration: `${tiles.length * SECONDS_PER_TILE}s` }}
+      >
+        {[...tiles, ...tiles].map((t, j) => (typeof t === "string" ? <Tile key={j} kind={t} /> : <PhotoTile key={j} photo={t} />))}
+      </div>
+    </motion.div>
   );
 }
 
@@ -64,6 +86,27 @@ const BASE =
   "tile-grain relative isolate flex aspect-[4/5] w-full shrink-0 flex-col justify-between overflow-hidden rounded-[18px] p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.5),0_18px_40px_-28px_rgb(10_27_51/0.45)] sm:p-3.5 lg:rounded-[22px] lg:p-4";
 const DARK = "[--grain-blend:screen] [--grain-opacity:0.06]";
 const LABEL = "font-display text-[11px] font-medium leading-tight sm:text-[13px] lg:text-[14px]";
+
+/** Black and white, with grain and a soft vignette, so any photo sits with the others. */
+function PhotoTile({ photo }: { photo: MosaicPhoto }) {
+  return (
+    <div className={cn(BASE, "justify-end bg-[#d6d3d1] [--grain-opacity:0.1]")}>
+      <img
+        src={photo.src}
+        alt=""
+        decoding="async"
+        fetchPriority="low"
+        draggable={false}
+        className="absolute inset-0 -z-10 size-full object-cover contrast-[1.06] grayscale"
+        style={{ objectPosition: photo.position ?? "50% 50%" }}
+      />
+      <span className="absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_50%_35%,transparent_55%,rgb(10_27_51/0.28))]" />
+      {photo.caption && (
+        <span className={cn(LABEL, "self-start rounded-full bg-white/85 px-2.5 py-1 text-[#0a1b33] backdrop-blur-sm")}>{photo.caption}</span>
+      )}
+    </div>
+  );
+}
 
 function Brand({ icon, className }: { icon: SimpleIcon; className?: string }) {
   return (
