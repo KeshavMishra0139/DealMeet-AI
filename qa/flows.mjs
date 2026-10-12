@@ -140,6 +140,31 @@ await step("Brand sends an offer from matches; it lands in the creator's pipelin
   if (!r.pipeline) throw new Error("no pipeline");
 });
 
+await step("Campaigns: a draft lists what's missing, then publish, pause and resume", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/new?as=br_senpai`);
+  await page.getByLabel("Title").fill("QA festive anime drop");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await page.waitForURL(/\/brand\/campaigns\/lst_/);
+  await page.getByText("Before it can go live").waitFor();
+  await page.getByRole("link", { name: "Edit" }).click();
+  await page.getByLabel("Brief", { exact: true }).fill("Two reels showing the festive drop, posted before Diwali.");
+  await page.getByRole("group", { name: "Objectives" }).getByRole("checkbox", { name: "Product launch" }).click();
+  await page.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Anime edits" }).click();
+  await page.getByRole("group", { name: "Languages" }).getByRole("checkbox", { name: /Hindi/ }).first().click();
+  await page.getByRole("group", { name: "Audience ages" }).getByRole("checkbox", { name: "18-24" }).click();
+  await page.getByLabel("Deadline").fill("2026-12-15");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByText("Campaign live").waitFor();
+  await page.getByRole("button", { name: "Pause" }).click();
+  await page.getByText(/Paused: no new applications/).first().waitFor();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await page.getByText("Live again.").waitFor();
+  await page.getByRole("tab", { name: "Applications" }).click();
+  await page.getByText(/No applications yet/).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();

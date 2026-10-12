@@ -86,9 +86,10 @@ def _l(id, type, owner, title, summary, niches, languages, regions, deal_kind, *
         "niches": niches, "languages": languages, "regions": regions, "deal_kind": deal_kind,
         "deliverables": [{"kind": "reel", "count": 1}], "usage_rights_days": 0, "exclusivity_days": 0,
         "min_followers": 0, "max_followers": None, "budget": {}, "posted_on": "2026-10-01",
-        "deadline": "2026-10-31", "status": "open",
+        "deadline": "2026-10-31", "status": "live", "objectives": ["awareness"], "cities": [],
     }
     base.update(kw)
+    base.setdefault("start_date", base["posted_on"])
     return base
 
 

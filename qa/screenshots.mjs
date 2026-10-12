@@ -41,6 +41,8 @@ const ROUTES = [
   ["brand-campaigns", "/brand/campaigns?as=br_senpai"],
   ["brand-new-campaign", "/brand/campaigns/new?as=br_senpai"],
   ["brand-campaign", "/brand/campaigns/lst_senpai_hoodie?as=br_senpai"],
+  ["brand-campaign-edit", "/brand/campaigns/lst_senpai_hoodie/edit?as=br_senpai"],
+  ["brand-profile", "/brand/profile?as=br_senpai"],
   ["brand-collective", "/brand/campaigns/lst_thalam_collective?as=br_thalam"],
   ["brand-creator", "/brand/creators/cr_a?as=br_senpai&listing=lst_senpai_hoodie"],
   ["brand-creator-locked", "/brand/creators/cr_b?as=br_senpai"],

@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { inr, inrShort, shortDate } from "@/lib/format";
 import type { Console } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
+import { CampaignStatusBadge } from "./CampaignStatus";
 import { cn } from "@/lib/utils";
 
 export const TYPE_LABEL: Record<string, string> = {
@@ -33,7 +34,7 @@ export default function BrandHome() {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   if (!q.data) return <ConsoleSkeleton />;
   const d = q.data;
-  const live = d.campaigns.filter((c) => c.status === "open");
+  const live = d.campaigns.filter((c) => c.status === "live");
   const maxCount = Math.max(1, ...d.stages.map((s) => s.count));
 
   return (
@@ -244,7 +245,10 @@ export function CampaignTable({ campaigns }: { campaigns: Console["campaigns"] }
                 <Link to={`/brand/campaigns/${c.id}`} className="font-medium text-fg group-hover:text-accent">
                   {c.title}
                 </Link>
-                <span className="block text-xs text-muted">{c.languages.join(", ")}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                  <CampaignStatusBadge status={c.status} />
+                  {c.languages.join(", ")}
+                </span>
               </td>
               <td className="hidden px-3 py-2.5 md:table-cell">
                 <Badge size="sm" variant={c.type === "collective" ? "accent" : "neutral"}>

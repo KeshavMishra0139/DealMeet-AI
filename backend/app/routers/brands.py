@@ -5,7 +5,7 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..config import now_iso, today
 from ..db import get_db, out
@@ -16,7 +16,9 @@ from ..engines.matching import listing_fit
 from ..engines.trust import trust_score
 from ..seed.catalog import CITIES, LANGS, NICHES
 from ..services import auth as au
+from ..services import brand_profile as bp
 from ..services import cache
+from ..services import campaigns as camp
 from ..services import consent as cs
 from ..services import payments
 from ..services.deals import auto_release_due, sweep
@@ -71,7 +73,8 @@ def _campaign_row(x: dict, brand: dict, deals: list[dict]) -> dict:
         "title": x["title"],
         "type": x["type"],
         "deal_kind": x.get("deal_kind"),
-        "status": x.get("status", "open"),
+        "status": camp.status_of(x),
+        "objectives": [camp.OBJECTIVES[o] for o in x.get("objectives") or [] if o in camp.OBJECTIVES],
         "deadline": x.get("deadline"),
         "posted_on": x.get("posted_on"),
         "languages": [LANGS[l]["label"] for l in x.get("languages") or [] if l in LANGS],
@@ -115,7 +118,7 @@ def console(brand_id: str, _: dict = Depends(au.own_brand)):
             needs.append({"deal_id": d["_id"], "kind": "sign", "text": f"Sign {who}'s contract", "detail": inr(d["amount"]), "urgent": False})
         elif d["stage"] == "contract" and (d.get("contract") or {}).get("signed_by_creator") and d.get("escrow") is None:
             needs.append({"deal_id": d["_id"], "kind": "fund", "text": f"Fund escrow for {who}", "detail": inr(d["amount"]), "urgent": False})
-    live_campaigns = [c for c in campaigns if c["status"] == "open"]
+    live_campaigns = [c for c in campaigns if c["status"] == "live"]
     waiting = sum(1 for n in needs if n["kind"] == "confirm")
     headline = f"{len(live_campaigns)} campaign{'s' if len(live_campaigns) != 1 else ''} live. {inr(held_total)} held in escrow{' (simulated)' if held_simulated else ''}."
     if waiting:
@@ -164,71 +167,177 @@ def campaigns(brand_id: str, _: dict = Depends(au.own_brand)):
     return [_campaign_row(x, brand, deals) for x in get_db().listings.find({"owner_id": brand_id})]
 
 
-class CampaignIn(BaseModel):
-    title: str = Field(min_length=4, max_length=90)
-    summary: str = Field(min_length=10, max_length=400)
-    niches: list[Short] = Field(min_length=1, max_length=12)
-    languages: list[Short] = Field(min_length=1, max_length=10)
-    regions: list[Short] = Field(default=["Pan-India"], max_length=8)
-    collective: bool = False
-    collective_size: int = Field(default=20, ge=10, le=50)
-    budget_min: int | None = Field(default=None, ge=0)
-    budget_max: int | None = Field(default=None, ge=0)
-    budget_total: int | None = Field(default=None, ge=0)
-    reels: int = Field(default=1, ge=1, le=5)
-    stories: int = Field(default=0, ge=0, le=10)
-    usage_rights_days: int = Field(default=0, ge=0, le=365)
-    exclusivity_days: int = Field(default=0, ge=0, le=365)
-    min_followers: int = Field(default=0, ge=0, le=50_000_000)
+Objective = Literal["awareness", "consideration", "sales", "launch", "content"]
+
+
+class CampaignEdit(BaseModel):
+    """Every campaign field. A draft can be incomplete; publishing checks it."""
+
+    title: str | None = Field(default=None, min_length=4, max_length=90)
+    summary: str | None = Field(default=None, max_length=400)
+    objectives: list[Objective] | None = Field(default=None, max_length=5)
+    niches: list[Short] | None = Field(default=None, max_length=12)
+    languages: list[Short] | None = Field(default=None, max_length=10)
+    audience_ages: list[Short] | None = Field(default=None, max_length=5)
+    audience_gender: Literal["any", "female", "male"] | None = None
+    regions: list[Short] | None = Field(default=None, max_length=8)
+    cities: list[Short] | None = Field(default=None, max_length=30)
+    collective_size: int | None = Field(default=None, ge=10, le=50)
+    budget_min: int | None = Field(default=None, ge=0, le=100_000_000)
+    budget_max: int | None = Field(default=None, ge=0, le=100_000_000)
+    budget_total: int | None = Field(default=None, ge=0, le=100_000_000)
+    reels: int | None = Field(default=None, ge=0, le=5)
+    stories: int | None = Field(default=None, ge=0, le=10)
+    usage_rights_days: int | None = Field(default=None, ge=0, le=365)
+    exclusivity_days: int | None = Field(default=None, ge=0, le=365)
+    min_followers: int | None = Field(default=None, ge=0, le=50_000_000)
+    start_date: str | None = Field(default=None, max_length=10)
     deadline: str | None = Field(default=None, max_length=10)
 
 
+class CampaignIn(CampaignEdit):
+    title: str = Field(min_length=4, max_length=90)
+    collective: bool = False
+
+
+def _changes(body: CampaignEdit, x: dict) -> dict:
+    """The sent fields, in the stored shape."""
+    sent = body.model_dump(exclude_unset=True)
+    ch: dict = {}
+    for k in ("objectives", "niches", "languages", "regions", "cities", "usage_rights_days", "exclusivity_days", "min_followers", "start_date", "deadline"):
+        if k in sent:
+            ch[k] = sent[k] if sent[k] is not None else ([] if k in ("objectives", "niches", "languages", "regions", "cities") else (None if k in ("start_date", "deadline") else 0))
+    for k in ("title", "summary"):
+        if sent.get(k) is not None:
+            ch[k] = sent[k].strip()
+    if "audience_ages" in sent or "audience_gender" in sent:
+        aud = dict(x.get("audience") or {"ages": [], "gender": "any"})
+        if "audience_ages" in sent:
+            aud["ages"] = sent["audience_ages"] or []
+        if sent.get("audience_gender"):
+            aud["gender"] = sent["audience_gender"]
+        ch["audience"] = aud
+    if "reels" in sent or "stories" in sent:
+        cur = {d["kind"]: d["count"] for d in x.get("deliverables") or []}
+        reels = sent.get("reels", cur.get("reel", 0)) or 0
+        stories = sent.get("stories", cur.get("story", 0)) or 0
+        ch["deliverables"] = [d for d in x.get("deliverables") or [] if d["kind"] not in ("reel", "story")]
+        ch["deliverables"] = ([{"kind": "reel", "count": reels}] if reels else []) + ([{"kind": "story", "count": stories}] if stories else []) + ch["deliverables"]
+    budget = dict(x.get("budget") or {})
+    if x.get("type") == "collective":
+        if "budget_total" in sent:
+            budget["total"] = sent["budget_total"]
+            ch["budget"] = budget
+        if sent.get("collective_size"):
+            ch["collective_size"] = sent["collective_size"]
+    elif x.get("deal_kind") != "affiliate" and ("budget_min" in sent or "budget_max" in sent):
+        if "budget_min" in sent:
+            budget["per_creator_min"] = sent["budget_min"]
+        if "budget_max" in sent:
+            budget["per_creator_max"] = sent["budget_max"]
+        ch["budget"] = budget
+    return ch
+
+
+def _campaign_view(x: dict, user: dict) -> dict:
+    d = out(x)
+    d["status"] = camp.status_of(x)
+    owner = get_db().brands.find_one({"_id": x["owner_id"]})
+    d["owner"] = {"id": owner["_id"], "name": owner["name"], "hue": owner.get("hue", 260), "slug": owner.get("slug")} if owner else None
+    d["language_labels"] = [LANGS[l]["label"] for l in x.get("languages") or [] if l in LANGS]
+    d["niche_labels"] = [NICHES[n]["label"] for n in x.get("niches") or [] if n in NICHES]
+    d["objective_labels"] = [camp.OBJECTIVES[o] for o in x.get("objectives") or [] if o in camp.OBJECTIVES]
+    mine = x["owner_id"] in (user.get("brand_id"), user.get("creator_id"))
+    if mine:
+        d["missing"] = camp.missing(x)
+        d["actions"] = [a for a, (frm, to) in camp.TRANSITIONS.items() if camp.status_of(x) in frm]
+    else:
+        d.pop("history", None)
+    return d
+
+
 @router.post("/brands/{brand_id}/campaigns")
-def create_campaign(brand_id: str, body: CampaignIn, _: dict = Depends(au.own_brand)):
+def create_campaign(brand_id: str, body: CampaignIn, user: dict = Depends(au.own_brand)):
+    """Creates a draft. Creators don't see it until it's published."""
     _brand(brand_id)
-    if any(n not in NICHES for n in body.niches):
-        raise HTTPException(422, "Unknown niche")
     if get_db().listings.count_documents({"owner_id": brand_id}) >= 20:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     lid = f"lst_{brand_id[3:]}_{uuid.uuid4().hex[:6]}"
-    deliverables = [{"kind": "reel", "count": body.reels}] + ([{"kind": "story", "count": body.stories}] if body.stories else [])
-    budget = {"total": body.budget_total or 100_000} if body.collective else {"per_creator_min": body.budget_min or 5_000, "per_creator_max": body.budget_max or 25_000}
-    get_db().listings.insert_one(
-        {
-            "_id": lid,
-            "type": "collective" if body.collective else "brand_campaign",
-            "owner_id": brand_id,
-            "title": body.title.strip(),
-            "summary": body.summary.strip(),
-            "niches": body.niches,
-            "languages": body.languages,
-            "regions": body.regions or ["Pan-India"],
-            "deal_kind": "collective" if body.collective else "paid",
-            "deliverables": deliverables,
-            "usage_rights_days": body.usage_rights_days,
-            "exclusivity_days": body.exclusivity_days,
-            "min_followers": body.min_followers,
-            "max_followers": None,
-            "budget": budget,
-            "collective_size": body.collective_size if body.collective else None,
-            "posted_on": today().isoformat(),
-            "deadline": body.deadline,
-            "status": "open",
-        }
-    )
+    base = {
+        "_id": lid,
+        "type": "collective" if body.collective else "brand_campaign",
+        "owner_id": brand_id,
+        "title": "",
+        "summary": "",
+        "objectives": [],
+        "niches": [],
+        "languages": [],
+        "audience": {"ages": [], "gender": "any"},
+        "regions": ["Pan-India"],
+        "cities": [],
+        "deal_kind": "collective" if body.collective else "paid",
+        "deliverables": [{"kind": "reel", "count": 1}],
+        "usage_rights_days": 0,
+        "exclusivity_days": 0,
+        "min_followers": 0,
+        "max_followers": None,
+        "budget": {},
+        "collective_size": 20 if body.collective else None,
+        "posted_on": today().isoformat(),
+        "start_date": None,
+        "deadline": None,
+        "source": "manual",
+        "created_at": now_iso(),
+    }
+    changes = _changes(body, base)
+    camp.validate_fields(changes)
+    camp.create({**base, **changes}, user)
     cache.invalidate("spam")
-    return {"id": lid}
+    x = _listing(lid)
+    return {"id": lid, "status": "draft", "missing": camp.missing(x)}
+
+
+@router.patch("/campaigns/{listing_id}")
+def edit_campaign(listing_id: str, body: CampaignEdit, user: dict = Depends(au.current_user)):
+    x = _own_listing(listing_id, user)
+    camp.edit(x, _changes(body, x), user)
+    cache.invalidate("spam")
+    return _campaign_view(_listing(listing_id), user)
+
+
+class StatusIn(BaseModel):
+    action: Literal["publish", "pause", "resume", "close"]
+
+
+@router.post("/campaigns/{listing_id}/status")
+def campaign_status(listing_id: str, body: StatusIn, user: dict = Depends(au.current_user)):
+    """draft -> live -> paused <-> live; any -> closed (final)."""
+    x = _own_listing(listing_id, user)
+    x, changed = camp.transition(x, body.action, user)
+    return {**_campaign_view(x, user), "changed": changed}
+
+
+@router.get("/campaigns/{listing_id}/applications")
+def campaign_applications(listing_id: str, user: dict = Depends(au.current_user)):
+    return camp.applications(_own_listing(listing_id, user))
+
+
+class ApplicationIn(BaseModel):
+    status: Literal["applied", "shortlisted", "declined"]
+
+
+@router.post("/campaigns/{listing_id}/applications/{creator_id}")
+def campaign_application(listing_id: str, creator_id: str, body: ApplicationIn, user: dict = Depends(au.current_user)):
+    """Shortlist or decline an application (or move it back to applied)."""
+    return camp.set_application(_own_listing(listing_id, user), creator_id, body.status, user)
 
 
 @router.get("/listings/{listing_id}")
-def listing_detail(listing_id: str, _: dict = Depends(au.current_user)):
+def listing_detail(listing_id: str, user: dict = Depends(au.current_user)):
     x = _listing(listing_id)
-    d = out(x)
-    owner = get_db().brands.find_one({"_id": x["owner_id"]})
-    d["owner"] = {"id": owner["_id"], "name": owner["name"], "hue": owner.get("hue", 260)} if owner else None
-    d["language_labels"] = [LANGS[l]["label"] for l in x.get("languages") or [] if l in LANGS]
-    d["niche_labels"] = [NICHES[n]["label"] for n in x.get("niches") or [] if n in NICHES]
-    return d
+    if not camp.visible_to(x, user):
+        raise HTTPException(404, "Campaign not found")
+    return _campaign_view(x, user)
 
 
 @router.get("/listings/{listing_id}/matches")
@@ -360,6 +469,8 @@ def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
     listing = db.listings.find_one({"_id": body.listing_id}) if body.listing_id else None
     if body.listing_id and (not listing or listing["owner_id"] != body.brand_id):
         raise HTTPException(403, "That campaign belongs to another account.")
+    if listing:
+        camp.require_live(listing, "taking offers")
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else {"deliverables": [{"kind": "reel", "count": 1}]}
     fp = fair_price(c, brand, terms, with_model=False)
     did = f"dl_{uuid.uuid4().hex[:10]}"
@@ -382,6 +493,7 @@ def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
             "created_at": at,
         }
     )
+    camp.mark_offered(body.listing_id, body.creator_id, did)
     below = 1 - body.amount / fp["total"] if fp["total"] else 0
     return {"id": did, "fair": fp["total"], "below_pct": round(below * 100)}
 
@@ -396,6 +508,7 @@ class BookIn(BaseModel):
 def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.current_user)):
     db = get_db()
     x = _own_listing(listing_id, user)
+    camp.require_live(x, "taking bookings")
     brand = _brand(x["owner_id"])
     pack = collective.build(x, brand, must_include=body.member_ids, size_max=len(body.member_ids))
     members = [m for m in pack["members"] if m["id"] in body.member_ids]
@@ -419,9 +532,11 @@ def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.curre
         }
     )
     for m in members:
+        did = f"dl_{uuid.uuid4().hex[:10]}"
+        camp.mark_offered(listing_id, m["id"], did)
         db.deals.insert_one(
             {
-                "_id": f"dl_{uuid.uuid4().hex[:10]}",
+                "_id": did,
                 "kind": "collective",
                 "collective_id": cid,
                 "listing_id": listing_id,
@@ -444,7 +559,14 @@ def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.curre
 class BrandIn(BaseModel):
     name: str = Field(min_length=2, max_length=60)
     category: str = Field(min_length=2, max_length=60)
-    description: str = Field(default="", max_length=200)
+    description: str = Field(default="", max_length=400)
+    website: str | None = Field(default=None, max_length=200)
+    contact_email: str | None = Field(default=None, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+    @field_validator("website")
+    @classmethod
+    def _site(cls, v: str | None) -> str | None:
+        return bp.clean_website(v)
     niches: list[Short] = Field(min_length=1, max_length=12)
     ages: list[Short] = Field(min_length=1, max_length=12)
     gender: Literal["any", "female", "male"] = "any"
@@ -470,8 +592,13 @@ def create_brand(body: BrandIn, user: dict = Depends(au.current_user)):
             "_id": bid,
             "kind": "brand",
             "name": body.name.strip(),
+            "slug": bp.unique_slug(body.name),
             "category": body.category.strip(),
             "description": body.description.strip(),
+            "website": body.website,
+            "contact": {"name": user.get("name"), "email": body.contact_email, "phone": None},
+            "source": "manual",
+            "owner_user_id": user["_id"],
             "hue": sum(map(ord, body.name)) % 360,
             "niches": body.niches,
             "target": {"ages": body.ages, "gender": body.gender, "regions": regions, "cities": body.cities, "languages": body.languages},
@@ -482,5 +609,17 @@ def create_brand(body: BrandIn, user: dict = Depends(au.current_user)):
         }
     )
     au.link_profile(user, bid)
+    au.audit("brand_created", user["_id"], "brand", brand_id=bid)
     return {"id": bid}
+
+
+@router.get("/brands/{brand_id}/profile")
+def brand_profile(brand_id: str, _: dict = Depends(au.own_brand)):
+    """The organisation profile, with its private contact (owner only)."""
+    return bp.view(_brand(brand_id), owner=True)
+
+
+@router.patch("/brands/{brand_id}/profile")
+def update_brand_profile(brand_id: str, body: bp.OrgIn, user: dict = Depends(au.own_brand)):
+    return bp.update(_brand(brand_id), body, user)
 
