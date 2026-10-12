@@ -261,6 +261,21 @@ await step("Public page: write a positioning, show it on the page with badges, a
   await page.getByRole("link", { name: "Download QR" }).waitFor();
 });
 
+await step("Assistant: pausing a campaign waits for Confirm, then runs once", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand?as=br_senpai`);
+  await page.getByRole("button", { name: "Assistant: do something for me" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("button", { name: "Pause the winter hoodie drop" }).click();
+  await dlg.getByText("Needs your confirmation").waitFor();
+  const before = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
+  if (before.status !== "live") throw new Error(`paused before confirming: ${before.status}`);
+  await dlg.getByRole("button", { name: "Confirm" }).click();
+  await page.getByText("Campaign paused").first().waitFor();
+  const after = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
+  if (after.status !== "paused") throw new Error(`not paused: ${after.status}`);
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();
