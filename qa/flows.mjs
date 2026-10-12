@@ -278,6 +278,16 @@ await step("Assistant: pausing a campaign waits for Confirm, then runs once", as
   if (after.status !== "paused") throw new Error(`not paused: ${after.status}`);
 });
 
+await step("TEE: the audience overlap says where it was computed, and the health check agrees", async () => {
+  const health = await fetch(`${API}/api/health`).then((r) => r.json());
+  if (health.modes.tee !== "not_configured") throw new Error(`QA expects no TEE configured, got ${health.modes.tee}`);
+  await page.goto(`${BASE}/brand/creators/cr_b?as=br_thalam`);
+  await page.getByRole("heading", { name: "Overlap with your target" }).waitFor();
+  await page.getByText(/No TEE configured/).waitFor();
+  await page.goto(`${BASE}/creator/privacy?as=cr_b`);
+  await page.getByText(/No TEE configured/).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();
