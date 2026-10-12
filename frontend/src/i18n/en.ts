@@ -9,6 +9,7 @@ export const en = {
   "nav.privacy": "Privacy",
   "nav.connections": "Connections",
   "nav.profile": "Profile",
+  "nav.dream": "Dream Brands",
   "connections.title": "Connections",
   "nav.more": "More",
   "home.greeting": "Here's what to do this week",

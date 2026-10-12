@@ -75,7 +75,7 @@ def _with_profiles(listers: list[dict], listings: list[dict]) -> tuple[list[dict
     for b in listers:
         slug = unique_slug(b["name"], taken)
         taken.add(slug)
-        brands.append({**b, "slug": slug})
+        brands.append({"claimed": True, "public_handles": {}, **b, "slug": slug})
     targets = {b["_id"]: b.get("target") or {} for b in listers}
     out = []
     for x in listings:

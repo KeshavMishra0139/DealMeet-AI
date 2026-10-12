@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 22 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 23 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -47,6 +47,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | --- | --- | --- |
 | `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas (or any MongoDB), with TLS certificates from certifi | Without `USE_MOCK_DB=1`, startup stops with a clear message. The API never falls back to memory on its own |
 | `USE_MOCK_DB` | `1`: in-memory database (mongomock); data is lost on restart. `make dev` sets it when `MONGODB_URI` is empty; the Docker image sets it for the shared demo | `0` |
+| `ATLAS_SEARCH_INDEX` | Atlas Search index for the brand directory (`backend/atlas/brands_search.json`) | `brands_search`; empty or `off` uses a plain text match |
 | `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow (`rzp_test_` keys only). Each order is stored with its deal and amount; checkout must match both, and a payment is used once. A failed Razorpay call is an error (502), never a simulated success | Demo mode: a simulated payment, labelled so. Otherwise funding answers 503 and no money moves |
 | `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
@@ -256,6 +257,19 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Brand directory, unclaimed brands and Dream Brands
+
+**Directory** (`/brands`, public): search by name, category, city, language and "has open campaigns". Each brand has a page at `/brands/:slug` with its description, website and live campaigns (drafts never show).
+
+- **Search on Atlas** uses an Atlas Search index with a `$search` query (autocomplete on the name, fuzzy text on name, category and description). If the index is missing, the directory falls back to a plain text match and says so. **Locally and on mongomock** (no `$search`) it uses a case-insensitive regex over **escaped** input.
+- **Atlas Search setup**: Atlas → your cluster → **Atlas Search** → **Create Search Index** → **JSON Editor** → database `jodidar` (or the one in your URI), collection `brands`, index name `brands_search` → paste `backend/atlas/brands_search.json` → Create. It takes a minute to build. `ATLAS_SEARCH_INDEX` names the index (empty or `off` turns it off).
+
+**Unclaimed brands**: brands that aren't on JodiDar AI show only their public name, category and public handles, no logo, and say "Not on JodiDar AI and not affiliated with us". Only admins add them (`POST /api/admin/brands`). Any visitor can ask for one to be removed (rate-limited per IP); an admin decides.
+
+**Claim this page**: a brand account that doesn't manage a brand yet asks to own an unclaimed page; the page stays unclaimed until an admin approves (`/api/admin/claims`). Approval links the account to the page and rejects other pending claims.
+
+**Dream Brands**: creators save brands (Studio → Dream Brands, or the brand's page). A brand's page shows "N creators with connected accounts want to work with you": a count only, with names only for creators who switched on "Let this brand see my name", and only to that brand. When a saved brand publishes a campaign or collective, each creator who saved it gets one notification.
+
 ## Matches, shortlist, compare and draft offers
 
 **How matches are ranked** (`engines/brand_matching.py`). Each part is scored from 0 to 1, then weighted; the criteria and each creator's scores come back with every result ("Why ranked here").
@@ -409,14 +423,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 267 API tests (below), the copy rules on about 4,500 UI strings, and the TypeScript type check |
-| `make e2e` | 22 journeys in a real browser (below) |
-| `make shots` | 72 screenshots (36 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 278 API tests (below), the copy rules on about 4,800 UI strings, and the TypeScript type check |
+| `make e2e` | 23 journeys in a real browser (below) |
+| `make shots` | 80 screenshots (40 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- The brand directory: search filters, escaped input, Atlas Search on Atlas and the fallback when its index is missing, live-only campaigns on brand pages, unclaimed pages showing only public basics, admin-only listing, claims approved by an admin, removal requests (rate-limited) and Dream Brand counts, consent for names and notifications.
 - Matches and the shortlist: ranking criteria and weights on every result, evidence that follows what each creator shares, neutral scores for missing data, owner-only shortlists with notes, compare limits and ledger entries, drafts sent only on confirm, no duplicate open offers, no sending while paused, and private fields kept out.
 - Campaigns: owner-only access, invalid input, drafts hidden from creators (opportunities, the campaign page, applying and offers), publishing that lists what's missing, live campaigns that can't be edited into invalid ones, pause, resume (re-checked) and close (final), repeated requests, applications by state, and audit entries; the brand profile's owner-only access, validation (address, website, contact) and unique addresses.
 - Rates and the media kit: owner-only access, invalid input, estimates that name missing metrics, YouTube formats with and without a linked channel, saved rates next to the estimate, the Hindi live kit and PDF (with the font embedded), a Hindi PDF without text shaping, a failed AI call, versions that never change and keep their own PDF, duplicate saves, the version limit, promises refused, and the public page following the chosen version and the sharing settings.
@@ -441,6 +456,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Searching the brand directory, saving a Dream Brand and seeing it in the Studio; an unclaimed page's notice.
 - Shortlisting two matches with a note, comparing them, and sending a drafted offer after confirming.
 - A campaign saved as a draft lists what's missing, then is edited, published, paused and resumed.
 - Saving a rate next to its estimate, saving a Hindi media kit version and showing it on the public page.

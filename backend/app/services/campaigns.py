@@ -191,7 +191,12 @@ def transition(x: dict, action: str, user: dict) -> tuple[dict, bool]:
             return fresh, False
         raise HTTPException(409, "The campaign changed at the same time. Reload and try again.")
     _history(x["_id"], user, action, **{"from": current, "to": target})
-    return db.listings.find_one({"_id": x["_id"]}), True
+    fresh = db.listings.find_one({"_id": x["_id"]})
+    if action == "publish":
+        from .directory import notify_dream
+
+        notify_dream(fresh)  # creators who saved this brand hear about it, once
+    return fresh, True
 
 
 def visible_to(x: dict, user: dict | None) -> bool:
