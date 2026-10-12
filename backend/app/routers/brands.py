@@ -419,7 +419,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
             "followers": c.get("followers"),
             "median_views": round(metrics.median_views(c)),
             "reach_ratio": round(metrics.reach_ratio(c), 1),
-            "saves_shares_per_view": round(metrics.ss_rate(c), 4),
+            "saves_shares_per_view": round(metrics.ss_rate(c), 4) if metrics.ss_known(c) else None,
             "posts_per_week": round(metrics.posts_per_week(c), 1),
             "recent": [{"date": r["date"], "views": r["views"], "topic": r.get("topic")} for r in recent],
             "provenance": {"views": metrics.prov(c, "reels.0.views"), "saves": metrics.prov(c, "reels.0.saves"), "topic": metrics.prov(c, "reels.0.topic")},

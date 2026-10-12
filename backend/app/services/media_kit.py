@@ -180,14 +180,16 @@ def build_kit(c: dict, lang: Lang = "en") -> dict:
     stats = None
     if pub["stats"]:
         rows = []
-        if metrics.has_reels(c):
+        # A linked channel's videos are already shown by the YouTube rows below.
+        if metrics.has_reels(c) and source_of(c, "reels.0.views") != "youtube_api":
             views_src, saves_src = source_of(c, "reels.0.views"), source_of(c, "reels.0.saves")
             rows = [
                 {"label": tx["followers"], "value": short(c.get("followers", 0)), "source": source_of(c, "followers")},
                 {"label": tx["median"], "value": short(metrics.median_views(c)), "source": views_src},
                 {"label": tx["reach"], "value": f"{metrics.reach_ratio(c):.1f}x", "source": views_src},
-                {"label": tx["ss"], "value": f"{metrics.ss_rate(c) * 100:.1f}%", "source": saves_src},
             ]
+            if metrics.ss_known(c):
+                rows.append({"label": tx["ss"], "value": f"{metrics.ss_rate(c) * 100:.1f}%", "source": saves_src})
         rows += _youtube_stats(c, tx)
         stats = [{**r, "simulated": r["source"] == "synthetic"} for r in rows] or None
     formats = None

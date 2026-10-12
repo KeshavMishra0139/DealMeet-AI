@@ -88,7 +88,7 @@ def build(
             excluded.append({"id": c["_id"], "name": c["name"], "kind": "fit", "reason": f"Audience fit {fit['score']} is too low for this brief"})
             continue
         fp = fair_price(c, brand, terms, with_model=False)
-        row.update({"price": fp["total"], "reach": metrics.median_views(c), "ss": metrics.ss_rate(c)})
+        row.update({"price": fp["total"], "reach": metrics.median_views(c), "ss": metrics.ss_rate(c) if metrics.ss_known(c) else None})
         candidates.append(row)
 
     selected: list[dict] = []
@@ -185,7 +185,7 @@ def build(
                 "split": round(r["price"] / total, 4) if total else 0,
                 "fit": r["fit"]["score"],
                 "trust": r["trust"],
-                "engagement": round(r["ss"], 4) if stats else None,
+                "engagement": round(r["ss"], 4) if stats and r["ss"] is not None else None,
                 "opted_in": c["_id"] in must_include,
                 "why": why,
                 "deliverables": terms.get("deliverables") or [{"kind": "reel", "count": 1}],
@@ -222,7 +222,7 @@ def build(
         "combined_reach": round(combined) if all_stats else None,
         "raw_reach": round(raw) if all_stats else None,
         "dedup_saved": round(raw - combined) if all_stats else None,
-        "avg_engagement": (round(sum(r["ss"] for r in selected) / len(selected), 4) if selected else 0) if all_stats else None,
+        "avg_engagement": _avg_engagement(selected) if all_stats else None,
         "cost_per_1k": (round(total / combined * 1000) if combined else None) if all_stats else None,
         "trust_min": trust_min,
         "method": {
@@ -242,3 +242,11 @@ def build(
             f"{f' ({inr(budget - total)} under budget)' if budget - total > 500 else ''}."
         ),
     }
+
+
+def _avg_engagement(selected: list[dict]) -> float | None:
+    """Saves + shares per view across members that report them (YouTube videos don't)."""
+    known = [r["ss"] for r in selected if r["ss"] is not None]
+    if not selected:
+        return 0
+    return round(sum(known) / len(known), 4) if known else None

@@ -209,7 +209,8 @@ export interface Gap {
 export interface Roadmap {
   creator: CreatorSummary;
   stage: Stage;
-  working: { topic: string; median_views: number; count: number; save_rate: number; why: Why }[];
+  /** save_rate is null for YouTube videos: YouTube doesn't report saves. */
+  working: { topic: string; median_views: number; count: number; save_rate: number | null; why: Why }[];
   gaps: Gap[];
   skills: { rank: number; title: string; action: string; reason: string }[];
   twins: { id: string; name: string; followers: number; platform: string; languages: string[]; steps: string[]; lesson: string; label: string }[];

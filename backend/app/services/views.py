@@ -68,6 +68,7 @@ def creator_view(c: dict) -> dict:
     # Rule: every number says where it came from (Live data, Self-reported, Sample data).
     d["sources"] = {k: source_of(c, k) for k in ("followers", "reels", "audience", "current_rate")}
     d.pop("pre_instagram", None)
+    d.pop("pre_youtube", None)
     return d
 
 

@@ -78,6 +78,10 @@ async def lifespan(_: FastAPI):
     from .services import reach
 
     reach.backfill(db)
+    # Channels linked before linking updated the profile get their YouTube numbers.
+    from .services import youtube_public
+
+    youtube_public.backfill_profiles(db)
     # Instagram long-lived tokens: an in-process daily job refreshes those that expire within
     # 10 days (each sync also refreshes first, for hosts that sleep).
     from .services import instagram

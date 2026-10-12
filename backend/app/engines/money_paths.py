@@ -179,7 +179,9 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
     # Digital product.
     prod, price = DIGITAL[niche]
     top = metrics.by_topic(c)
-    best_topic = max(top, key=lambda t: t["save_rate"])["topic"] if top else None
+    top_saved = max(top, key=lambda t: t["save_rate"] or 0) if top else None
+    best_topic = top_saved["topic"] if top_saved else None
+    saves_known = bool(top_saved) and top_saved["save_rate"] is not None  # YouTube videos don't report saves
     if niche == "food" and best_topic == "Quick breakfast":
         prod = f"{lang_name} quick-breakfast e-book".strip()
     views = monthly_views(c)
@@ -200,19 +202,19 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                 "month",
                 [
                     f"{max(1, round(buyers_lo))} to {max(2, round(buyers_hi))} buyers a month at ₹{price}",
-                    f"Mostly from your {short(followers)} followers, plus some of your {short(views)} monthly views",
+                    f"Mostly from your {short(followers)} {metrics.audience_noun(c)}, plus some of your {short(views)} monthly views",
                     "Sold through a UPI checkout link in your bio",
                 ],
                 "low",
             ),
             "reasons": (
                 [f"People save your {metrics.topic_plural(best_topic)} to come back to. A {prod} packages them."]
-                if best_topic and niche in ("food", "finance", "education", "fitness", "tech", "parenting")
+                if saves_known and niche in ("food", "finance", "education", "fitness", "tech", "parenting")
                 else ["A small product earns between brand deals."]
             )
             + [f"A low price (₹{price}) keeps the decision easy for your audience."],
             "first_step": f"Outline 10 {metrics.topic_name(best_topic) if best_topic else 'favourite'} recipes for the e-book" if niche == "food" else f"Draft the {prod} outline",
-            "simulated": metrics.fields_simulated(c, "reels.saves") if best_topic else [],
+            "simulated": metrics.fields_simulated(c, "reels.saves") if saves_known else [],
         }
     )
 

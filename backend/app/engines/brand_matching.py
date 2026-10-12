@@ -61,9 +61,11 @@ def _components(c: dict, fit: dict, t: dict | None, fp: dict, cap: int | None, s
         add("reach", reach, note=note if stats else "Not shared with you: used in the ranking, not shown.", private=not stats)
     else:
         add("reach", NEUTRAL["reach"], True, "Data missing: scored as neutral.")
-    if metrics.has_reels(c):
+    if metrics.ss_known(c):
         eng = clamp(metrics.ss_rate(c) / niche["ss_bench"], 0, 2) / 2
         add("engagement", eng, note=None if stats else "Not shared with you: used in the ranking, not shown.", private=not stats)
+    elif metrics.has_reels(c):
+        add("engagement", NEUTRAL["engagement"], True, "YouTube doesn't report saves or shares: scored as typical for the niche.")
     else:
         add("engagement", NEUTRAL["engagement"], True, "Data missing: scored as typical for the niche.")
     if t:
@@ -81,7 +83,8 @@ def evidence(c: dict, scopes: dict) -> list[dict]:
         rows.append({"key": "followers", "label": "Followers", "value": short(c.get("followers", 0)), "source": source_of(c, "followers")})
         if metrics.has_reels(c):
             rows.append({"key": "median_views", "label": f"Median views, last {len(metrics.recent(c))} posts", "value": short(metrics.median_views(c)), "source": source_of(c, "reels.0.views")})
-            rows.append({"key": "engagement", "label": "Saves + shares per view", "value": f"{metrics.ss_rate(c) * 100:.1f}%", "source": source_of(c, "reels.0.saves")})
+            if metrics.ss_known(c):
+                rows.append({"key": "engagement", "label": "Saves + shares per view", "value": f"{metrics.ss_rate(c) * 100:.1f}%", "source": source_of(c, "reels.0.saves")})
         elif (c.get("manual") or {}).get("avg_views"):
             rows.append({"key": "median_views", "label": "Average views (self-reported)", "value": short(c["manual"]["avg_views"]), "source": "manual"})
     if scopes.get("demographics") and c.get("audience"):
@@ -144,7 +147,7 @@ def rank_creator(c: dict, listing: dict, brand: dict, scopes: dict) -> dict:
         "audience_stage": audience_stage(c.get("followers", 0))["label"],
         "followers": c.get("followers") if stats else None,
         "median_views": round(metrics.median_views(c)) if stats else None,
-        "engagement": round(metrics.ss_rate(c), 4) if stats else None,
+        "engagement": round(metrics.ss_rate(c), 4) if stats and metrics.ss_known(c) else None,
         "fit": fit["score"],
         "rank": round(rank, 4),
         "ranking": comps,

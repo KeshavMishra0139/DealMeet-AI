@@ -44,7 +44,8 @@ interface CreatorView {
     followers: number;
     median_views: number;
     reach_ratio: number;
-    saves_shares_per_view: number;
+    /** null when the creator's posts don't report saves and shares (YouTube videos). */
+    saves_shares_per_view: number | null;
     posts_per_week: number;
     recent: { date: string; views: number; topic: string | null }[];
     provenance: { views: Provenance; saves: Provenance; topic: Provenance };
@@ -184,7 +185,7 @@ export default function BrandCreator() {
                   ["Followers", count(c.stats.followers), null],
                   ["Median views, last 6", count(c.stats.median_views), c.stats.provenance.views],
                   ["Reach vs followers", `${c.stats.reach_ratio}x`, c.stats.provenance.views],
-                  ["Saves + shares per view", pct(c.stats.saves_shares_per_view, 1), c.stats.provenance.saves],
+                  ["Saves + shares per view", c.stats.saves_shares_per_view != null ? pct(c.stats.saves_shares_per_view, 1) : "Not reported by YouTube", c.stats.provenance.saves],
                 ].map(([k, v, p]) => (
                   <div key={k as string}>
                     <dt className="text-[11px] text-muted">{k}</dt>

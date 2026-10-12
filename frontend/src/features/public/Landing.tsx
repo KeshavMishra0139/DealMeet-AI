@@ -7,6 +7,7 @@ import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Moti
 import { Wordmark } from "@/components/shared/Wordmark";
 import { WorthLink } from "@/components/shared/WorthLink";
 import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/session";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -179,9 +180,18 @@ function NavItem({ to, className, children }: { to: string; className?: string; 
   );
 }
 
+/** Where a signed-in visitor's dashboard is, or null when nobody is signed in. */
+function useDashboard(): string | null {
+  const creator = useSession("creator").data;
+  const brand = useSession("brand").data;
+  const role = (creator ?? brand)?.user.role;
+  return role === "creator" ? "/creator" : role === "brand" ? "/brand" : role === "admin" ? "/admin" : null;
+}
+
 /** Pill navigation floating at the bottom of the hero. Every item goes to a real page. */
 function FloatingNav({ demo }: { demo: boolean }) {
   const reduce = useReducedMotion();
+  const dashboard = useDashboard();
   return (
     <motion.nav
       aria-label="Primary"
@@ -207,14 +217,16 @@ function FloatingNav({ demo }: { demo: boolean }) {
           Demo
         </NavItem>
       )}
-      <NavItem to="/login" className="hidden sm:inline-flex">
-        Sign in
-      </NavItem>
+      {!dashboard && (
+        <NavItem to="/login" className="hidden sm:inline-flex">
+          Sign in
+        </NavItem>
+      )}
       <Link
-        to="/login?mode=signup"
+        to={dashboard ?? "/login?mode=signup"}
         className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-[#0a1b33] py-2 pl-4 pr-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#16305a]"
       >
-        Get started
+        {dashboard ? "Your dashboard" : "Get started"}
         <ChevronRight className="size-4" aria-hidden />
       </Link>
     </motion.nav>

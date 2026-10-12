@@ -250,6 +250,10 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
         for k in ("analytics", "analytics_connected"):
             if k in prev:
                 summary[k] = prev[k]
+    elif prev:
+        # Switched to another channel: the old channel's videos and snapshots aren't this one's.
+        db.posts.delete_many({"creator_id": creator_id, "platform": "youtube"})
+        db.metric_snapshots.delete_many({"creator_id": creator_id, "platform": "youtube"})
     db.creators.update_one({"_id": creator_id}, {"$set": {"channels.youtube": summary}})
     for v in report["videos"]:
         db.posts.update_one(
@@ -278,13 +282,165 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
     )
     from . import coach, fan_proof
 
+    first = apply_to_profile(creator_id)
+    if first:
+        _fresh_plan(creator_id)
     fan_proof.recompute(creator_id, "youtube")
     coach.on_new_data(creator_id, "New YouTube data")
     return summary
 
 
+# ------------------------------------------------------------------ the profile's numbers
+# What a linked channel replaces on the profile. The values from before are kept in
+# pre_youtube and put back when the channel is unlinked.
+PROFILE_KEYS = ("reels", "followers", "provenance", "insights_source", "insights_connected", "reference_note")
+PROFILE_VIDEOS = 30
+LIVE_NOTE = "Views and subscribers are live from your YouTube channel."
+NOTE_SAMPLE_AUDIENCE = "Audience details are sample data, marked simulated."
+NOTE_SAMPLE_REST = "Everything else is sample data."
+
+
+def _ist_date(iso: str | None) -> str | None:
+    try:
+        return datetime.fromisoformat((iso or "").replace("Z", "+00:00")).astimezone(IST).date().isoformat()
+    except ValueError:
+        return None
+
+
+def _reel(v: dict, day: str) -> dict:
+    """A video in the shape the creator engines read. YouTube's public data has no saves
+    or shares, so they stay unknown (None) rather than zero; likes and comments are None
+    when the channel hides them."""
+    return {
+        "id": f"yt_{v['post_id']}",
+        "date": day,
+        "views": int(v.get("views") or 0),
+        "likes": v.get("likes"),
+        "comments": v.get("comments"),
+        "saves": None,
+        "shares": None,
+        "format": v.get("format") or "long",
+        "topic": "Shorts" if v.get("format") == "shorts" else "Long videos",
+        "caption": (v.get("title") or "")[:2200] or None,
+        "lang": None,
+        "copyrighted_clips": False,
+        "original_voiceover": None,
+        "source": SOURCE,
+    }
+
+
+def _note(c: dict) -> str:
+    from .views import provenance_of
+
+    if c.get("created_by") != "onboarding":
+        return f"{LIVE_NOTE} {NOTE_SAMPLE_REST}"  # a seeded demo profile
+    if provenance_of(c, "audience") == "simulated":
+        return f"{LIVE_NOTE} {NOTE_SAMPLE_AUDIENCE}"
+    return LIVE_NOTE
+
+
+def apply_to_profile(creator_id: str) -> bool:
+    """The linked channel's numbers replace the profile's typed or sample ones, as a
+    connected Instagram account's do: subscribers become the follower count and the
+    channel's recent videos become the posts every screen is built from (views, posting
+    pace, reach, the fair price). A connected Instagram account keeps priority: its
+    numbers include saves, shares and the audience. Returns True the first time."""
+    db = get_db()
+    c = db.creators.find_one({"_id": creator_id}) or {}
+    channels = c.get("channels") or {}
+    yt = channels.get("youtube")
+    if not yt or channels.get("instagram"):
+        return False
+    from .views import source_of
+
+    first = "pre_youtube" not in c
+    update: dict = {"insights_connected.youtube": True, "reference_note": _note(c)}
+    if first:
+        update["pre_youtube"] = {k: c.get(k) for k in PROFILE_KEYS}
+    subscribers = yt.get("subscribers")  # None when the channel hides it
+    replaced = ("reels", "followers") if subscribers is not None else ("reels",)
+    prov = {k: v for k, v in (c.get("provenance") or {}).items() if not k.startswith(replaced)}
+    # Numbers YouTube doesn't replace keep their label: a typed follower count stays
+    # self-reported rather than turning into "live from YouTube".
+    for key in ("followers", "audience"):
+        if key not in replaced and source_of(c, key) == "manual":
+            prov[key] = "manual"
+    if subscribers is not None:
+        update["followers"] = int(subscribers)
+        prov["followers"] = "real"
+    videos = db.posts.find({"creator_id": creator_id, "platform": "youtube"}).sort("published_at", -1).limit(PROFILE_VIDEOS)
+    reels = [_reel(v, day) for v in videos if (day := _ist_date(v.get("published_at")))]
+    if reels:
+        update["reels"] = reels
+        prov["reels"] = "real"
+        update["insights_source"] = SOURCE
+    elif c.get("insights_source") == "synthetic":
+        # Sample reels never stand in for a real channel that has no public videos yet.
+        update["reels"] = []
+        update["insights_source"] = SOURCE
+    update["provenance"] = prov
+    db.creators.update_one({"_id": creator_id}, {"$set": update})
+    from . import reach
+
+    reach.refresh(creator_id)  # brand search filters on it
+    return first
+
+
+def _restore(creator_id: str) -> None:
+    """Puts back what the profile showed before the channel was linked."""
+    db = get_db()
+    c = db.creators.find_one({"_id": creator_id}) or {}
+    before = c.get("pre_youtube")
+    if before is None:
+        return
+    update: dict = {"$unset": {"pre_youtube": ""}}
+    if (c.get("channels") or {}).get("instagram"):
+        # Instagram's numbers are on show and stay. What Instagram puts back when it's
+        # disconnected becomes the profile from before YouTube, and the note goes back now.
+        pre_ig = c.get("pre_instagram")
+        if pre_ig is not None:
+            update["$set"] = {"pre_instagram": {**pre_ig, **{k: before.get(k) for k in pre_ig if k in before}}}
+        update.setdefault("$set", {})["reference_note"] = before.get("reference_note")
+    else:
+        update["$set"] = {k: v for k, v in before.items() if v is not None}
+        update["$set"]["insights_connected"] = {**(before.get("insights_connected") or {}), "youtube": False}
+        update["$unset"].update({k: "" for k, v in before.items() if v is None and k != "insights_connected"})
+    db.creators.update_one({"_id": creator_id}, update)
+    from . import reach
+
+    reach.refresh(creator_id)
+
+
+def _fresh_plan(creator_id: str) -> None:
+    """The first real numbers: a week's plan nobody has acted on yet is rebuilt from them."""
+    from ..engines import next_step
+    from . import creator_ctx
+
+    db = get_db()
+    plan = db.plans.find_one({"creator_id": creator_id}, sort=[("week", -1)])
+    if not plan or any(m.get("status") != "open" for m in plan["moves"]):
+        return
+    c = creator_ctx.load_creator(creator_id)
+    next_step.rebuild(c, creator_ctx.build(c, with_plan=False), plan["week"], "New moves from your YouTube channel's numbers.")
+
+
+def backfill_profiles(db=None) -> int:
+    """Channels linked before linking updated the profile get their numbers now. Safe to repeat."""
+    db = db if db is not None else get_db()
+    n = 0
+    for c in list(db.creators.find({"channels.youtube": {"$exists": True}, "channels.instagram": {"$exists": False}, "pre_youtube": {"$exists": False}}, {"_id": 1})):
+        try:
+            if apply_to_profile(c["_id"]):
+                _fresh_plan(c["_id"])
+                n += 1
+        except Exception:  # one profile never stops the app from starting
+            log.exception("Couldn't apply YouTube numbers to %s", c["_id"])
+    return n
+
+
 def unlink(creator_id: str) -> None:
     db = get_db()
+    _restore(creator_id)
     db.creators.update_one({"_id": creator_id}, {"$unset": {"channels.youtube": ""}})
     db.posts.delete_many({"creator_id": creator_id, "platform": "youtube"})
     db.metric_snapshots.delete_many({"creator_id": creator_id, "platform": "youtube"})

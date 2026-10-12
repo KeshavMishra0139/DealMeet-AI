@@ -71,15 +71,27 @@ def reach_ratio(c: dict) -> float:
     return mean_views(c) / f if f else 0.0
 
 
+def _known(posts: list[dict], *fields: str) -> list[dict]:
+    """Posts that carry these numbers. YouTube's public data has no saves or shares (None),
+    and a channel can hide its likes: unknown is left out, never counted as zero."""
+    return [x for x in posts if all(x.get(f) is not None for f in fields)]
+
+
+def ss_known(c: dict) -> bool:
+    """Whether saves and shares are known for the recent reels (not for YouTube videos)."""
+    return bool(_known(recent(c), "saves", "shares"))
+
+
 def ss_rate(c: dict) -> float:
-    """(saves + shares) per view across recent reels."""
-    r = recent(c)
+    """(saves + shares) per view across recent reels that report them. Check ss_known
+    first: 0.0 here can also mean "not reported"."""
+    r = _known(recent(c), "saves", "shares")
     views = sum(x["views"] for x in r)
     return sum(x["saves"] + x["shares"] for x in r) / views if views else 0.0
 
 
 def like_rate(c: dict) -> float:
-    r = recent(c)
+    r = _known(recent(c), "likes")
     views = sum(x["views"] for x in r)
     return sum(x["likes"] for x in r) / views if views else 0.0
 
@@ -103,18 +115,25 @@ def by_topic(c: dict) -> list[dict]:
     out = []
     for topic, rs in groups.items():
         views = [r["views"] for r in rs]
-        total = sum(views) or 1
         out.append(
             {
                 "topic": topic,
                 "count": len(rs),
                 "median_views": safe_median(views),
                 "views": sorted(views),
-                "save_rate": sum(r["saves"] for r in rs) / total,
-                "share_rate": sum(r["shares"] for r in rs) / total,
+                # None when these posts don't report it (YouTube videos)
+                "save_rate": _per_view(rs, "saves"),
+                "share_rate": _per_view(rs, "shares"),
             }
         )
     return sorted(out, key=lambda t: t["median_views"], reverse=True)
+
+
+def _per_view(posts: list[dict], field: str) -> float | None:
+    known = _known(posts, field)
+    if not known:
+        return None
+    return sum(r[field] for r in known) / (sum(r["views"] for r in known) or 1)
 
 
 def fields_simulated(c: dict, *paths: str) -> list[str]:
@@ -175,8 +194,36 @@ def topic_name(topic: str) -> str:
 
 
 def topic_plural(topic: str) -> str:
-    """'Beat-sync fight edit' -> 'beat-sync fight edits'; 'Budgeting' -> 'budgeting reels'."""
+    """'Beat-sync fight edit' -> 'beat-sync fight edits'; 'Budgeting' -> 'budgeting reels';
+    YouTube's 'Shorts' and 'Long videos' stay as they are."""
     t = topic_name(topic)
+    if topic in YOUTUBE_TOPICS:
+        return t
     if t.endswith(("edit", "transition", "tribute", "recap", "skit", "guide")):
         return t + "s"
     return t + " reels"
+
+
+# Topics given to a linked channel's videos (services/youtube_public.py)
+YOUTUBE_TOPICS = ("Shorts", "Long videos")
+
+
+def post_word(topic: str | None = None) -> str:
+    """'videos' for a linked channel's videos, else 'reels'."""
+    return "videos" if topic in YOUTUBE_TOPICS else "reels"
+
+
+def on_youtube(c: dict) -> bool:
+    """Whether the posts on file are a linked YouTube channel's videos."""
+    r = recent(c)
+    return bool(r) and r[0].get("source") == "youtube_api"
+
+
+def post_noun(c: dict) -> str:
+    """'video' or 'reel', for copy about the creator's own posts."""
+    return "video" if on_youtube(c) else "reel"
+
+
+def audience_noun(c: dict) -> str:
+    """'subscribers' or 'followers', for copy about the creator's follower count."""
+    return "subscribers" if on_youtube(c) else "followers"

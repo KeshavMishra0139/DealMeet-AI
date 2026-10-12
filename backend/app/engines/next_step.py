@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from ..config import now_iso, today
 from ..db import get_db
+from ..seed.catalog import NICHES
 from . import brand_safety, hindi, metrics
 from .common import estimate, inp, inr, inr_range, percentile, short, why
 
@@ -59,8 +60,8 @@ def g_raise_rate(c, ctx):
     return _move(
         "raise_rate",
         "money",
-        f"Raise your reel rate to {inr_range(fair['range']['low'], fair['range']['high'])}",
-        f"Your reels reach about {ratio:.0f}x your followers, but you're priced on followers.",
+        f"Raise your {metrics.post_noun(c)} rate to {inr_range(fair['range']['low'], fair['range']['high'])}",
+        f"Your {metrics.post_noun(c)}s reach about {ratio:.0f}x your {metrics.audience_noun(c)}, but you're priced on {metrics.audience_noun(c)}.",
         estimate(
             (mid - rate) * lo_d,
             (mid - rate) * hi_d,
@@ -101,10 +102,11 @@ def g_double_down(c, ctx):
     topics = [t for t in metrics.by_topic(c) if t["count"] >= 2]
     if not topics:
         return None
-    best = max(topics, key=lambda t: (t["median_views"], t["save_rate"]))
+    best = max(topics, key=lambda t: (t["median_views"], t["save_rate"] or 0))
     views = best["views"]
     lo, hi = 2 * percentile(views, 0.25), 2 * percentile(views, 0.5)
-    most_saved = max(topics, key=lambda t: t["save_rate"])["topic"] == best["topic"]
+    saved = [t for t in topics if t["save_rate"] is not None]  # YouTube videos don't report saves
+    most_saved = bool(saved) and max(saved, key=lambda t: t["save_rate"])["topic"] == best["topic"]
     sim = metrics.fields_simulated(c, "reels.saves", "reels.topic")
     return _move(
         "double_down",
@@ -119,10 +121,8 @@ def g_double_down(c, ctx):
                 f"{best['save_rate'] * 100:.1f}% of viewers save them, the highest of your formats." if most_saved else "",
                 "Doubling down on what already works is the fastest growth you can get.",
             ],
-            [
-                inp("Median views", short(best["median_views"]), metrics.prov(c, "reels.0.views")),
-                inp("Saves per view", f"{best['save_rate'] * 100:.1f}%", metrics.prov(c, "reels.0.saves")),
-            ],
+            [inp("Median views", short(best["median_views"]), metrics.prov(c, "reels.0.views"))]
+            + ([inp("Saves per view", f"{best['save_rate'] * 100:.1f}%", metrics.prov(c, "reels.0.saves"))] if best["save_rate"] is not None else []),
             sim,
             title="Why this format",
         ),
@@ -271,15 +271,114 @@ def g_rate_card(c, ctx):
     return _move(
         "rate_card",
         "money",
-        f"Set your first rate card at {inr_range(fair['range']['low'], fair['range']['high'])} a reel",
+        f"Set your first rate card at {inr_range(fair['range']['low'], fair['range']['high'])} a {metrics.post_noun(c)}",
         "Brands take you seriously when you name a price with reasons.",
-        estimate(fair["range"]["low"] * 0.5, fair["range"]["high"], "inr", "month", ["About one paid reel a month to start"], "low"),
+        estimate(fair["range"]["low"] * 0.5, fair["range"]["high"], "inr", "month", [f"About one paid {metrics.post_noun(c)} a month to start"], "low"),
         "S",
         fair["why"],
         {"label": "See your media kit", "to": "/creator/kit"},
         0.5,
         hi=hindi.move("rate_card", low=fair["range"]["low"], high=fair["range"]["high"]),
     )
+
+
+# Fallbacks: only to fill a plan the moves above leave short of 3, so no week has an empty
+# slot. Built from the creator's own numbers and settings, never from sample listings.
+def fb_steady_pace(c, ctx):
+    if not metrics.has_reels(c):
+        return None
+    noun, recent = metrics.post_noun(c), metrics.recent(c)
+    pace = metrics.posts_per_week(c)
+    target = max(1, min(3, round(pace) + 1))
+    views = [r["views"] for r in recent]
+    plural = f"{noun}s" if target != 1 else noun
+    return _move(
+        "steady_pace",
+        "growth",
+        f"Post {target} {plural} this week",
+        f"You posted {pace:.1f} {noun}s a week over the last 4 weeks. A steady pace gives brands, and your fair price, recent views to go on.",
+        estimate(target * percentile(views, 0.25), target * percentile(views, 0.5), "views", "week",
+                 [f"Each new {noun} performs like your typical one (25th to 50th percentile of your last {len(views)})"], "medium"),
+        "M",
+        why(
+            [f"Your last {len(views)} {noun}s had a median of {short(metrics.median_views(c))} views.", f"{pace:.1f} {noun}s a week over the last 4 weeks."],
+            [
+                inp("Median views", short(metrics.median_views(c)), metrics.prov(c, "reels.0.views")),
+                inp(f"{noun.capitalize()}s a week", f"{pace:.1f}", metrics.prov(c, "reels.0.date")),
+            ],
+            metrics.recent_simulated(c, "views"),
+            title="Why a steady pace",
+        ),
+        {"label": "See what's working", "to": "/creator/roadmap"},
+        0.3,
+        hi=hindi.move("steady_pace", n=target, video=noun == "video"),
+    )
+
+
+def fb_real_numbers(c, ctx):
+    """No views on file: everything runs on an estimate from the follower count."""
+    if metrics.has_reels(c) or (c.get("manual") or {}).get("avg_views") or (c.get("channels") or {}).get("youtube") or (c.get("channels") or {}).get("instagram"):
+        return None
+    from ..services import youtube_public
+
+    fair, link = ctx["fair"], youtube_public.configured()
+    return _move(
+        "real_numbers",
+        "growth",
+        "Link your YouTube channel" if link else "Add your average views",
+        "Your price and moves use an estimate from your follower count. Your real views make them fit you.",
+        estimate(fair["range"]["low"], fair["range"]["high"], "inr", "deal", ["Your fair price per post today, from that estimate: real views can move it either way"], "low"),
+        "S",
+        why(
+            [f"Priced on about {short(metrics.median_views(c))} views a post, estimated from {short(c.get('followers', 0))} followers.", "Moves like posting more of what works need your real views."],
+            [inp("Followers", short(c.get("followers", 0)), metrics.prov(c, "followers"))],
+            title="Why your real numbers",
+        ),
+        {"label": "Link your channel", "to": "/creator/connections"} if link else {"label": "Add your views", "to": "/creator/profile"},
+        0.3,
+        hi=hindi.move("real_numbers", link=link),
+    )
+
+
+def fb_share_kit(c, ctx):
+    fair, noun = ctx["fair"], metrics.post_noun(c)
+    niche = NICHES[c["niche"]]["label"].lower()
+    return _move(
+        "share_kit",
+        "money",
+        f"Send your media kit to 3 {niche} brands",
+        f"Your kit shows your numbers and a fair price with reasons: {inr_range(fair['range']['low'], fair['range']['high'])} a {noun}.",
+        estimate(0, fair["range"]["high"], "inr", "month", [f"If one of the 3 brands books one paid {noun} at your fair price", "Many brands don't reply; that's normal"], "low"),
+        "S",
+        why(
+            [f"Your fair price is {inr_range(fair['range']['low'], fair['range']['high'])} a {noun}, priced on {short(metrics.median_views(c))} median views.", "A short note with your kit link is enough."],
+            title="Why reach out",
+        ),
+        {"label": "Open your media kit", "to": "/creator/kit"},
+        0.28,
+        hi=hindi.move("share_kit", niche=niche),
+    )
+
+
+def fb_dream_brands(c, ctx):
+    if get_db().wishlists.count_documents({"creator_id": c["_id"]}) >= 3:
+        return None
+    fair, noun = ctx["fair"], metrics.post_noun(c)
+    return _move(
+        "dream_brands",
+        "opportunity",
+        "Save 3 Dream Brands",
+        "When a brand you saved opens a campaign, it shows up in your Dream Brands news.",
+        estimate(fair["range"]["low"], fair["range"]["high"], "inr", "deal", [f"If a saved brand opens a campaign that fits and books one {noun} at your fair price"], "low"),
+        "S",
+        why([f"Brands in {NICHES[c['niche']]['label'].lower()} post campaigns here.", "Saving them is how you hear first."], title="Why Dream Brands"),
+        {"label": "Browse brands", "to": "/creator/brands"},
+        0.26,
+        hi=hindi.move("dream_brands"),
+    )
+
+
+FALLBACKS = [fb_steady_pace, fb_real_numbers, fb_share_kit, fb_dream_brands]
 
 
 # Follow-ups, chosen by last week's outcomes.
@@ -399,6 +498,12 @@ def generate_moves(c: dict, ctx: dict, previous: dict | None = None) -> tuple[li
             picked.append(pool[0])
     rest = sorted([m for m in candidates if m not in picked], key=lambda m: -m["priority"])
     picked += rest[: max(0, 3 - len(picked))]
+    if len(picked) < 3:
+        # Short of 3: fill from the fallbacks, categories the plan doesn't have yet first.
+        have, kinds = {m["category"] for m in picked}, {m["kind"] for m in picked} | skip_kinds
+        extra = [m for m in (f(c, ctx) for f in FALLBACKS) if m and m["kind"] not in kinds]
+        extra.sort(key=lambda m: (m["category"] in have, -m["priority"]))
+        picked += extra[: 3 - len(picked)]
     picked = sorted(picked[:3], key=lambda m: -m["priority"])
     return picked, changes
 
@@ -409,6 +514,11 @@ def current_plan(c: dict, ctx: dict) -> dict:
     if plan is None:
         moves, _ = generate_moves(c, ctx)
         plan = _save(c, 1, moves, [])
+    elif len(plan["moves"]) < 3 and all(m["status"] == "open" for m in plan["moves"]):
+        # Saved before plans were filled to 3, and not acted on yet: build it again.
+        moves, _ = generate_moves(c, ctx)
+        if len(moves) > len(plan["moves"]):
+            plan = _save(c, plan["week"], moves, plan.get("changes") or [])
     return _out(plan)
 
 
@@ -420,6 +530,12 @@ def next_week(c: dict, ctx: dict) -> dict:
     if not changes:
         changes = ["New week, fresh moves from your latest numbers."]
     return _out(_save(c, week, moves, changes))
+
+
+def rebuild(c: dict, ctx: dict, week: int, reason: str) -> dict:
+    """This week's moves again, from new numbers. Only for a plan nobody has acted on yet."""
+    moves, _ = generate_moves(c, ctx)
+    return _out(_save(c, week, moves, [reason]))
 
 
 def _save(c: dict, week: int, moves: list[dict], changes: list[str]) -> dict:

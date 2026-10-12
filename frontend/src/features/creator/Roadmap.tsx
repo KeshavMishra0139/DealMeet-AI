@@ -50,7 +50,8 @@ export default function Roadmap() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{w.topic}</p>
                     <p className="num text-xs text-muted">
-                      {w.count} reels · median {count(w.median_views)} views · {(w.save_rate * 100).toFixed(1)}% save
+                      {w.count} {/^(Shorts|Long videos)$/.test(w.topic) ? "videos" : "reels"} · median {count(w.median_views)} views
+                      {w.save_rate != null && ` · ${(w.save_rate * 100).toFixed(1)}% save`}
                     </p>
                   </div>
                   <WhyPopover why={w.why} subject={w.topic} label="" className="no-underline" />

@@ -73,7 +73,8 @@ def facts_for(c: dict, b: dict) -> tuple[list[dict], dict | None]:
         add("followers", "Followers", short(c["followers"]), source_of(c, "followers"))
     if metrics.has_reels(c):
         add("median_views", f"Median views, last {len(metrics.recent(c))} posts", short(metrics.median_views(c)), source_of(c, "reels.0.views"))
-        add("engagement", "Saves + shares per view", f"{metrics.ss_rate(c) * 100:.1f}%", source_of(c, "reels.0.saves"))
+        if metrics.ss_known(c):
+            add("engagement", "Saves + shares per view", f"{metrics.ss_rate(c) * 100:.1f}%", source_of(c, "reels.0.saves"))
     elif (c.get("manual") or {}).get("avg_views"):
         add("median_views", "Average views (self-reported)", short(c["manual"]["avg_views"]), "manual")
     a = c.get("audience") or {}

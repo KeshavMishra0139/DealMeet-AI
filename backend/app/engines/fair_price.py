@@ -109,7 +109,9 @@ def consistency_score(c: dict) -> float:
 def factors(c: dict, lister: dict | None = None) -> dict:
     """Raw inputs to the price, also used to train and query the cross-check model."""
     niche = NICHES[c["niche"]]
-    ss = metrics.ss_rate(c) if metrics.has_reels(c) else niche["ss_bench"]
+    # Saves and shares aren't known for YouTube videos: the niche typical stands in (no adjustment).
+    ss_known = metrics.ss_known(c)
+    ss = metrics.ss_rate(c) if ss_known else niche["ss_bench"]
     fit = audience_fit(c, lister)["fit"] if lister else None
     t = trust_score(c)
     safety = brand_safety.assess(c)
@@ -124,6 +126,7 @@ def factors(c: dict, lister: dict | None = None) -> dict:
         "safety": safety,
         "trust_detail": t,
         "ss": ss,
+        "ss_known": ss_known,
     }
 
 
@@ -250,14 +253,15 @@ def fair_price(
         running += amount
 
     ss_pct = f["ss"] * 100
-    add(
-        "engagement",
-        "Engagement quality",
-        f"{ss_pct:.1f}% of viewers save or share, against {niche['ss_bench'] * 100:.1f}% typical for the niche."
-        if adj["engagement"] >= 0
-        else f"{ss_pct:.1f}% of viewers save or share, below the {niche['ss_bench'] * 100:.1f}% niche typical.",
-        sim_ss,
-    )
+    if f.get("ss_known", True) or not metrics.has_reels(c):
+        engagement_reason = (
+            f"{ss_pct:.1f}% of viewers save or share, against {niche['ss_bench'] * 100:.1f}% typical for the niche."
+            if adj["engagement"] >= 0
+            else f"{ss_pct:.1f}% of viewers save or share, below the {niche['ss_bench'] * 100:.1f}% niche typical."
+        )
+    else:
+        engagement_reason = f"YouTube doesn't report saves or shares, so this uses the niche typical ({niche['ss_bench'] * 100:.1f}%): no change."
+    add("engagement", "Engagement quality", engagement_reason, sim_ss if f.get("ss_known", True) else [])
     if lister:
         add("fit", f"Audience fit to {lister['name']}", fit_reason(audience_fit(c, lister), scopes), sim_aud)
     else:

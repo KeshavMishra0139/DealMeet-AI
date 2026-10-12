@@ -31,7 +31,7 @@ import { LangScope, useI18n } from "@/i18n";
 import type { Dict } from "@/i18n/en";
 import { api, post } from "@/lib/api";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
-import { isEmbedFrame, useCreatorId } from "@/lib/session";
+import { useCreatorId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { Creator } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,6 @@ function Studio() {
   const creator = useCreator();
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
-  const embedded = isEmbedFrame();
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
@@ -89,8 +88,8 @@ function Studio() {
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-line bg-[var(--bg)]/85 px-3 py-5 lg:flex">
-        <Link to="/" className="mx-2 rounded-lg" aria-label="DealMeet AI home">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col overflow-y-auto overscroll-contain border-r border-line bg-[var(--bg)]/85 px-3 py-5 lg:flex">
+        <Link to="/creator" className="mx-2 rounded-lg" aria-label="DealMeet AI: your Studio home">
           <Wordmark />
         </Link>
         <ProfileCard creator={creator.data} className="mx-1 mt-6" />
@@ -114,7 +113,7 @@ function Studio() {
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-[var(--bg)]/92 px-4 lg:hidden">
-        <Link to={embedded ? "/creator" : "/"} aria-label="DealMeet AI home" className="rounded-lg">
+        <Link to="/creator" aria-label="DealMeet AI: your Studio home" className="rounded-lg">
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">

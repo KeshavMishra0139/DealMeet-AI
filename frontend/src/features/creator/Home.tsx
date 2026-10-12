@@ -78,7 +78,7 @@ export default function Home() {
       <section aria-labelledby="moves" className="mt-6">
         <div className="mb-3 flex items-end justify-between gap-3">
           <h2 id="moves" className="font-display text-lg font-semibold">
-            {t("home.moves")}
+            {plan.moves.length === 1 ? t("home.move1") : t("home.moves", { n: plan.moves.length })}
           </h2>
           <Button
             variant={plan.done_count > 0 ? "secondary" : "ghost"}
@@ -150,6 +150,8 @@ export function StagePill({ stage }: { stage: Stage }) {
   );
 }
 
+const COLUMNS: Record<number, string> = { 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3" };
+
 function MovesCarousel({ children, label }: { children: React.ReactNode[]; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -170,7 +172,11 @@ function MovesCarousel({ children, label }: { children: React.ReactNode[]; label
         role="region"
         aria-label={label}
         tabIndex={0}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0"
+        className={cn(
+          "-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:overflow-visible lg:px-0",
+          // As many columns as moves: a short week never leaves an empty slot.
+          COLUMNS[Math.min(children.length, 3)] ?? "lg:grid-cols-3",
+        )}
       >
         {children.map((child, i) => (
           <div key={i} className="w-[86%] shrink-0 snap-center sm:w-[60%] lg:w-auto">

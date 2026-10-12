@@ -89,19 +89,19 @@ def working(c: dict) -> list[dict]:
     sim = metrics.fields_simulated(c, "reels.topic")
     out = []
     for t in topics[:2]:
+        saved = t["save_rate"] is not None  # YouTube videos don't report saves
         out.append(
             {
                 "topic": t["topic"],
                 "median_views": round(t["median_views"]),
                 "count": t["count"],
-                "save_rate": round(t["save_rate"], 4),
+                "save_rate": round(t["save_rate"], 4) if saved else None,
                 "why": why(
-                    [f"{t['count']} reels in this format, median {short(t['median_views'])} views.", f"{t['save_rate'] * 100:.1f}% of viewers saved them."],
-                    [
-                        inp("Views", short(t["median_views"]), metrics.prov(c, "reels.0.views")),
-                        inp("Saves per view", f"{t['save_rate'] * 100:.1f}%", metrics.prov(c, "reels.0.saves")),
-                    ],
-                    sim + metrics.fields_simulated(c, "reels.saves"),
+                    [f"{t['count']} {metrics.post_word(t['topic'])} in this format, median {short(t['median_views'])} views."]
+                    + ([f"{t['save_rate'] * 100:.1f}% of viewers saved them."] if saved else []),
+                    [inp("Views", short(t["median_views"]), metrics.prov(c, "reels.0.views"))]
+                    + ([inp("Saves per view", f"{t['save_rate'] * 100:.1f}%", metrics.prov(c, "reels.0.saves"))] if saved else []),
+                    sim + (metrics.fields_simulated(c, "reels.saves") if saved else []),
                     title=f"Why keep {t['topic'].lower()}",
                 ),
             }
@@ -117,7 +117,9 @@ def content_gaps(c: dict) -> list[dict]:
     peers = _peers(c)
     reels = c.get("reels") or []
     for t in topics:
-        rest = [r for r in reels if r.get("topic") != t["topic"]]
+        if t["save_rate"] is None:
+            continue  # gaps are found from saves, which YouTube videos don't report
+        rest = [r for r in reels if r.get("topic") != t["topic"] and r.get("saves") is not None]
         rest_views = sum(r["views"] for r in rest) or 1
         rest_rate = sum(r["saves"] for r in rest) / rest_views
         lift = t["save_rate"] / rest_rate if rest_rate else 1
@@ -181,7 +183,8 @@ def skills(c: dict, stage_id: str, paths: list[dict]) -> list[dict]:
         out.append(("Basic editing: cuts, captions, a first-second hook", "Learn jump cuts and auto-captions in a free phone editor (2 hours).", "Tighter reels keep people watching past the first second."))
     top3 = [p["type"] for p in paths[:3]]
     if "digital" in top3 and c["niche"] == "food":
-        out.append(("Writing and pricing a recipe e-book", "Pick 10 recipes, photograph each, price at ₹199.", "Your saves show people want to keep these recipes."))
+        out.append(("Writing and pricing a recipe e-book", "Pick 10 recipes, photograph each, price at ₹199.",
+                    "Your saves show people want to keep these recipes." if metrics.ss_known(c) else "Recipes are what people keep and come back to."))
     if c["niche"] == "food":
         out.append(("Phone food photography", "Shoot near a window at mid-morning; one overhead, one side angle.", "Better thumbnails lift saves and product sales."))
     if c.get("platforms") == ["instagram"] and metrics.has_reels(c) and metrics.reach_ratio(c) > 1:
@@ -224,7 +227,8 @@ def topic_ideas(c: dict, gaps: list[dict]) -> dict:
     key = (c["niche"], lang)
     template = TOPIC_TEMPLATES.get(key) or TOPIC_TEMPLATES.get((c["niche"], "hi" if lang == "hinglish" else lang))
     if not template:
-        base = GENERIC_TOPICS.get(c["niche"], [(f"{t}", t, "Matches what your audience saves.") for t in (x["topic"] for x in metrics.by_topic(c)[:3])])
+        reason = "Matches what your audience saves." if metrics.ss_known(c) else "Matches what your audience watches most."
+        base = GENERIC_TOPICS.get(c["niche"], [(f"{t}", t, reason) for t in (x["topic"] for x in metrics.by_topic(c)[:3])])
         template = base or [("Your best format, weekly", "Your best format, weekly", "Consistency builds habit.")]
 
     def fallback() -> TopicIdeas:

@@ -562,9 +562,11 @@ def disconnect(user: dict, creator_id: str) -> None:
         update["$set"]["insights_connected"] = {**(restore.get("insights_connected") or {}), "instagram": False}
         update["$unset"].update({k: "" for k, v in restore.items() if v is None and k != "insights_connected"})
     db.creators.update_one({"_id": creator_id}, update)
-    from . import fan_proof_hooks, reach
+    from . import fan_proof_hooks, reach, youtube_public
 
-    reach.refresh(creator_id)
+    # A linked YouTube channel's numbers take over again (apply_to_profile refreshes reach).
+    if not youtube_public.apply_to_profile(creator_id):
+        reach.refresh(creator_id)
 
     fan_proof_hooks.on_disconnect(creator_id, "instagram")
 

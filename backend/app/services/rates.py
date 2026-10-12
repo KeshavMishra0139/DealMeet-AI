@@ -61,10 +61,14 @@ def _instagram_metrics(c: dict) -> tuple[list[dict], list[dict]]:
         missing.append(_missing("followers", "Followers", "Not used.", "Add your follower count", "/creator/profile"))
     if metrics.has_reels(c):
         n = len(metrics.recent(c))
-        used.append(_metric("median_views", f"Median views, last {n} reels", short(metrics.median_views(c)), source_of(c, "reels.0.views")))
-        ss = metrics.ss_rate(c)
-        used.append(_metric("engagement", "Saves + shares per view", f"{ss * 100:.1f}%", source_of(c, "reels.0.saves")))
-        used.append(_metric("consistency", "Reels a week, last 4 weeks", f"{metrics.posts_per_week(c):.1f}", source_of(c, "reels.0.date")))
+        used.append(_metric("median_views", f"Median views, last {n} {metrics.post_word((metrics.recent(c) or [{}])[0].get('topic'))}", short(metrics.median_views(c)), source_of(c, "reels.0.views")))
+        word = metrics.post_word((metrics.recent(c) or [{}])[0].get("topic"))
+        if metrics.ss_known(c):
+            ss = metrics.ss_rate(c)
+            used.append(_metric("engagement", "Saves + shares per view", f"{ss * 100:.1f}%", source_of(c, "reels.0.saves")))
+        else:
+            missing.append(_missing("engagement", "Saves + shares per view", "YouTube doesn't report saves or shares, so the niche typical is used.", "Connect Instagram", "/creator/connections"))
+        used.append(_metric("consistency", f"{word.capitalize()} a week, last 4 weeks", f"{metrics.posts_per_week(c):.1f}", source_of(c, "reels.0.date")))
     else:
         if manual.get("avg_views"):
             used.append(_metric("median_views", "Average views per post", short(manual["avg_views"]), "manual"))
