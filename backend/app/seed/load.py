@@ -48,10 +48,11 @@ def seed_all(db, force: bool = False, sandbox: bool = True) -> dict:
         for name in SEEDED:
             db[name].delete_many({"source": SYNTHETIC})
     creators = all_creators()
+    brands, listings = _with_profiles(LISTERS, LISTINGS)
     for name, docs in (
         ("creators", creators),
-        ("brands", LISTERS),
-        ("listings", LISTINGS),
+        ("brands", brands),
+        ("listings", listings),
         ("consents", CONSENTS),
         ("consent_audit", CONSENT_AUDIT),
         ("deals", DEALS),
@@ -63,6 +64,24 @@ def seed_all(db, force: bool = False, sandbox: bool = True) -> dict:
     counts = {name: db[name].count_documents({}) for name in COLLECTIONS}
     log.info("Seeded demo data: %s", counts)
     return {"seeded": True, "counts": counts}
+
+
+def _with_profiles(listers: list[dict], listings: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Each lister gets a unique address (slug); each campaign's target audience is its owner's."""
+    from ..services.brand_profile import unique_slug
+
+    taken: set[str] = set()
+    brands = []
+    for b in listers:
+        slug = unique_slug(b["name"], taken)
+        taken.add(slug)
+        brands.append({**b, "slug": slug})
+    targets = {b["_id"]: b.get("target") or {} for b in listers}
+    out = []
+    for x in listings:
+        t = targets.get(x["owner_id"], {})
+        out.append({**x, "audience": x.get("audience") or {"ages": t.get("ages") or ["18-24", "25-34"], "gender": t.get("gender", "any")}})
+    return brands, out
 
 
 def seed_users(db, creators: list[dict], drop_sandbox_accounts: bool = True) -> None:

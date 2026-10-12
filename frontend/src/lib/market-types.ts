@@ -31,7 +31,7 @@ export interface Opportunity {
   why: Why;
   scopes: Scopes;
   scope_source: "grant" | "default";
-  application: "applied" | "opted_in" | "withdrawn" | null;
+  application: "applied" | "opted_in" | "shortlisted" | "offered" | "declined" | "withdrawn" | null;
 }
 
 export interface Opportunities {
@@ -147,7 +147,7 @@ export interface Listing {
   id: string;
   type: ListingType;
   owner_id: string;
-  owner: { id: string; name: string; hue: number } | null;
+  owner: { id: string; name: string; hue: number; slug?: string | null } | null;
   title: string;
   summary: string;
   niches: string[];
@@ -164,7 +164,37 @@ export interface Listing {
   collective_size: number | null;
   deadline: string | null;
   posted_on: string | null;
-  status: string;
+  status: CampaignStatus;
+  objectives?: string[];
+  objective_labels?: string[];
+  audience?: { ages: string[]; gender: "any" | "female" | "male" } | null;
+  cities?: string[];
+  start_date?: string | null;
+  /** Owner only: what blocks going live, and the status actions open now. */
+  missing?: { field: string; message: string }[];
+  actions?: CampaignAction[];
+  history?: { at: string; by: string; action: string; from?: string; to?: string; fields?: string[]; creator_id?: string }[];
+}
+
+export type CampaignStatus = "draft" | "live" | "paused" | "closed";
+export type CampaignAction = "publish" | "pause" | "resume" | "close";
+
+export interface CampaignApplications {
+  listing_id: string;
+  status: CampaignStatus;
+  items: {
+    creator_id: string;
+    name: string;
+    handle: string;
+    avatar_hue: number;
+    is_reference: boolean;
+    niche: string;
+    status: "applied" | "shortlisted" | "offered" | "declined" | "withdrawn";
+    message: string | null;
+    at: string | null;
+    deal_id: string | null;
+  }[];
+  counts: Record<"applied" | "shortlisted" | "offered" | "declined" | "withdrawn", number>;
 }
 
 export interface Console {

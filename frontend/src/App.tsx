@@ -100,6 +100,7 @@ export default function App() {
           <Route index element={<BrandHome />} />
           <Route path="campaigns" element={<BrandCampaigns />} />
           <Route path="campaigns/new" element={<BrandNewCampaign />} />
+          <Route path="campaigns/:id/edit" element={<BrandNewCampaign />} />
           <Route path="campaigns/:id" element={<BrandCampaign />} />
           <Route path="creators/:id" element={<BrandCreator />} />
           <Route path="deals" element={<BrandDeals />} />

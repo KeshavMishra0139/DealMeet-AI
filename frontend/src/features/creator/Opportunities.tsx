@@ -153,7 +153,17 @@ export default function Opportunities() {
 }
 
 function OppCard({ o, onApply }: { o: Opportunity; onApply: () => void }) {
-  const done = o.application === "applied" || o.application === "opted_in" || o.applied;
+  const done = (o.application && o.application !== "withdrawn") || o.applied;
+  const state =
+    o.application === "opted_in"
+      ? "Opted in"
+      : o.application === "shortlisted"
+        ? "Shortlisted"
+        : o.application === "offered"
+          ? "Offer received"
+          : o.application === "declined"
+            ? "Not selected"
+            : "Applied";
   const cta = o.type === "collective" ? "Opt in" : o.type === "creator_collab" ? "Ask to collab" : "Apply";
   const deliv = o.deliverables?.map(deliverable);
   return (
@@ -221,8 +231,8 @@ function OppCard({ o, onApply }: { o: Opportunity; onApply: () => void }) {
           </span>
           <WhyPopover why={o.why} subject={o.title} />
           {done ? (
-            <Badge variant="success" className="h-9 px-3">
-              <Check aria-hidden /> {o.application === "opted_in" ? "Opted in" : "Applied"}
+            <Badge variant={o.application === "declined" ? "neutral" : "success"} className="h-9 px-3">
+              <Check aria-hidden /> {state}
             </Badge>
           ) : (
             <Button variant="primary" size="sm" className="h-9" onClick={onApply}>

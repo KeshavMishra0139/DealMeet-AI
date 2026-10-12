@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..db import get_db
 from ..seed.catalog import NICHES
+from ..services.campaigns import LIVE_QUERY
 from . import metrics
 from .common import estimate, inp, inr, inr_range, short, why
 from .fair_price import PRODUCTION_FLOOR, fair_price
@@ -119,7 +120,7 @@ def matched(c: dict, limit: int | None = None, include_flagged: bool = False) ->
     taken = {d["listing_id"] for d in db.deals.find({"creator_id": c["_id"]})}
     flags = scan()
     items, hidden, by_prefs = [], [], []
-    for listing in db.listings.find({"status": "open"}):
+    for listing in db.listings.find({"status": LIVE_QUERY}):
         if listing["owner_id"] == c["_id"]:
             continue
         if is_flagged(listing["_id"]) and not include_flagged:

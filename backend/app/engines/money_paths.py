@@ -11,6 +11,7 @@ import math
 
 from ..db import get_db
 from ..seed.catalog import NICHES
+from ..services.campaigns import LIVE_QUERY
 from . import metrics
 from .common import clamp, estimate, inp, inr, inr_range, short, why
 from .opportunities import affiliate_estimate, monthly_views
@@ -58,7 +59,7 @@ def _income_score(mid: float, goal: float) -> float:
 
 def _listings(niche: str):
     db = get_db()
-    return list(db.listings.find({"status": "open", "niches": niche, "owner_id": {"$not": {"$regex": "^xx_"}}}))
+    return list(db.listings.find({"status": LIVE_QUERY, "niches": niche, "owner_id": {"$not": {"$regex": "^xx_"}}}))
 
 
 def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:

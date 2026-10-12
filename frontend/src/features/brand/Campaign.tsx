@@ -21,6 +21,7 @@ import type { BrandMatch, Collective, Listing, Matches } from "@/lib/market-type
 import { useMediaQuery } from "@/lib/hooks";
 import { useBrandId } from "@/lib/session";
 import { cn } from "@/lib/utils";
+import { ApplicationsPanel, CampaignControls, HistoryPanel } from "./CampaignManage";
 
 export default function Campaign() {
   const { id = "" } = useParams();
@@ -51,6 +52,7 @@ export default function Campaign() {
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight">{l.title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-fg-2">{l.summary}</p>
+          <CampaignControls listing={l} />
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             <Badge size="sm" variant={l.type === "collective" ? "accent" : "neutral"}>
               {l.type === "collective" ? `Collective · ${l.collective_size} creators` : l.deal_kind === "affiliate" ? "Affiliate" : "Campaign"}
@@ -64,6 +66,12 @@ export default function Campaign() {
             {l.exclusivity_days > 0 && <Badge size="sm">{l.exclusivity_days} days exclusivity</Badge>}
             <Badge size="sm">{l.language_labels.join(", ")}</Badge>
             <Badge size="sm">{l.regions.join(", ")}</Badge>
+            {l.objective_labels?.map((o) => (
+              <Badge key={o} size="sm" variant="accent">
+                {o}
+              </Badge>
+            ))}
+            {l.audience && l.audience.ages.length > 0 && <Badge size="sm">Ages {l.audience.ages.join(", ")}</Badge>}
           </div>
         </div>
         <div className="text-right text-sm">
@@ -84,6 +92,8 @@ export default function Campaign() {
           <TabsTrigger value="compare" disabled={compare.length < 2}>
             Compare{compare.length ? ` (${compare.length})` : ""}
           </TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* Kept mounted while another tab is open: unmounting the 3D match space mid-update made
@@ -107,6 +117,14 @@ export default function Campaign() {
 
         <TabsContent value="collective" className="pt-4">
           <CollectivePanel listing={l} />
+        </TabsContent>
+
+        <TabsContent value="applications" className="pt-4">
+          <ApplicationsPanel listing={l} />
+        </TabsContent>
+
+        <TabsContent value="history" className="pt-4">
+          <HistoryPanel listing={l} />
         </TabsContent>
 
         <TabsContent value="compare" className="pt-4">

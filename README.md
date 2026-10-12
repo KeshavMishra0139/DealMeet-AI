@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 20 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 21 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -256,6 +256,19 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Brand profile and campaign lifecycle
+
+**Organisation profile** (Brand Console → Profile): name, address on JodiDar (a unique slug, checked and reserved-word safe), category, website (must be a full `https://` address), description, and a contact that only the brand account sees. Owner-only; every change is audited.
+
+**Campaigns** have objectives, target audience (ages, gender), geography (Pan-India or regions, plus priority cities), languages, budget, deliverables, a start date and deadline, usage rights and exclusivity.
+
+- Status: **draft → live → paused ⇄ live**, and **any → closed** (final). New campaigns start as drafts.
+- **Publishing** (and resuming) checks the campaign: required fields, a sane budget (at least ₹500 per creator, upper bound not below the lower one) and a deadline in the future (within a year). If something's missing it answers 422 with the list, and the campaign page shows it as a checklist.
+- **Edits** to a live or paused campaign that would leave it incomplete are refused with the same list; closed campaigns can't be edited. Asking for the state a campaign is already in (a double click) changes nothing.
+- **Drafts are invisible to creators.** Only live campaigns appear in opportunities, take applications or offers, or book collectives. A paused or closed campaign stays visible only to creators who already applied or have a deal on it.
+- **Applications** per campaign, grouped Applied, Shortlisted, Offered and Declined. The brand shortlists or declines; an offer on the campaign moves that creator to Offered. Applying again doesn't undo the brand's decision, and an application with an offer can't be withdrawn (decline the offer instead). Creators see Shortlisted, Offer received or Not selected.
+- **Every change is audited**: the campaign keeps a history (shown to its owner only) and each change is written to the append-only audit log.
+
 ## Rates and the media kit
 
 **Your rates** (Money) is a pricing form and a saved rate per format.
@@ -374,14 +387,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 246 API tests (below), the copy rules on about 4,100 UI strings, and the TypeScript type check |
-| `make e2e` | 20 journeys in a real browser (below) |
-| `make shots` | 68 screenshots (34 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 256 API tests (below), the copy rules on about 4,400 UI strings, and the TypeScript type check |
+| `make e2e` | 21 journeys in a real browser (below) |
+| `make shots` | 72 screenshots (36 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Campaigns: owner-only access, invalid input, drafts hidden from creators (opportunities, the campaign page, applying and offers), publishing that lists what's missing, live campaigns that can't be edited into invalid ones, pause, resume (re-checked) and close (final), repeated requests, applications by state, and audit entries; the brand profile's owner-only access, validation (address, website, contact) and unique addresses.
 - Rates and the media kit: owner-only access, invalid input, estimates that name missing metrics, YouTube formats with and without a linked channel, saved rates next to the estimate, the Hindi live kit and PDF (with the font embedded), a Hindi PDF without text shaping, a failed AI call, versions that never change and keep their own PDF, duplicate saves, the version limit, promises refused, and the public page following the chosen version and the sharing settings.
 - The coach: creators only, answers listing their numbers and sources, no trend under 6 posts, price from the fair-price engine, caching and the hourly limit, model answers with promises or invented numbers rejected, measurable goals, and recalculation when new data arrives.
 - Profile: owner-only access, edits that persist, invalid input, completeness, readiness with and without a connected account, self-reported numbers with history that never replace connected ones, preferences filtering opportunities, and private fields kept from brands and public pages.
@@ -404,6 +418,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- A campaign saved as a draft lists what's missing, then is edited, published, paused and resumed.
 - Saving a rate next to its estimate, saving a Hindi media kit version and showing it on the public page.
 - Asking the coach: the numbers used with their sources, then making a plan.
 - Editing the profile: completeness rises and the edit survives a reload.

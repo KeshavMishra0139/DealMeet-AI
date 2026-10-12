@@ -4,11 +4,19 @@ import { announceChange } from "./sync";
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
+/** One thing a request still needs, e.g. a field a campaign must fill in before it can go live. */
+export interface MissingItem {
+  field: string;
+  message: string;
+}
+
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  missing: MissingItem[];
+  constructor(status: number, message: string, missing: MissingItem[] = []) {
     super(message);
     this.status = status;
+    this.missing = missing;
   }
 }
 
@@ -40,14 +48,20 @@ export async function api<T>(path: string, init?: ApiInit): Promise<T> {
   }
   if (!res.ok) {
     let detail = res.statusText;
+    let missing: MissingItem[] = [];
     try {
       const body = await res.json();
-      detail = typeof body.detail === "string" ? body.detail : detail;
+      if (typeof body.detail === "string") detail = body.detail;
+      else if (body.detail && typeof body.detail.message === "string") {
+        // A structured refusal: a message and the list of what's missing.
+        detail = body.detail.message;
+        missing = Array.isArray(body.detail.missing) ? body.detail.missing : [];
+      }
     } catch {
       /* not JSON */
     }
     if (res.status === 401 && token) forgetToken(token);
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, missing);
   }
   if (rest.method && rest.method !== "GET" && !path.startsWith("/auth/")) announceChange(path);
   if (res.status === 204) return undefined as T;

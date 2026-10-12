@@ -11,6 +11,7 @@ from ..config import now_iso
 from ..db import get_db, out_many
 from ..engines.opportunities import matched
 from ..services import cache
+from ..services import campaigns as camp
 from ..services import consent as cs
 from ..services import social
 from ..services.auth import own_creator
@@ -49,8 +50,14 @@ def apply(creator_id: str, body: ApplyIn):
     c = load_creator(creator_id)
     db = get_db()
     listing = db.listings.find_one({"_id": body.listing_id})
-    if not listing:
+    if not listing or not camp.visible_to(listing, {"creator_id": creator_id}):
         raise HTTPException(404, "Listing not found")
+    if listing["owner_id"] == creator_id:
+        raise HTTPException(409, "You can't apply to your own listing.")
+    camp.require_live(listing, "taking applications")
+    prev = db.applications.find_one({"_id": f"ap_{creator_id}_{body.listing_id}"})
+    if prev and prev["status"] in ("shortlisted", "offered", "declined"):
+        return {"status": prev["status"]}  # applying again doesn't undo the brand's decision
     cs.grant(c["_id"], listing["owner_id"], body.scopes)
     status = "opted_in" if listing["type"] == "collective" else "applied"
     doc = {
@@ -68,7 +75,9 @@ def apply(creator_id: str, body: ApplyIn):
 
 @router.delete("/apply/{listing_id}")
 def withdraw(creator_id: str, listing_id: str):
-    get_db().applications.update_one({"_id": f"ap_{creator_id}_{listing_id}"}, {"$set": {"status": "withdrawn"}})
+    res = get_db().applications.update_one({"_id": f"ap_{creator_id}_{listing_id}", "status": {"$ne": "offered"}}, {"$set": {"status": "withdrawn"}})
+    if not res.matched_count and get_db().applications.count_documents({"_id": f"ap_{creator_id}_{listing_id}"}):
+        raise HTTPException(409, "You already have an offer for this campaign. Decline it in Deals instead.")
     return {"status": "withdrawn"}
 
 
@@ -102,7 +111,8 @@ def post_collab(creator_id: str, body: CollabIn):
             "budget": {},
             "posted_on": now_iso()[:10],
             "deadline": None,
-            "status": "open",
+            "status": "live",
+            "source": "manual",
         }
     )
     cache.invalidate("spam")
