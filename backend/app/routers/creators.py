@@ -261,6 +261,16 @@ def ai_tag(body: TagIn, _: dict = Depends(au.current_user)):
     return tag_captions(body.captions)
 
 
+@router.get("/creators/{creator_id}/weekly-report")
+def weekly_report(creator_id: str, _: dict = Depends(au.own_creator)):
+    """This week against last week: brand views, offers, payouts, reach and followers,
+    aggregated from the database (services/weekly_report.py)."""
+    from ..services import weekly_report as wr
+
+    cc.load_creator(creator_id)
+    return wr.build(creator_id)
+
+
 @router.get("/creators/{creator_id}/connections")
 def connections(creator_id: str, _: dict = Depends(au.own_creator)):
     """Instagram and YouTube connection status. Nothing is simulated for an account that

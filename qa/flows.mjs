@@ -119,7 +119,11 @@ await step("Money: price changes per brand match", async () => {
 
 await step("Why? popovers open with reasons", async () => {
   await page.goto(`${BASE}/creator?as=cr_a`);
-  await page.getByRole("button", { name: /Why: Raise your reel rate/ }).click();
+  // The weekly report puts the moves below the fold on a phone, and the move cards animate in
+  // as they scroll into view, so a tap would land on the sticky bars mid-animation. Reach the
+  // button the way a keyboard user does: focus scrolls it into view, Enter opens it.
+  await page.getByRole("button", { name: /Why: Raise your reel rate/ }).focus();
+  await page.keyboard.press("Enter");
   await page.getByText("Why raise your rate").waitFor();
   await page.getByText(/Depends on simulated data/).waitFor();
 });

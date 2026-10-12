@@ -285,6 +285,20 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
 
+## Weekly report and "Check your worth"
+
+The top of the Creator Studio home is a **Weekly report**: the 7 days ending today against the 7 before, as a light card on the dark Studio. Code: `backend/app/services/weekly_report.py`, `frontend/src/features/creator/WeeklyReport.tsx`; tests: `backend/tests/test_weekly_report.py`.
+
+- **Aggregated in MongoDB** (`GET /api/creators/{creator_id}/weekly-report`, the creator only) from records the app already keeps; nothing is estimated:
+  - **Brand views**: brands opening the creator's profile (`consent_audit` "viewed" events), and how many brands.
+  - **New offers**: deals offered to the creator (`deals.created_at`), and their total value.
+  - **Paid out**: deals that reached "paid" (their timeline), with the amount; simulated payouts say so.
+  - **Views on new reels**: views on reels posted each week, and how many reels. With no reels at all, the tile asks the creator to connect Instagram or YouTube instead of showing a zero.
+  - **Followers**: the change between Instagram or YouTube snapshots (`metric_snapshots`), only when there's one in both weeks.
+- Each tile shows last week's figure with an up, down or same marker, and its data label (Sample data, Self-reported, Live data). In English and हिंदी. The loading state is the same size as the loaded card, so the page doesn't jump.
+
+**Check your worth** (`/worth`) is emphasised wherever navigation shows it: the landing page's floating nav, the Studio sidebar (after the main tabs) and the Studio's mobile menu. One component (`frontend/src/components/shared/WorthLink.tsx`): a signature-gradient pill with a soft glow that breathes (opacity only; still with reduced motion) and a sparkle that turns on hover.
+
 ## Creator profile, completeness and brand-readiness
 
 **Profile** in the Studio edits name, bio, niche, content categories, city, languages, formats, platforms and collaboration preferences (paid, barter or both; a minimum fee; categories to avoid). Opportunities that don't fit the preferences are hidden from the list, with the reason one tap away.
