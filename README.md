@@ -40,6 +40,16 @@ make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus a
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
 ```
 
+### Updating your local copy
+
+1. Stop the running app (**Ctrl+C** in its terminal), so ports 8000 and 5173 are free.
+2. Get the latest code: `git stash` first if you have local edits, then `git pull` on your branch (or `git fetch origin && git checkout <branch>` to try a branch that isn't merged yet).
+3. Run `make dev` (Windows: `npm run dev`). It reinstalls the API and web dependencies on its own when `requirements.txt` or `package-lock.json` changed, so the first start after an update can take a few minutes.
+4. Open http://localhost:5173 and press **Ctrl+Shift+R** if the page still looks old. Click **Reset demo** for fresh sample data; the demo keeps its data in memory, so a restart also resets it.
+5. New settings, if any, are in `.env.example`. All are optional for the demo.
+
+If the dependency install fails, check `python --version` (3.10 to 3.14), delete `backend/.venv` and run `make dev` again. "Port already in use" means the old app is still running.
+
 ## Setup: from the demo to real services
 
 The demo needs nothing. To run with real accounts and live data, set these up in order. Each step works on its own: anything you skip says "not connected" in the app instead of showing made-up numbers. Put values in `.env` locally (copy `.env.example`) or in your host's environment (secrets on Render), never in the repository.
