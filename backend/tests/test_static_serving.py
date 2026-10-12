@@ -132,3 +132,21 @@ def test_files_and_client_routes_still_load(site):
     assert client.get("/assets/app.js").text == "console.log(1)"
     assert "<title>app</title>" in client.get("/creator/money").text
     assert "<title>app</title>" in client.get("/").text
+
+
+def test_creator_pages_get_escaped_link_previews(site, db):
+    from app.static import with_preview
+
+    dist, client = site
+    (dist / "index.html").write_text('<!doctype html><head><meta name="description" content="x" /><title>app</title></head><body></body>', encoding="utf-8")
+    db.creators.update_one({"_id": "cr_b"}, {"$set": {"name": 'Meera "<script>alert(1)</script>"', "branding": {"positioning": "Tamil breakfasts & <b>more</b>", "show_on_page": True}}})
+    handle = db.creators.find_one({"_id": "cr_b"})["handle"]
+    html = client.get(f"/c/{handle}").text
+    assert 'property="og:title" content="Meera &quot;&lt;script&gt;' in html and "<script>alert" not in html
+    assert 'content="Tamil breakfasts &amp; &lt;b&gt;more&lt;/b&gt;"' in html
+    assert f'property="og:url" content="http://testserver/c/{handle}"' in html and html.count("<title>") == 1
+    # Unknown or private pages get the plain app.
+    assert "og:title" not in client.get("/c/nobody-here").text
+    db.creators.update_one({"_id": "cr_b"}, {"$set": {"public_page": False}})
+    assert "og:title" not in client.get(f"/c/{handle}").text
+    assert with_preview("<html></html>", {"title": "<t>", "description": "d"}, "u").startswith("<meta")

@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 24 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 25 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -257,6 +257,17 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Public creator page
+
+`/c/:handle` is the creator's full public page, under their sharing settings (Studio → Media kit → What your page shows: reach and engagement, audience demographics, rate card, past collaborations and case studies).
+
+- The media kit (stats with Live data / Self-reported / Sample data badges, best formats, audience snapshot, rates) plus niche tags, an estimated price range (labelled estimate), the 6 most-viewed posts synced through the official APIs, Fan Proof badges, collaborations completed on JodiDar and case studies.
+- **Badges appear only when data backs them**: Connected audience (a verified connection), On time (posts submitted by the deal's or campaign's deadline, shown as "X of Y posts"), Completed on JodiDar ×N (posts the brand approved), Brand rating (brands rate a creator once per approved deal), Collective member (accepted a collective place). No "Paid" counts: payouts aren't connected to a verified provider. Badges built on sample deals carry the Sample data label.
+- **Case studies**: predicted views are stored when the offer is accepted (with what they're based on); actual views come from the platform API by matching the submitted post, or from the creator's own number, labelled Self-reported. "Paid in X days" appears only from a verified provider payout event, so it's absent in the demo.
+- **Share**: the link and a QR code drawn in the browser (the `qrcode` package; no outside QR service), with a PNG download, on the page and in the Studio.
+- **Link previews**: in single-port mode (`static.py`), `/c/:handle` gets per-creator Open Graph and Twitter tags injected into `index.html` on the server, with every creator value HTML-escaped. Unknown or private pages get the plain app.
+- **Positioning** (Studio → Media kit → Your positioning): `ai/llm.py` writes a one-line positioning statement, 3 content pillars and 2 bio suggestions from the creator's niche and top posts (template fallback), cached in `creators.branding`. The creator can rewrite or edit it (copy rules apply) and chooses whether the positioning shows on the public page.
+
 ## Fan Proof, AI Pitch Builder and the Brand Fan Inbox
 
 **Fan Proof** (`services/fan_proof.py`) scans a creator's posts synced through the official APIs (Instagram captions, YouTube titles and descriptions) for a brand's `@handle` (from its organisation profile or public handles) or `#brandname` (its name without spaces). Posts with `#ad`, `#ads`, `#sponsored`, `#collab` or "paid partnership" don't count; typed-in or sample data never counts. It stores the first mention date, the count and up to 10 post links per platform, is rebuilt after each sync, and is deleted when that platform is disconnected. It shows as "Fan since <month year> · N unpaid mentions" on pitches, Dream Brands and the brand's view of the creator. We never say "following since": the APIs don't show who a creator follows.
@@ -437,14 +448,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 290 API tests (below), the copy rules on about 5,000 UI strings, and the TypeScript type check |
-| `make e2e` | 24 journeys in a real browser (below) |
+| `make test` | 297 API tests (below), the copy rules on about 5,200 UI strings, and the TypeScript type check |
+| `make e2e` | 25 journeys in a real browser (below) |
 | `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- The public creator page: sharing settings, no private fields, badges only with data (connected, on time, completed, brand rating once per approved deal), case studies with predicted views and labelled actual views, positioning that shows only when chosen, and escaped link-preview tags.
 - Fan Proof and pitches: handle and hashtag matching with the paid-post exclusions, only API posts, recompute and delete on disconnect; pitch drafts from the creator's facts, a price range that never comes from the model, model answers with invented numbers, promises or over 150 words falling back, checked edits, the inbox for on-platform brands, revocable share links with no private data, the weekly limit, and accept (an offer) and decline (a polite note).
 - The brand directory: search filters, escaped input, Atlas Search on Atlas and the fallback when its index is missing, live-only campaigns on brand pages, unclaimed pages showing only public basics, admin-only listing, claims approved by an admin, removal requests (rate-limited) and Dream Brand counts, consent for names and notifications.
 - Matches and the shortlist: ranking criteria and weights on every result, evidence that follows what each creator shares, neutral scores for missing data, owner-only shortlists with notes, compare limits and ledger entries, drafts sent only on confirm, no duplicate open offers, no sending while paused, and private fields kept out.
@@ -471,6 +483,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Writing a positioning and showing it on the public page with badges, an estimate and a QR code.
 - Writing a pitch from the creator's own numbers, sending it, and the brand accepting it from the Fan Inbox.
 - Searching the brand directory, saving a Dream Brand and seeing it in the Studio; an unclaimed page's notice.
 - Shortlisting two matches with a note, comparing them, and sending a drafted offer after confirming.

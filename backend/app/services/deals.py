@@ -127,6 +127,25 @@ def _payout(d: dict) -> None:
     _event(d, "verified", "Payout isn't connected yet, so nothing has been paid out. The payment stays in escrow.")
 
 
+def _predict(d: dict) -> None:
+    """Record the views we expect when the offer is accepted, for the case study later."""
+    if d.get("predicted"):
+        return
+    from ..engines import metrics
+    from .views import source_of
+
+    c = get_db().creators.find_one({"_id": d["creator_id"]})
+    if not c:
+        return
+    if metrics.has_reels(c):
+        basis, source = "median of recent posts", source_of(c, "reels.0.views")
+    elif (c.get("manual") or {}).get("avg_views"):
+        basis, source = "self-reported average views", "manual"
+    else:
+        basis, source = "estimated from followers", source_of(c, "followers")
+    d["predicted"] = {"views": round(metrics.median_views(c)), "basis": basis, "source": source, "at": now_iso()}
+
+
 def _finished(d: dict) -> None:
     """A deal was approved: the creator's plan is recalculated with it."""
     from . import coach
@@ -189,6 +208,7 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         if d.get("kind") == "collective":
             d["contract"]["signed_by_brand"] = d["contract"].get("signed_by_brand") or d.get("created_at")
         d["stage"] = "contract"
+        _predict(d)
         _event(d, "contract", f"{creator.get('name')} accepted and e-signed the contract")
         _invoice_for(d, "pending")
         _maybe_fund_from_collective(d)
@@ -209,6 +229,7 @@ def act(deal_id: str, role: str, action: str, payload: dict) -> dict:
         d["contract"].update({"signed_by_creator": d["counter"]["at"], "signed_by_brand": now_iso(), "brand_signature": payload.get("name") or brand.get("name"), "creator_signature": creator.get("name")})
         d["counter"]["accepted_at"] = now_iso()
         d["stage"] = "contract"
+        _predict(d)
         _event(d, "contract", f"{brand.get('name')} accepted the counter at {inr(d['amount'])}; contract signed by both")
         _invoice_for(d, "pending")
     elif role == "brand" and action == "decline_counter":
@@ -396,6 +417,9 @@ def view(d: dict, role: str) -> dict:
         "escrow": d.get("escrow"),
         "proof_url": d.get("proof_url"),
         "verify_due": d.get("verify_due"),
+        "predicted": d.get("predicted"),
+        "result": d.get("result"),
+        "rating": {k: v for k, v in d["rating"].items() if k != "by"} if d.get("rating") else None,
         "auto_release_on": due.isoformat() if due else None,
         "verification": d.get("verification"),
         "post_check": d.get("post_check") or (post_check(d) if d["stage"] == "live" else None),

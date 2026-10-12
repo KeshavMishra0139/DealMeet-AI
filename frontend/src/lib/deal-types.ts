@@ -43,6 +43,11 @@ export interface Deal {
   auto_release_on: string | null;
   verification: (PostCheck & { auto?: boolean; approved_by?: "brand" | "auto"; approved_at?: string }) | null;
   post_check: PostCheck | null;
+  /** Views expected when the offer was accepted, for the case study. */
+  predicted: { views: number; basis: string; source: string; at: string } | null;
+  /** The creator's own view count after the deal (self-reported). */
+  result: { views: number; source: "manual"; at: string } | null;
+  rating: { stars: number; note: string | null; at: string } | null;
   revisions: { reason: string; at: string; post: string | null }[];
   payout: { status: "simulated" | "not_connected" | "paid"; at: string } | null;
   payouts: { creator_id: string; amount: number; mode: "simulated" | "provider"; at: string }[];

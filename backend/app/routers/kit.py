@@ -11,6 +11,7 @@ from ..config import get_settings, now_iso
 from ..db import get_db
 from ..engines.fair_price import fair_price
 from ..services import auth as au
+from ..services import branding, creator_page, ratelimit
 from ..services import media_kit as mk
 from ..services.creator_ctx import load_creator
 
@@ -35,6 +36,7 @@ class PublicIn(BaseModel):
     stats: bool
     demographics: bool
     rates: bool
+    collabs: bool = True  # past collaborations and case studies
 
 
 @router.post("/creators/{creator_id}/kit")
@@ -104,7 +106,32 @@ def public_page(handle: str, lang: str | None = Query(None, pattern="^(en|hi)$")
     c = get_db().creators.find_one({"handle": handle.lstrip("@")})
     if not c or c.get("public_page") is False:
         raise HTTPException(404, "This page isn't here")
-    return mk.public_kit(c, lang)
+    return {**mk.public_kit(c, lang), **creator_page.public_extras(c, mk.public_scopes(c))}
+
+
+# ------------------------------------------------------------------ positioning
+class BrandingEdit(BaseModel):
+    positioning: str | None = Field(default=None, min_length=10, max_length=120)
+    pillars: list[str] | None = Field(default=None, min_length=3, max_length=3)
+    bio_suggestions: list[str] | None = Field(default=None, min_length=2, max_length=2)
+    show_on_page: bool | None = None
+
+
+@router.get("/creators/{creator_id}/branding")
+def get_branding(creator_id: str, _: dict = Depends(au.own_creator)):
+    return {"branding": load_creator(creator_id).get("branding")}
+
+
+@router.post("/creators/{creator_id}/branding/regenerate")
+def regenerate_branding(creator_id: str, _: dict = Depends(au.own_creator)):
+    """Writes (or rewrites) the positioning, pillars and bio suggestions."""
+    ratelimit.enforce(f"branding:{creator_id}", 10, 3600, "That's a lot of rewrites this hour. Edit the current one, or try again later.")
+    return {"branding": branding.generate_for(load_creator(creator_id))}
+
+
+@router.patch("/creators/{creator_id}/branding")
+def edit_branding(creator_id: str, body: BrandingEdit, _: dict = Depends(au.own_creator)):
+    return {"branding": branding.edit(load_creator(creator_id), body.model_dump(exclude_none=True))}
 
 
 class BookIn(BaseModel):

@@ -69,6 +69,45 @@ def deal_action(deal_id: str, body: ActionIn, user: dict = Depends(au.current_us
     return rail.act(deal_id, side, body.action, body.model_dump())
 
 
+class RatingIn(BaseModel):
+    stars: int = Field(ge=1, le=5)
+    note: str | None = Field(default=None, max_length=280)
+
+
+@router.post("/deals/{deal_id}/rating")
+def rate_creator(deal_id: str, body: RatingIn, user: dict = Depends(au.current_user)):
+    """The brand rates the creator, once, after the post is approved."""
+    d, side = _party(deal_id, user)
+    if side != "brand":
+        raise HTTPException(403, "Only the brand on this deal can rate it.")
+    if d["stage"] not in ("verified", "paid"):
+        raise HTTPException(409, "Rate the creator after you approve the post.")
+    rating = {"stars": body.stars, "note": (body.note or "").strip() or None, "at": now_iso(), "by": user["_id"]}
+    res = get_db().deals.update_one({"_id": deal_id, "rating": {"$exists": False}}, {"$set": {"rating": rating}})
+    if not res.modified_count:
+        raise HTTPException(409, "You've already rated this deal.")
+    au.audit("deal_rated", user["_id"], "brand", deal_id=deal_id, stars=body.stars)
+    return {"rating": rating}
+
+
+class ResultIn(BaseModel):
+    views: int = Field(ge=0, le=2_000_000_000)
+
+
+@router.post("/deals/{deal_id}/results")
+def report_results(deal_id: str, body: ResultIn, user: dict = Depends(au.current_user)):
+    """The creator's own view count for a completed deal, labelled self-reported.
+    Views from a connected account replace it on the public page."""
+    d, side = _party(deal_id, user)
+    if side != "creator":
+        raise HTTPException(403, "Only the creator on this deal can report its results.")
+    if d["stage"] not in ("verified", "paid"):
+        raise HTTPException(409, "Report results after the post is approved.")
+    result = {"views": body.views, "source": "manual", "at": now_iso()}
+    get_db().deals.update_one({"_id": deal_id}, {"$set": {"result": result}})
+    return {"result": result}
+
+
 def _brand_party(deal_id: str, user: dict) -> dict:
     d, side = _party(deal_id, user)
     if side != "brand":
