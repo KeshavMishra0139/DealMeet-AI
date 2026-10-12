@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ErrorState } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
@@ -28,6 +28,9 @@ function Waiting() {
 export function RequireSession({ role, needsProfile = true, children }: { role: Role; needsProfile?: boolean; children: ReactNode }) {
   const session = useSession(role);
   const location = useLocation();
+  // Whether the account already had a profile when this page opened. Onboarding sends an
+  // account that has one home, but not one that just made it here (onboarding moves on itself).
+  const hadProfile = useRef<boolean | null>(null);
   if (session.isPending) return <Waiting />;
   if (session.isError)
     return (
@@ -42,8 +45,9 @@ export function RequireSession({ role, needsProfile = true, children }: { role: 
   }
   if (me.user.role !== role) return <WrongSide me={me} wanted={role} />;
   const hasProfile = role === "creator" ? !!me.user.creator_id && !!me.profile : !!me.user.brand_id && !!me.profile;
+  if (hadProfile.current === null) hadProfile.current = hasProfile;
   if (needsProfile && !hasProfile) return <Navigate to={ONBOARDING[role]} replace />;
-  if (!needsProfile && hasProfile) return <Navigate to={HOME[role]} replace />;
+  if (!needsProfile && hasProfile && hadProfile.current) return <Navigate to={HOME[role]} replace />;
   return <>{children}</>;
 }
 
