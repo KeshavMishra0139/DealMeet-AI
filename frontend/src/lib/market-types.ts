@@ -280,3 +280,38 @@ export interface Console {
     updated: string;
   }[];
 }
+
+/** GET /brands/{id}/creators: brand creator search (backend services/creator_search.py). */
+export interface CreatorSearchOption {
+  id: string;
+  label: string;
+}
+
+export interface CreatorSearchResult {
+  id: string;
+  name: string;
+  handle: string | null;
+  avatar_hue: number;
+  is_reference: boolean;
+  niche_label: string;
+  languages: string[];
+  city: string | null;
+  audience_stage: string;
+  /** False when the creator doesn't share stats with this brand: followers and reach are then null. */
+  shares_stats: boolean;
+  followers: number | null;
+  followers_source: string | null;
+  reach_views: number | null;
+  reach_source: string | null;
+  sample: boolean;
+}
+
+export interface CreatorSearch {
+  results: CreatorSearchResult[];
+  total: number;
+  page: number;
+  pages: number;
+  /** Creators left out of a reach filter because they don't share stats with this brand. */
+  hidden_by_reach: number;
+  options: { niches: CreatorSearchOption[]; followers: CreatorSearchOption[]; reach: CreatorSearchOption[]; sorts: CreatorSearchOption[] };
+}

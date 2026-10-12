@@ -17,7 +17,7 @@ from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
 from ..services import auth as au
-from ..services import cache, social_signin
+from ..services import cache, reach, social_signin
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
 
@@ -242,6 +242,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         doc["avg_comments"] = int(sum(r["comments"] for r in doc["reels"]) / len(doc["reels"]))
     if AGE_PROFILES.get(body.niche) is None:
         raise HTTPException(422, "Unknown niche")
+    doc.update(reach.measured(doc))  # brand search filters on it
     db.creators.insert_one(doc)
     au.link_profile(user, cid)
     # Signed in with Instagram or YouTube: their real numbers replace what was typed.

@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from ..config import now_iso, today
@@ -22,6 +22,7 @@ from ..services import cache
 from ..services import campaigns as camp
 from ..services import collectives
 from ..services import consent as cs
+from ..services import creator_search
 from ..services import fan_proof, offers, payments, tee
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
@@ -375,6 +376,23 @@ def _audience_overlap(audience: dict, brand: dict) -> dict:
     out = tee.protected(overlap_engine.JOB, overlap_engine.minimise(audience, brand.get("target") or {}), overlap_engine.compute)
     note = OVERLAP_NOTE["tee" if out["processed_in"] == "tee" else out["tee_status"]]
     return {**out["result"], "processed_in": out["processed_in"], "tee_status": out["tee_status"], "note": note}
+
+
+@router.get("/brands/{brand_id}/creators")
+def search_creators(
+    brand_id: str,
+    q: str | None = Query(default=None, max_length=80),
+    niche: str | None = Query(default=None, max_length=40),
+    followers: str | None = Query(default=None, max_length=20),
+    reach: str | None = Query(default=None, max_length=20),
+    sort: str = Query(default="reach", max_length=10),
+    page: int = Query(default=1, ge=1, le=200),
+    _: dict = Depends(au.own_brand),
+):
+    """Find creators: partial text match, exact niche, follower band and reach range.
+    Only fields this brand may see (services/creator_search.py)."""
+    _brand(brand_id)
+    return creator_search.search(brand_id, q, niche, followers, reach, sort, page)
 
 
 @router.get("/brands/{brand_id}/creators/{creator_id}")
