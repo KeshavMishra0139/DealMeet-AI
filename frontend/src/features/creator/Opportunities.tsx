@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, CalendarDays, Check, EyeOff, Lock, Plus, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
 import { Reveal } from "@/components/motion/Motion";
@@ -118,6 +119,29 @@ export default function Opportunities() {
                 </li>
               ))}
             </ul>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {data.data && (data.data.hidden_by_prefs?.length ?? 0) > 0 && (
+        <Popover>
+          <PopoverTrigger className="ml-4 mt-6 inline-flex items-center gap-2 text-xs text-muted underline decoration-dotted underline-offset-4 hover:text-fg">
+            <EyeOff className="size-3.5" aria-hidden />
+            {data.data.hidden_by_prefs?.length} hidden by your preferences
+          </PopoverTrigger>
+          <PopoverContent>
+            <p className="font-display text-sm font-semibold">Outside your collaboration preferences</p>
+            <ul className="mt-2 space-y-2.5">
+              {data.data.hidden_by_prefs?.map((h) => (
+                <li key={h.id} className="text-[13px]">
+                  <p className="font-medium">{h.title}</p>
+                  <p className="text-xs text-muted">{h.reason}</p>
+                </li>
+              ))}
+            </ul>
+            <Link to="/creator/profile" className="mt-3 inline-block text-xs text-accent hover:underline">
+              Change preferences
+            </Link>
           </PopoverContent>
         </Popover>
       )}

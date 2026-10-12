@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 17 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 18 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -246,6 +246,16 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
 
+## Creator profile, completeness and brand-readiness
+
+**Profile** in the Studio edits name, bio, niche, content categories, city, languages, formats, platforms and collaboration preferences (paid, barter or both; a minimum fee; categories to avoid). Opportunities that don't fit the preferences are hidden from the list, with the reason one tap away.
+
+- **Profile completeness**: a fixed checklist of 10 items, 10 points each (name, a bio of 30+ characters, niche, content categories, city, languages, formats, platforms, collaboration preferences, audience numbers). Every missing item shows one suggested fix (rule-based text).
+- **Brand-readiness**: professional account connected, bio filled in, posting consistency (posts in the last 30 days), niche focus (share of recent posts on the top topic), disclosure on paid posts, and audience demographics available. Each item shows its data source. Items that need a connected account say "connect to check" instead of failing; the score is passed items over applicable ones.
+- **Self-reported numbers**: followers, average views and engagement, stored with `source: "manual"` and their history, labelled **Self-reported**. They feed the price only where no connected account provides the number ("Estimate from self-reported numbers"), and never replace connected numbers.
+- Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
+- Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
+
 ## YouTube Analytics (optional)
 
 After linking a channel, a creator can click **Connect YouTube Analytics**. Only then does the app ask Google (through Firebase) for `youtube.readonly` and `yt-analytics.readonly`; ordinary sign-in never asks, so brands are never asked for YouTube access. The same plain-language consent comes first.
@@ -337,14 +347,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 207 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
-| `make e2e` | 17 journeys in a real browser (below) |
+| `make test` | 216 API tests (below), the copy rules on about 3,200 UI strings, and the TypeScript type check |
+| `make e2e` | 18 journeys in a real browser (below) |
 | `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Profile: owner-only access, edits that persist, invalid input, completeness, readiness with and without a connected account, self-reported numbers with history that never replace connected ones, preferences filtering opportunities, and private fields kept from brands and public pages.
 - YouTube Analytics: 28-day numbers, a token that's never stored, another account's channel refused, no channel, a declined permission, disconnect, and owner-only access.
 - YouTube data (against a fake Data API): median-views pricing per format, no `search.list`, the 12-hour cache, the per-IP limit, unknown handle, used-up quota, network failure, hidden subscribers, too few videos, linking with posts and a daily snapshot, unlinking, and owner-only access.
 - Firebase sign-in: a forged token, an expired or revoked token, a token from another Firebase project (checked by the real Admin SDK, offline), a first sign-in, a role that can't change, and linking a verified email.
@@ -364,6 +375,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Editing the profile: completeness rises and the edit survives a reload.
 - The public "What am I worth?" page saying plainly when YouTube data isn't connected.
 - The sign-in gate, and an email sign-up that sets up a brand, survives a reload and signs out.
 - Onboarding.

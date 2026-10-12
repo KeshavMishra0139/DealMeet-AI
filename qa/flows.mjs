@@ -183,6 +183,23 @@ await step("Link-in-bio: a brand books from the public page; it lands in the cre
   await page.getByText("Otaku Threads").first().waitFor();
 });
 
+await step("Profile: edit the bio and preferences; completeness rises and it persists after a reload", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/profile?as=cr_b`);
+  const ring = page.locator("section[aria-labelledby=complete]");
+  const before = Number(await ring.locator(".num").first().innerText());
+  await page.getByLabel("Content categories").fill("quick breakfasts, ragi recipes");
+  await page.getByLabel("Minimum fee (₹)").fill("1500");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByText("Profile saved").waitFor();
+  await page.reload();
+  await page.getByLabel("Content categories").waitFor();
+  if ((await page.getByLabel("Content categories").inputValue()) !== "quick breakfasts, ragi recipes") throw new Error("categories didn't persist");
+  const after = Number(await ring.locator(".num").first().innerText());
+  if (!(after > before)) throw new Error(`completeness ${before} -> ${after}`);
+  await page.locator("section[aria-labelledby=ready]").getByText("connect to check").first().waitFor();
+});
+
 await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () => {
   await page.goto(`${BASE}/creator?as=cr_a&lang=en`);
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();

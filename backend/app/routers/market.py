@@ -35,7 +35,7 @@ def opportunities(creator_id: str):
     counts: dict[str, int] = {}
     for item in data["items"]:
         counts[item["type"]] = counts.get(item["type"], 0) + 1
-    return {"items": data["items"], "hidden": data["hidden"], "counts": counts}
+    return {"items": data["items"], "hidden": data["hidden"], "hidden_by_prefs": data["hidden_by_prefs"], "counts": counts}
 
 
 class ApplyIn(BaseModel):

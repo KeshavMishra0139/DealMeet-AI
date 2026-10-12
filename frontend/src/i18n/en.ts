@@ -8,6 +8,7 @@ export const en = {
   "nav.kit": "Media kit",
   "nav.privacy": "Privacy",
   "nav.connections": "Connections",
+  "nav.profile": "Profile",
   "connections.title": "Connections",
   "nav.more": "More",
   "home.greeting": "Here's what to do this week",
