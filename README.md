@@ -220,7 +220,7 @@ Motion is there to explain, not decorate. Every effect checks reduced motion fir
 
 | Where | What it does |
 | --- | --- |
-| Landing (1280 px and wider) | A 3D "creator core" with brand cards and rupee coins in orbit, following the pointer and the scroll |
+| Landing | A light hero card over a looping background video (paused on its first frame with reduced motion), a floating pill navigation with **Check your worth** emphasised, and a "Works with" logo scroller in pure CSS that pauses on hover and becomes a still, wrapped list with reduced motion. The landing loads no 3D |
 | Creator Studio home | **Reach vs followers in 3D**: the last 6 reels rise as bars through a glass plane set at the follower count, so "reach is about 7x followers" is visible at a glance. Hover a bar for its views |
 | Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to payout |
 | Brand Console campaign | **Match space**: matched creators placed by fair price, reach and trust, coloured and sized by fit. Drag to turn it, hover for details, click to open a profile |
@@ -648,6 +648,6 @@ scripts/           cross-platform dev, demo and test runners
 
 ## Stack
 
-- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, three.js with React Three Fiber and drei, Recharts, Lucide, React Router, TanStack Query; Sora and Inter.
+- **Web**: React 19, TypeScript, Vite, Tailwind CSS 4, Radix primitives (shadcn-style), Framer Motion, three.js with React Three Fiber and drei, Recharts, Lucide, Simple Icons, React Router, TanStack Query; Outfit and Inter (self-hosted).
 - **API**: FastAPI, Pydantic, scikit-learn, ReportLab, httpx.
 - **Data and services**: MongoDB or mongomock; optional Firebase Auth, Razorpay test mode and a language model.
