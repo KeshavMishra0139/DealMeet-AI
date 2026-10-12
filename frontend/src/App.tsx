@@ -34,6 +34,9 @@ const Worth = lazy(() => import("@/features/public/Worth"));
 const Brands = lazy(() => import("@/features/public/Brands"));
 const BrandPage = lazy(() => import("@/features/public/BrandPage"));
 const CreatorDreamBrands = lazy(() => import("@/features/creator/DreamBrands"));
+const CreatorPitches = lazy(() => import("@/features/creator/Pitches"));
+const PitchShare = lazy(() => import("@/features/public/PitchShare"));
+const BrandFanInbox = lazy(() => import("@/features/brand/FanInbox"));
 const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
 const CreatorProfile = lazy(() => import("@/features/creator/Profile"));
 const DemoCompare = lazy(() => import("@/features/demo/Compare"));
@@ -69,6 +72,7 @@ export default function App() {
         <Route path="/worth" element={<Worth />} />
         <Route path="/brands" element={<Brands />} />
         <Route path="/brands/:slug" element={<BrandPage />} />
+        <Route path="/p/:slug" element={<PitchShare />} />
 
         <Route
           path="/creator/onboarding"
@@ -89,6 +93,7 @@ export default function App() {
           <Route path="deals/:id" element={<DealView role="creator" />} />
           <Route path="kit" element={<CreatorKit />} />
           <Route path="brands" element={<CreatorDreamBrands />} />
+          <Route path="pitches" element={<CreatorPitches />} />
           <Route path="privacy" element={<CreatorPrivacy />} />
           <Route path="connections" element={<CreatorConnections />} />
           <Route path="profile" element={<CreatorProfile />} />
@@ -113,6 +118,7 @@ export default function App() {
           <Route path="deals/:id" element={<DealView role="brand" />} />
           <Route path="collectives/:id" element={<CollectiveDetail />} />
           <Route path="profile" element={<BrandProfile />} />
+          <Route path="inbox" element={<BrandFanInbox />} />
         </Route>
 
         <Route path="/demo/compare" element={<DemoCompare />} />

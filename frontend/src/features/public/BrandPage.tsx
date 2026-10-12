@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Building2, ExternalLink, Flag, Globe, Heart, KeyRound, Megaphone, Users } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Building2, ExternalLink, Flag, Globe, Heart, KeyRound, Megaphone, Send, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -80,7 +80,16 @@ export default function BrandPage() {
                     {p.category} {!p.claimed && <Badge size="sm" variant="outline">Unclaimed</Badge>} <SourceBadge source={p.source} />
                   </p>
                 </div>
-                {p.viewer.role === "creator" && p.viewer.creator_id && <DreamButton page={p} creatorId={p.viewer.creator_id} />}
+                {p.viewer.role === "creator" && p.viewer.creator_id && (
+                  <div className="flex flex-col items-end gap-2">
+                    <DreamButton page={p} creatorId={p.viewer.creator_id} />
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/creator/pitches?brand=${p.id}&name=${encodeURIComponent(p.name)}`}>
+                        <Send aria-hidden /> Pitch this brand
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {!p.claimed && (

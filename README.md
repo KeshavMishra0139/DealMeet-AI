@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 23 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 24 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -257,6 +257,20 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Fan Proof, AI Pitch Builder and the Brand Fan Inbox
+
+**Fan Proof** (`services/fan_proof.py`) scans a creator's posts synced through the official APIs (Instagram captions, YouTube titles and descriptions) for a brand's `@handle` (from its organisation profile or public handles) or `#brandname` (its name without spaces). Posts with `#ad`, `#ads`, `#sponsored`, `#collab` or "paid partnership" don't count; typed-in or sample data never counts. It stores the first mention date, the count and up to 10 post links per platform, is rebuilt after each sync, and is deleted when that platform is disconnected. It shows as "Fan since <month year> · N unpaid mentions" on pitches, Dream Brands and the brand's view of the creator. We never say "following since": the APIs don't show who a creator follows.
+
+**AI Pitch Builder** (Studio → Pitches, or "Pitch this brand" on a brand page):
+
+- Written through `ai/llm.py` `generate` with a strict schema (subject, a pitch of at most 150 words, exactly 3 content ideas), the copy rules and a check that every number is in the creator's facts; otherwise the template writes it. English or Hindi.
+- Input: the creator's stats with their sources, niche, audience, Fan Proof and the brand's public info. The **suggested price range comes from the fair-price engine**, never from the model.
+- The creator edits before sending. Edits are checked too: no promises, and no numbers that aren't in their data (small counts like "2 reels" are fine).
+- A brand on the platform gets the pitch in its **Fan Inbox**. For a brand that isn't, the creator gets a share link `/p/:slug` (unguessable, revocable, no private data) to send themselves.
+- **5 sent pitches per creator per rolling 7 days**, enforced on the server; one unanswered pitch per brand at a time.
+
+**Brand Fan Inbox** (Brand Console → Fan Inbox): only pitches sent to that brand, sorted by audience fit (the existing matching) and Fan Proof, with a "connected accounts only" filter. **Accept** creates an offer in the usual deal flow; **Decline** sends the creator a polite note.
+
 ## Brand directory, unclaimed brands and Dream Brands
 
 **Directory** (`/brands`, public): search by name, category, city, language and "has open campaigns". Each brand has a page at `/brands/:slug` with its description, website and live campaigns (drafts never show).
@@ -423,14 +437,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 278 API tests (below), the copy rules on about 4,800 UI strings, and the TypeScript type check |
-| `make e2e` | 23 journeys in a real browser (below) |
-| `make shots` | 80 screenshots (40 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 290 API tests (below), the copy rules on about 5,000 UI strings, and the TypeScript type check |
+| `make e2e` | 24 journeys in a real browser (below) |
+| `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Fan Proof and pitches: handle and hashtag matching with the paid-post exclusions, only API posts, recompute and delete on disconnect; pitch drafts from the creator's facts, a price range that never comes from the model, model answers with invented numbers, promises or over 150 words falling back, checked edits, the inbox for on-platform brands, revocable share links with no private data, the weekly limit, and accept (an offer) and decline (a polite note).
 - The brand directory: search filters, escaped input, Atlas Search on Atlas and the fallback when its index is missing, live-only campaigns on brand pages, unclaimed pages showing only public basics, admin-only listing, claims approved by an admin, removal requests (rate-limited) and Dream Brand counts, consent for names and notifications.
 - Matches and the shortlist: ranking criteria and weights on every result, evidence that follows what each creator shares, neutral scores for missing data, owner-only shortlists with notes, compare limits and ledger entries, drafts sent only on confirm, no duplicate open offers, no sending while paused, and private fields kept out.
 - Campaigns: owner-only access, invalid input, drafts hidden from creators (opportunities, the campaign page, applying and offers), publishing that lists what's missing, live campaigns that can't be edited into invalid ones, pause, resume (re-checked) and close (final), repeated requests, applications by state, and audit entries; the brand profile's owner-only access, validation (address, website, contact) and unique addresses.
@@ -456,6 +471,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Writing a pitch from the creator's own numbers, sending it, and the brand accepting it from the Fan Inbox.
 - Searching the brand directory, saving a Dream Brand and seeing it in the Studio; an unclaimed page's notice.
 - Shortlisting two matches with a note, comparing them, and sending a drafted offer after confirming.
 - A campaign saved as a draft lists what's missing, then is edited, published, paused and resumed.

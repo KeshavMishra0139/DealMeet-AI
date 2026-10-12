@@ -11,6 +11,7 @@ import {
   Map as MapIcon,
   Menu,
   RotateCcw,
+  Send,
   ShieldCheck,
   UserRound,
   Users,
@@ -44,6 +45,7 @@ const PRIMARY: NavItem[] = [
 ];
 const SECONDARY: NavItem[] = [
   { to: "/creator/brands", key: "nav.dream", icon: Heart },
+  { to: "/creator/pitches", key: "nav.pitches", icon: Send },
   { to: "/creator/profile", key: "nav.profile", icon: UserRound },
   { to: "/creator/connections", key: "nav.connections", icon: Link2 },
   { to: "/creator/kit", key: "nav.kit", icon: FileText },

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Handshake, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
+import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
@@ -34,6 +34,7 @@ const NAV = [
   { to: "/brand", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/brand/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/brand/deals", label: "Deals", icon: Handshake },
+  { to: "/brand/inbox", label: "Fan Inbox", icon: Inbox },
   { to: "/brand/profile", label: "Brand profile", icon: Building2 },
 ];
 

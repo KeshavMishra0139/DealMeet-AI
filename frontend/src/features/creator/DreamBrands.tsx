@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Heart, Search, Trash2 } from "lucide-react";
+import { Bell, Heart, Search, Send, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/shared/Bits";
@@ -13,7 +13,7 @@ import { useCreatorId } from "@/lib/session";
 import { BrandTile, type BrandCard } from "@/features/public/Brands";
 
 interface Dream {
-  items: (BrandCard & { saved_at: string | null; show_name: boolean })[];
+  items: (BrandCard & { saved_at: string | null; show_name: boolean; fan_proof: { label: string } | null })[];
   notifications: { id: string; brand_id: string; brand_name: string; listing_id: string; title: string; listing_type: string; at: string; read: boolean }[];
   unread: number;
 }
@@ -96,14 +96,22 @@ export default function DreamBrands() {
           {d.items.map((b) => (
             <li key={b.id} className="flex flex-col gap-2">
               <BrandTile b={b} />
+              {b.fan_proof && <p className="px-1 text-xs text-fg-2">{b.fan_proof.label}</p>}
               <div className="flex items-center justify-between gap-2 px-1">
                 <label className="flex items-center gap-2 text-xs text-fg-2">
                   <Switch checked={b.show_name} onCheckedChange={(v) => share.mutate({ brandId: b.id, show: v })} aria-label={`Let ${b.name} see my name`} />
                   Let them see my name
                 </label>
-                <Button size="sm" variant="ghost" onClick={() => remove.mutate(b.id)} aria-label={`Remove ${b.name} from your Dream Brands`}>
-                  <Trash2 aria-hidden />
-                </Button>
+                <span className="flex gap-1">
+                  <Button asChild size="sm" variant="outline">
+                    <Link to={`/creator/pitches?brand=${b.id}&name=${encodeURIComponent(b.name)}`}>
+                      <Send aria-hidden /> Pitch
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove.mutate(b.id)} aria-label={`Remove ${b.name} from your Dream Brands`}>
+                    <Trash2 aria-hidden />
+                  </Button>
+                </span>
               </div>
             </li>
           ))}

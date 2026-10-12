@@ -10,6 +10,7 @@ export const en = {
   "nav.connections": "Connections",
   "nav.profile": "Profile",
   "nav.dream": "Dream Brands",
+  "nav.pitches": "Pitches",
   "connections.title": "Connections",
   "nav.more": "More",
   "home.greeting": "Here's what to do this week",

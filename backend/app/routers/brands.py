@@ -20,7 +20,7 @@ from ..services import brand_profile as bp
 from ..services import cache
 from ..services import campaigns as camp
 from ..services import consent as cs
-from ..services import offers, payments
+from ..services import fan_proof, offers, payments
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
 
@@ -427,6 +427,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
         "demographics": demographics,
         "rate_card": rate_card,
         "listing": {"id": listing["_id"], "title": listing["title"]} if listing else None,
+        "fan_proof": fan_proof.summary(creator_id, brand_id),
         "deal": out(db.deals.find_one({"creator_id": creator_id, "brand_id": brand_id, "listing_id": listing_id})) if listing_id else None,
     }
 
