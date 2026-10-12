@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ErrorState, SectionTitle } from "@/components/shared/Bits";
 import { KitCard } from "@/components/shared/KitCard";
+import { QrCode } from "@/components/shared/QrCode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Segmented, Skeleton, Switch, Textarea } from "@/components/ui/form";
@@ -38,7 +39,7 @@ export default function Kit() {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   if (!q.data) return <Skeleton className="h-[600px] rounded-[28px]" />;
   const k = q.data;
-  const pub = k.public ?? { stats: true, demographics: false, rates: true };
+  const pub = { collabs: true, ...(k.public ?? { stats: true, demographics: false, rates: true }) };
   const url = `${window.location.origin}${k.path}`;
 
   return (
@@ -75,6 +76,9 @@ export default function Kit() {
             <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm">
               <Link2 className="size-4 shrink-0 text-accent" aria-hidden />
               <span className="truncate">{`${window.location.host}${k.path}`}</span>
+            </div>
+            <div className="mt-3 flex justify-center">
+              <QrCode url={url} label={`QR code for your JodiDar page, ${url}`} size={120} fileName={`jodidar-${k.handle}.png`} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
@@ -115,6 +119,7 @@ export default function Kit() {
                 ["stats", "Reach and engagement"],
                 ["demographics", "Audience demographics"],
                 ["rates", "Rate card"],
+                ["collabs", "Past collaborations and case studies"],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="flex items-center justify-between gap-4 py-2 text-sm">
@@ -133,6 +138,7 @@ export default function Kit() {
       </div>
 
       <Versions creatorId={id} kit={k} lang={lang} />
+      <Positioning creatorId={id} />
     </div>
   );
 }
@@ -264,6 +270,94 @@ function Versions({ creatorId, kit, lang }: { creatorId: string; kit: KitData; l
         </ol>
         {list.data && <p className="mt-2 text-xs text-muted">Up to {list.data.max} versions. Each keeps the content and PDF it was saved with.</p>}
       </div>
+    </section>
+  );
+}
+
+interface BrandingData {
+  positioning: string;
+  pillars: string[];
+  bio_suggestions: string[];
+  written_by: "ai" | "template";
+  generated_at: string;
+  edited: boolean;
+  show_on_page: boolean;
+}
+
+/** A positioning line, 3 content pillars and 2 bio ideas, written from your niche and top posts. */
+function Positioning({ creatorId }: { creatorId: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["branding", creatorId], queryFn: () => api<{ branding: BrandingData | null }>(`/creators/${creatorId}/branding`) });
+  const done = (d: { branding: BrandingData }) => {
+    qc.setQueryData(["branding", creatorId], d);
+    void qc.invalidateQueries({ queryKey: ["public"] });
+  };
+  const write = useMutation({ mutationFn: () => post<{ branding: BrandingData }>(`/creators/${creatorId}/branding/regenerate`), onSuccess: done, onError: (e) => toast.error((e as Error).message) });
+  const save = useMutation({
+    mutationFn: (body: Partial<BrandingData>) => api<{ branding: BrandingData }>(`/creators/${creatorId}/branding`, { method: "PATCH", json: body }),
+    onSuccess: (d) => (done(d), toast.success("Positioning saved")),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const b = q.data?.branding;
+  const [line, setLine] = useState<string | null>(null);
+  const text = line ?? b?.positioning ?? "";
+  return (
+    <section aria-labelledby="positioning" className="card-surface mt-8 rounded-[var(--radius-card)] p-5">
+      <SectionTitle id="positioning" eyebrow="Branding" title="Your positioning" />
+      {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+      {q.data && !b && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-fg-2">A one-line positioning, three content pillars and two bio ideas, written from your niche and top posts.</p>
+          <Button variant="primary" loading={write.isPending} onClick={() => write.mutate()}>
+            Write my positioning
+          </Button>
+        </div>
+      )}
+      {b && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="pos-line">Positioning</Label>
+              <Input id="pos-line" value={text} onChange={(e) => setLine(e.target.value)} maxLength={120} />
+            </div>
+            <label className="flex items-center justify-between gap-4 text-sm">
+              Show it on my public page
+              <Switch checked={b.show_on_page} onCheckedChange={(v) => save.mutate({ show_on_page: v })} aria-label="Show the positioning on my public page" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" disabled={text === b.positioning} loading={save.isPending} onClick={() => save.mutate({ positioning: text })}>
+                Save
+              </Button>
+              <Button size="sm" variant="outline" loading={write.isPending} onClick={() => (setLine(null), write.mutate())}>
+                Rewrite
+              </Button>
+            </div>
+            <p className="text-xs text-muted">{b.edited ? "Edited by you." : b.written_by === "ai" ? "Drafted by AI from your niche and top posts." : "Drafted from a template."}</p>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Content pillars</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {b.pillars.map((p) => (
+                  <li key={p}>
+                    <Badge>{p}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Bio ideas</p>
+              <ul className="mt-1.5 space-y-1.5">
+                {b.bio_suggestions.map((x) => (
+                  <li key={x} className="rounded-xl bg-surface-2 px-3 py-2 text-fg-2">
+                    {x}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

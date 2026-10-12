@@ -224,6 +224,22 @@ await step("Pitch: a creator writes a pitch from their own numbers and sends it;
   await page.getByText(/Offer sent to/).waitFor();
 });
 
+await step("Public page: write a positioning, show it on the page with badges, an estimate and a QR code", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/kit?as=cr_a`);
+  await page.getByRole("button", { name: "Write my positioning" }).click();
+  await page.getByText("Content pillars").waitFor();
+  await page.getByLabel("Positioning", { exact: true }).fill("Anime edits people rewatch, in Hindi and English");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText("Positioning saved").first().waitFor();
+  await page.getByRole("switch", { name: "Show the positioning on my public page" }).click();
+  await page.goto(`${BASE}/c/creator.a`);
+  await page.getByText("Anime edits people rewatch, in Hindi and English").waitFor();
+  await page.getByText(/Estimated range/).first().waitFor();
+  await page.getByRole("img", { name: /QR code for Creator A/ }).waitFor();
+  await page.getByRole("link", { name: "Download QR" }).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();

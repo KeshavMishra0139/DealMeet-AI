@@ -27,7 +27,7 @@ export interface Kit {
   from_rate: number | null;
   trust: { score: number; level: "high" | "medium" | "low"; reasons: string[] } | null;
   safety_note: string | null;
-  public?: { stats: boolean; demographics: boolean; rates: boolean };
+  public?: { stats: boolean; demographics: boolean; rates: boolean; collabs?: boolean };
   sections?: Record<KitSection, boolean>;
   /** Set when this is a saved version; null for the live view. */
   version?: { number: number; saved_on: string } | null;
@@ -37,6 +37,27 @@ export interface Kit {
   path: string;
   generated_on: string;
   has_simulated: boolean;
+}
+
+export interface PageBadge {
+  key: "connected" | "on_time" | "completed" | "rating" | "collective";
+  label: string;
+  detail: string;
+  sample: boolean;
+}
+
+/** The full public creator page: the kit plus what only the page shows. */
+export interface PublicPage extends Kit {
+  niche_tags: string[];
+  positioning: string | null;
+  badges: PageBadge[];
+  collaborations: { brand: string; slug: string | null; month: string | null; deliverables: string; sample: boolean }[] | null;
+  top_posts: { platform: string; url: string | null; text: string; views: number | null; views_label: string; published_at: string | null; source: DataSource }[] | null;
+  fan_badges: { brand: string; slug: string | null; label: string }[];
+  case_studies:
+    | { brand: string | null; predicted_views: number; predicted_label: string; predicted_source: string | null; actual_views: number | null; actual_label: string | null; actual_source: string | null; paid_in_days?: number; sample: boolean }[]
+    | null;
+  estimate: { range: { low: number; high: number }; deliverables: string; label: string; data_label: string; data_source: string } | null;
 }
 
 export interface KitVersion {

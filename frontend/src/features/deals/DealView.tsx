@@ -12,6 +12,7 @@ import {
   IndianRupee,
   Lock,
   ShieldCheck,
+  Star,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -228,6 +229,7 @@ export default function DealView({ role }: { role: Role }) {
             </p>
           )}
           {(d.verification ?? d.post_check) && <PostChecks check={(d.verification ?? d.post_check)!} />}
+          {(d.stage === "verified" || d.stage === "paid") && <AfterDeal deal={d} role={role} />}
           {!d.verification && d.auto_release_on && (
             <p className="mt-3 text-xs text-muted">If {d.brand.name} doesn't review it, the post is approved automatically on {shortDate(d.auto_release_on)}.</p>
           )}
@@ -382,6 +384,77 @@ function CounterDialog({ deal, onClose, onSubmit, pending }: { deal: Deal; onClo
         </Button>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** After approval: the brand rates the creator once; the creator can add the post's views. */
+function AfterDeal({ deal, role }: { deal: Deal; role: Role }) {
+  const qc = useQueryClient();
+  const [stars, setStars] = useState(0);
+  const [note, setNote] = useState("");
+  const [views, setViews] = useState("");
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["deal", deal.id, role] });
+  const rate = useMutation({
+    mutationFn: () => post(`/deals/${deal.id}/rating`, { stars, note: note || null }),
+    onSuccess: () => (refresh(), toast.success("Thanks for rating")),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const report = useMutation({
+    mutationFn: () => post(`/deals/${deal.id}/results`, { views: Number(views.replace(/[^\d]/g, "")) }),
+    onSuccess: () => (refresh(), toast.success("Views saved", { description: "Shown as self-reported until your connected account confirms them." })),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  return (
+    <div className="mt-4 border-t border-line pt-4 text-sm">
+      {deal.predicted && (
+        <p className="text-xs text-muted">
+          Expected when the offer was accepted: about {deal.predicted.views.toLocaleString("en-IN")} views ({deal.predicted.basis}).
+        </p>
+      )}
+      {role === "brand" &&
+        (deal.rating ? (
+          <p className="mt-2">
+            You rated this creator {deal.rating.stars}/5{deal.rating.note ? `: “${deal.rating.note}”` : "."}
+          </p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <p className="font-medium">Rate the creator</p>
+            <div role="radiogroup" aria-label="Rating out of 5" className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={stars === n}
+                  aria-label={`${n} out of 5`}
+                  onClick={() => setStars(n)}
+                  className="rounded-md p-1 text-accent hover:bg-surface-2"
+                >
+                  <Star className={stars >= n ? "size-5 fill-current" : "size-5"} aria-hidden />
+                </button>
+              ))}
+            </div>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={280} placeholder="A short note (optional)" aria-label="Note with your rating" className="min-h-16" />
+            <Button size="sm" variant="primary" disabled={!stars} loading={rate.isPending} onClick={() => rate.mutate()}>
+              Save rating
+            </Button>
+            <p className="text-xs text-muted">Once per deal. It shows as an average on the creator's public page.</p>
+          </div>
+        ))}
+      {role === "creator" && (
+        <div className="mt-2 space-y-2">
+          {deal.rating && <p>{deal.brand.name} rated you {deal.rating.stars}/5.</p>}
+          <p className="font-medium">How did the post do?</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input value={views} onChange={(e) => setViews(e.target.value)} inputMode="numeric" placeholder={deal.result ? String(deal.result.views) : "Views so far"} aria-label="Views on the post" className="h-9 w-40 text-sm" />
+            <Button size="sm" variant="outline" disabled={!views} loading={report.isPending} onClick={() => report.mutate()}>
+              Save views
+            </Button>
+          </div>
+          <p className="text-xs text-muted">Shown as self-reported on your case study. A connected account's numbers replace it.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

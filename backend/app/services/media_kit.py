@@ -84,7 +84,7 @@ def public_scopes(c: dict) -> dict:
     if p is None:
         d = c.get("consent_defaults") or {}
         p = {"stats": d.get("stats", True), "demographics": d.get("demographics", False), "rates": True}
-    return p
+    return {"collabs": True, **p}
 
 
 def _date(lang: Lang) -> str:
