@@ -276,6 +276,9 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
         },
         upsert=True,
     )
+    from . import coach
+
+    coach.on_new_data(creator_id, "New YouTube data")
     return summary
 
 

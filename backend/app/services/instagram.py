@@ -416,6 +416,9 @@ def _sync(conn: dict) -> dict:
     }
     _apply_to_profile(creator_id, summary, media, insights_by_id)
     db.connections.update_one({"_id": conn["_id"]}, {"$set": {"status": "connected", "last_error": None, "last_sync_at": now, "ig_user_id": ig_id, "username": profile.get("username")}})
+    from . import coach
+
+    coach.on_new_data(creator_id, "New Instagram data")
     return summary
 
 

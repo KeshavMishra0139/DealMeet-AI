@@ -200,6 +200,21 @@ await step("Profile: edit the bio and preferences; completeness rises and it per
   await page.locator("section[aria-labelledby=ready]").getByText("connect to check").first().waitFor();
 });
 
+await step("Coach: ask about views, see the numbers used with their sources, then make a plan", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator?as=cr_a`);
+  await page.getByRole("button", { name: "Ask about your numbers" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("button", { name: "Are my views growing?" }).click();
+  await dlg.getByText("Numbers used").waitFor();
+  await dlg.getByText("What's uncertain:").waitFor();
+  await dlg.getByText(/Self-reported|Sample data|Live data/).first().waitFor();
+  await dlg.getByRole("button", { name: "Make me a plan" }).click();
+  await page.getByText(/Plan saved: 3 goals/).waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("heading", { name: "Your goals" }).waitFor();
+});
+
 await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () => {
   await page.goto(`${BASE}/creator?as=cr_a&lang=en`);
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
