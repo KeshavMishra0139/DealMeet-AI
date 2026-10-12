@@ -87,7 +87,7 @@ def pipeline(c: dict) -> dict:
     db = get_db()
     from . import deals as rail
 
-    # Sweep first, so a post past its auto-release date shows as paid, not "releases in -2 days".
+    # Sweep first, so a post past its automatic-approval date shows as approved, not "approved in -2 days".
     deals = [rail.sweep(d) for d in db.deals.find({"creator_id": c["_id"]})]
     brands = {b["_id"]: b for b in db.brands.find({})}
     offers, active, awaiting, alerts = [], [], [], []
@@ -125,8 +125,8 @@ def pipeline(c: dict) -> dict:
                     {
                         "kind": "verify_late",
                         "deal_id": d["_id"],
-                        "text": f"{b.get('name', 'The brand')} is {days} day{'s' if days != 1 else ''} late confirming your post",
-                        "detail": f"{inr(d['amount'])} is safe in escrow. Their console flags your post as overdue, and it auto-releases to you in {left} day{'s' if left != 1 else ''}.",
+                        "text": f"{b.get('name', 'The brand')} is {days} day{'s' if days != 1 else ''} late reviewing your post",
+                        "detail": f"{inr(d['amount'])} is in escrow. Their console flags your post as overdue, and it's approved automatically in {left} day{'s' if left != 1 else ''}.",
                         "hi": hindi.alert("verify_late", brand=b.get("name"), days=days, left=left, amount=d["amount"]),
                     }
                 )

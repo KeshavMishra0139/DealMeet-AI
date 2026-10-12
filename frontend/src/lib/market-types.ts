@@ -31,12 +31,13 @@ export interface Opportunity {
   why: Why;
   scopes: Scopes;
   scope_source: "grant" | "default";
-  application: "applied" | "opted_in" | "withdrawn" | null;
+  application: "applied" | "opted_in" | "shortlisted" | "offered" | "declined" | "withdrawn" | null;
 }
 
 export interface Opportunities {
   items: Opportunity[];
   hidden: { id: string; title: string; reasons: string[] }[];
+  hidden_by_prefs?: { id: string; title: string; reason: string }[];
   counts: Record<string, number>;
 }
 
@@ -56,7 +57,7 @@ export interface Privacy {
   }[];
   requests: { id: string; lister_id: string; lister: string; scopes: string[]; at: string }[];
   audit: { id: string; lister: string; action: string; scopes: string[]; at: string; actor: string }[];
-  sources: { platform: string; connected: boolean; via: string | null }[];
+  sources: { platform: string; connected: boolean; status: "connected" | "not_connected" | "unavailable" | "expired" | "error"; via: string | null }[];
   is_reference: boolean;
 }
 
@@ -80,12 +81,25 @@ export interface BrandMatch {
   cautions: string[];
   trust: TrustInfo | null;
   safety?: Safety;
-  fair: { range: { low: number; high: number }; total: number; per_reel: number; deliverables: string };
+  fair: { range: { low: number; high: number }; total: number; per_reel: number; deliverables: string; estimate?: boolean };
   within_budget: boolean;
   rate_card: number | null;
   scopes: Scopes;
   application: string | null;
   deal_stage: string | null;
+  /** How the rank was built: each part scored 0 to 1 and weighted. A null score is hidden (not shared). */
+  ranking?: { key: string; label: string; weight: number; score: number | null; missing: boolean; note: string | null }[];
+  /** What the creator chose to share with this brand, with sources. */
+  evidence?: { key: string; label: string; value: string; source: string }[];
+  limitations?: string[];
+  shortlisted?: boolean;
+}
+
+export interface RankCriterion {
+  key: string;
+  label: string;
+  weight: number;
+  how: string;
 }
 
 export interface Matches {
@@ -94,6 +108,33 @@ export interface Matches {
   detail: string;
   items: BrandMatch[];
   total: number;
+  criteria?: RankCriterion[];
+}
+
+export interface OfferDraft {
+  id: string;
+  listing_id: string;
+  creator_id: string;
+  creator_name: string | null;
+  avatar_hue: number;
+  is_reference: boolean;
+  amount: number;
+  message: string | null;
+  fair_estimate: { total: number; range: { low: number; high: number } } | null;
+  status: "draft" | "sending" | "sent";
+  deal_id: string | null;
+  updated_at: string | null;
+}
+
+export type ShortlistItem =
+  | (BrandMatch & { available: true; note: string | null; added_at: string; draft: { id: string; status: string; amount: number } | null })
+  | { id: string; available: false; note: string | null; added_at: string; draft: null; deal_stage: null };
+
+export interface Shortlist {
+  listing_id: string;
+  items: ShortlistItem[];
+  max: number;
+  criteria: RankCriterion[];
 }
 
 export interface CollectiveMember {
@@ -120,6 +161,9 @@ export interface CollectiveMember {
   trust: TrustInfo | null;
   engagement: number | null;
   opted_in: boolean;
+  /** Why the builder picked them: reach, fit, trust and price. */
+  why: string[];
+  deliverables: { kind: string; count: number }[];
 }
 
 export interface Collective {
@@ -136,6 +180,7 @@ export interface Collective {
   avg_engagement: number | null;
   cost_per_1k: number | null;
   trust_min: number;
+  method: { objective: string; effective_reach: string; overlap: string; thresholds: string[]; privacy: string };
   members: CollectiveMember[];
   excluded: { id: string; name: string; reason: string }[];
   notes: string[];
@@ -146,7 +191,7 @@ export interface Listing {
   id: string;
   type: ListingType;
   owner_id: string;
-  owner: { id: string; name: string; hue: number } | null;
+  owner: { id: string; name: string; hue: number; slug?: string | null } | null;
   title: string;
   summary: string;
   niches: string[];
@@ -163,7 +208,37 @@ export interface Listing {
   collective_size: number | null;
   deadline: string | null;
   posted_on: string | null;
-  status: string;
+  status: CampaignStatus;
+  objectives?: string[];
+  objective_labels?: string[];
+  audience?: { ages: string[]; gender: "any" | "female" | "male" } | null;
+  cities?: string[];
+  start_date?: string | null;
+  /** Owner only: what blocks going live, and the status actions open now. */
+  missing?: { field: string; message: string }[];
+  actions?: CampaignAction[];
+  history?: { at: string; by: string; action: string; from?: string; to?: string; fields?: string[]; creator_id?: string }[];
+}
+
+export type CampaignStatus = "draft" | "live" | "paused" | "closed";
+export type CampaignAction = "publish" | "pause" | "resume" | "close";
+
+export interface CampaignApplications {
+  listing_id: string;
+  status: CampaignStatus;
+  items: {
+    creator_id: string;
+    name: string;
+    handle: string;
+    avatar_hue: number;
+    is_reference: boolean;
+    niche: string;
+    status: "applied" | "shortlisted" | "offered" | "declined" | "withdrawn";
+    message: string | null;
+    at: string | null;
+    deal_id: string | null;
+  }[];
+  counts: Record<"applied" | "shortlisted" | "offered" | "declined" | "withdrawn", number>;
 }
 
 export interface Console {
@@ -185,7 +260,10 @@ export interface Console {
     deals: number;
     committed: number;
   }[];
-  escrow: { held: number; count: number; items: { deal_id: string; creator: string; amount: number; stage: string; stage_label: string }[] };
+  escrow: { held: number; simulated: boolean; count: number; items: { deal_id: string; creator: string; amount: number; stage: string; stage_label: string }[] };
+  paid_simulated: boolean;
+  payments_mode: string;
+  payout_mode: string;
   paid_total: number;
   stages: { stage: string; label: string; count: number; amount: number }[];
   needs_you: { deal_id: string; kind: string; text: string; detail: string; urgent: boolean }[];

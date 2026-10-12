@@ -12,6 +12,8 @@ import { shortDate, timeOfDay } from "@/lib/format";
 import type { Privacy as PrivacyData, Scopes } from "@/lib/market-types";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
+import { ProtectedStatus } from "@/components/shared/ProtectedStatus";
+import { useHealth } from "@/lib/shared-demo";
 
 const ACTION = {
   granted: { label: "Access granted", icon: KeyRound, tone: "text-success" },
@@ -68,6 +70,7 @@ export default function Privacy() {
             onChange={(v) => mutate.mutate({ path: "/privacy", body: { defaults: v } })}
           />
           <p className="mt-2 text-xs text-muted">Per-brand choices below override these defaults.</p>
+          <TeeLine />
         </section>
 
         <section aria-labelledby="sources" className="card-surface rounded-[var(--radius-card)] p-5">
@@ -80,7 +83,9 @@ export default function Privacy() {
                   <Icon className="size-5" aria-hidden />
                   <span className="flex-1">
                     <span className="block text-sm font-medium capitalize">{s.platform}</span>
-                    <span className="block text-xs text-muted">{s.connected ? s.via : "Not connected"}</span>
+                    <span className="block text-xs text-muted">
+                      {s.connected ? s.via : s.status === "unavailable" ? "Connect isn't available on this server yet" : "Not connected"}
+                    </span>
                   </span>
                   {s.connected ? <Badge size="sm" variant="success">Connected</Badge> : <Badge size="sm">Off</Badge>}
                 </li>
@@ -93,7 +98,7 @@ export default function Privacy() {
             read accounts that haven't connected.
           </p>
           {p.is_reference && (
-            <p className="mt-2 text-xs text-muted">This reference profile's connected data is partly simulated for the demo.</p>
+            <p className="mt-2 text-xs text-muted">This reference profile's real values come from a creator interview; the rest is sample data, marked simulated.</p>
           )}
           <Button asChild variant="outline" size="sm" className="mt-4">
             <a href={`/api/creators/${id}/export`} download={`jodidar-${id}.json`}>
@@ -210,4 +215,17 @@ export default function Privacy() {
       </section>
     </div>
   );
+}
+
+/** The server's real TEE status, for the audience overlap brands see. */
+function TeeLine() {
+  const tee = useHealth().data?.modes.tee;
+  if (!tee) return null;
+  const note =
+    tee === "available"
+      ? "Brands you share demographics with see their overlap with your audience computed inside an attested enclave."
+      : tee === "failed"
+        ? "Nothing is sent to it. The overlap brands see is computed on our server, from only the percentages it needs."
+        : "Brands you share demographics with see their overlap with your audience computed on our server, from only the percentages it needs.";
+  return <ProtectedStatus className="mt-3" processedIn={tee === "available" ? "tee" : "server"} status={tee} note={note} />;
 }

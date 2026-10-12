@@ -22,9 +22,11 @@ import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import type { FairPrice, Money as MoneyData, MoneyPath } from "@/lib/api-types";
 import { inr, inrRange, signedPct } from "@/lib/format";
+import { SourceBadge } from "@/components/shared/SourceBadge";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { StagePill } from "./Home";
+import { RateCards } from "./RateCards";
 
 const ICONS: Record<string, typeof IndianRupee> = {
   brand: Megaphone,
@@ -56,6 +58,8 @@ export default function Money() {
       {m.creator.is_reference && m.creator.reference_note && <ReferenceNote text={m.creator.reference_note} className="mt-2" />}
 
       <FairPriceCard creatorId={id} initial={m.fair} options={m.brand_options} />
+
+      <RateCards creatorId={id} />
 
       <Reveal as="section" aria-labelledby="goal" className="mt-8">
         <div className="card-surface flex flex-col gap-3 rounded-[var(--radius-card)] p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -118,7 +122,7 @@ function FairPriceCard({
               <span className="text-gradient">{inrRange(data.range.low, data.range.high)}</span>
             </p>
             <p className="mt-2 text-sm text-fg-2">
-              For <span className="font-medium text-fg">{data.lister_name}</span>. Priced on followers alone:{" "}
+              For <span className="font-medium text-fg">{data.lister_name ?? "a typical brand in your niche"}</span>. Priced on followers alone:{" "}
               <span className="num font-medium text-fg">{inr(data.follower_price)}</span>
               {data.uplift_vs_followers && data.uplift_vs_followers > 1.2 && (
                 <span className="num"> ({data.uplift_vs_followers.toFixed(1)}x less)</span>
@@ -126,6 +130,11 @@ function FairPriceCard({
               .
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {data.data_label && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-fg-2">
+                  {data.data_label} <SourceBadge source={data.data_source} />
+                </span>
+              )}
               <EstimateNote estimate={data.estimate} />
               <WhyPopover why={data.why} subject="Fair rate" />
             </div>

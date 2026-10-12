@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from ..config import now_iso, today
 from ..db import get_db
+from ..services import auth as au
+from ..services import collectives
 from ..services import deals as rail
 from ..services import payments
 from ..services.creator_ctx import load_creator
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/api", tags=["deals"])
 
 
 @router.get("/creators/{creator_id}/deals")
-def creator_deals(creator_id: str):
+def creator_deals(creator_id: str, _: dict = Depends(au.own_creator)):
     load_creator(creator_id)
     db = get_db()
     invoices = []
@@ -31,7 +33,7 @@ def creator_deals(creator_id: str):
 
 
 @router.get("/brands/{brand_id}/deals")
-def brand_deals(brand_id: str):
+def brand_deals(brand_id: str, _: dict = Depends(au.own_brand)):
     db = get_db()
     cols = []
     for col in db.collectives.find({"brand_id": brand_id}):
@@ -39,30 +41,113 @@ def brand_deals(brand_id: str):
     return {"deals": [d for d in rail.list_for("brand", brand_id) if d["kind"] != "collective"], "collectives": cols}
 
 
+def _party(deal_id: str, user: dict) -> tuple[dict, str]:
+    d = rail._get(deal_id)
+    return d, au.deal_side(user, d)
+
+
 @router.get("/deals/{deal_id}")
-def deal(deal_id: str, role: Literal["creator", "brand"] = "creator"):
-    return rail.view(rail._get(deal_id), role)
+def deal(deal_id: str, user: dict = Depends(au.current_user)):
+    d, side = _party(deal_id, user)
+    return rail.view(d, side)
+
+
+class Deliverable(BaseModel):
+    kind: Literal["reel", "story", "short", "carousel", "live", "link_in_bio"]
+    count: int = Field(ge=0, le=20)
 
 
 class ActionIn(BaseModel):
-    role: Literal["creator", "brand"]
+    # The acting side comes from the session. A role sent here must match it.
+    role: Literal["creator", "brand"] | None = None
     action: str = Field(max_length=32)
     amount: int | None = Field(default=None, ge=0, le=50_000_000)
     note: str | None = Field(default=None, max_length=300)
     url: str | None = Field(default=None, max_length=300)
+    links: list[Annotated[str, Field(max_length=300)]] | None = Field(default=None, max_length=5)
     name: str | None = Field(default=None, max_length=80)
+    # Proposed terms ("propose"): only the ones that change.
+    deliverables: list[Deliverable] | None = Field(default=None, max_length=6)
+    post_by: str | None = Field(default=None, max_length=10)
+    usage_rights_days: int | None = Field(default=None, ge=0, le=365)
+    exclusivity_days: int | None = Field(default=None, ge=0, le=365)
+    # The same key on a repeated request (double-click, retry) makes it a no-op.
+    request_key: str | None = Field(default=None, max_length=80)
 
 
 @router.post("/deals/{deal_id}/action")
-def deal_action(deal_id: str, body: ActionIn):
-    return rail.act(deal_id, body.role, body.action, body.model_dump())
+def deal_action(deal_id: str, body: ActionIn, user: dict = Depends(au.current_user)):
+    _, side = _party(deal_id, user)
+    if body.role and body.role != side:
+        raise HTTPException(403, f"You're the {side} on this deal.")
+    payload = body.model_dump()
+    if body.deliverables is not None:
+        payload["deliverables"] = [x.model_dump() for x in body.deliverables]
+    if body.action == "propose" and body.amount is not None:
+        payload["amount"] = body.amount
+    return rail.act(deal_id, side, body.action, payload, user)
+
+
+class RatingIn(BaseModel):
+    stars: int = Field(ge=1, le=5)
+    note: str | None = Field(default=None, max_length=280)
+
+
+@router.post("/deals/{deal_id}/rating")
+def rate_creator(deal_id: str, body: RatingIn, user: dict = Depends(au.current_user)):
+    """The brand rates the creator, once, after the post is approved."""
+    d, side = _party(deal_id, user)
+    if side != "brand":
+        raise HTTPException(403, "Only the brand on this deal can rate it.")
+    if d["stage"] not in ("verified", "paid"):
+        raise HTTPException(409, "Rate the creator after you approve the post.")
+    rating = {"stars": body.stars, "note": (body.note or "").strip() or None, "at": now_iso(), "by": user["_id"]}
+    res = get_db().deals.update_one({"_id": deal_id, "rating": {"$exists": False}}, {"$set": {"rating": rating}})
+    if not res.modified_count:
+        raise HTTPException(409, "You've already rated this deal.")
+    au.audit("deal_rated", user["_id"], "brand", deal_id=deal_id, stars=body.stars)
+    return {"rating": rating}
+
+
+class ResultIn(BaseModel):
+    views: int = Field(ge=0, le=2_000_000_000)
+
+
+@router.post("/deals/{deal_id}/results")
+def report_results(deal_id: str, body: ResultIn, user: dict = Depends(au.current_user)):
+    """The creator's own view count for a completed deal, labelled self-reported.
+    Views from a connected account replace it on the public page."""
+    d, side = _party(deal_id, user)
+    if side != "creator":
+        raise HTTPException(403, "Only the creator on this deal can report its results.")
+    if d["stage"] not in ("verified", "paid"):
+        raise HTTPException(409, "Report results after the post is approved.")
+    result = {"views": body.views, "source": "manual", "at": now_iso()}
+    get_db().deals.update_one({"_id": deal_id}, {"$set": {"result": result}})
+    return {"result": result}
+
+
+def _brand_party(deal_id: str, user: dict) -> dict:
+    d, side = _party(deal_id, user)
+    if side != "brand":
+        raise HTTPException(403, "Only the brand on this deal can fund it.")
+    return d
+
+
+def _ready_to_fund(d: dict) -> None:
+    c = d.get("contract") or {}
+    if d.get("kind") == "collective":
+        raise HTTPException(409, "Fund the collective once from its page")
+    if d["stage"] != "contract" or not (c.get("signed_by_creator") and c.get("signed_by_brand")):
+        raise HTTPException(409, "Both sides sign before escrow is funded")
 
 
 @router.post("/deals/{deal_id}/pay")
-def start_payment(deal_id: str):
-    """Start escrow funding: a Razorpay test order, or a simulated payment."""
-    d = rail._get(deal_id)
-    order = payments.create_order(d["amount"], deal_id)
+def start_payment(deal_id: str, user: dict = Depends(au.current_user)):
+    """Start escrow funding: a Razorpay test order, or (demo mode only) a simulated payment."""
+    d = _brand_party(deal_id, user)
+    _ready_to_fund(d)
+    order = payments.create_order(d["amount"], "deal", deal_id)
     if order["mode"] == "simulated":
         view = rail.act(deal_id, "brand", "fund", {"mode": "simulated", "payment_ref": order["ref"]})
         return {"mode": "simulated", "deal": view}
@@ -76,53 +161,126 @@ class VerifyIn(BaseModel):
 
 
 @router.post("/deals/{deal_id}/pay/verify")
-def verify_payment(deal_id: str, body: VerifyIn):
-    if not payments.verify_signature(body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature):
-        raise HTTPException(400, "Payment signature didn't match")
-    return rail.act(deal_id, "brand", "fund", {"mode": "razorpay-test", "payment_ref": body.razorpay_payment_id})
+def verify_payment(deal_id: str, body: VerifyIn, user: dict = Depends(au.current_user)):
+    d = _brand_party(deal_id, user)
+    p = payments.verify_checkout("deal", deal_id, d["amount"], body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature)
+    if (d.get("escrow") or {}).get("ref") == p["payment_id"]:
+        return rail.view(d, "brand")  # already funded by this payment (a repeat or the webhook got here first)
+    return rail.act(deal_id, "brand", "fund", {"mode": "razorpay-test", "payment_ref": p["payment_id"]})
+
+
+def _collective(collective_id: str) -> dict:
+    col = get_db().collectives.find_one({"_id": collective_id})
+    if not col:
+        raise HTTPException(404, "Collective not found")
+    return col
+
+
+def _own_collective(collective_id: str, user: dict) -> dict:
+    col = _collective(collective_id)
+    au.require_brand(user, col["brand_id"])
+    return col
 
 
 @router.get("/collectives/{collective_id}")
-def collective(collective_id: str):
+def collective(collective_id: str, user: dict = Depends(au.current_user)):
+    col = _collective(collective_id)
+    if user.get("role") == "creator" and any(m["creator_id"] == user.get("creator_id") for m in col["members"]):
+        return rail.collective_view(collective_id, viewer=user["creator_id"])
+    au.require_brand(user, col["brand_id"])
     return rail.collective_view(collective_id)
 
 
 @router.post("/collectives/{collective_id}/fund")
-def fund_collective(collective_id: str):
-    col = get_db().collectives.find_one({"_id": collective_id})
-    if not col:
-        raise HTTPException(404, "Collective not found")
-    order = payments.create_order(col["total"], collective_id)
+def fund_collective(collective_id: str, user: dict = Depends(au.current_user)):
+    col = _own_collective(collective_id, user)
+    if col.get("funded"):
+        raise HTTPException(409, "Already funded")
+    collectives.require_active(col)  # every member has confirmed their terms
+    order = payments.create_order(col["total"], "collective", collective_id)
     if order["mode"] == "simulated":
         return rail.fund_collective(collective_id, "simulated", order["ref"])
     return order
 
 
 @router.post("/collectives/{collective_id}/fund/verify")
-def verify_collective(collective_id: str, body: VerifyIn):
-    if not payments.verify_signature(body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature):
-        raise HTTPException(400, "Payment signature didn't match")
-    return rail.fund_collective(collective_id, "razorpay-test", body.razorpay_payment_id)
+def verify_collective(collective_id: str, body: VerifyIn, user: dict = Depends(au.current_user)):
+    col = _own_collective(collective_id, user)
+    p = payments.verify_checkout("collective", collective_id, col["total"], body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature)
+    if col.get("funded") and (col.get("escrow") or {}).get("ref") == p["payment_id"]:
+        return rail.collective_view(collective_id)
+    return rail.fund_collective(collective_id, "razorpay-test", p["payment_id"])
+
+
+@router.post("/payments/razorpay/webhook")
+async def razorpay_webhook(request: Request):
+    """Razorpay calls this; it proves itself with the webhook signature, not a session.
+    Each event is applied once. A captured payment funds its deal or collective if the
+    brand's browser didn't finish the checkout step."""
+    body = await request.body()
+    payment, reply = payments.apply_webhook(body, request.headers.get("x-razorpay-signature"), request.headers.get("x-razorpay-event-id"))
+    if payment:
+        _fund_from(payment)
+    return reply
+
+
+def _fund_from(p: dict) -> None:
+    db = get_db()
+    if p["kind"] == "deal":
+        d = db.deals.find_one({"_id": p["ref_id"]})
+        c = (d or {}).get("contract") or {}
+        if d and d["stage"] == "contract" and c.get("signed_by_creator") and c.get("signed_by_brand") and d["amount"] == p["amount"]:
+            rail.act(d["_id"], "brand", "fund", {"mode": "razorpay-test", "payment_ref": p["payment_id"]})
+    elif p["kind"] == "collective":
+        col = db.collectives.find_one({"_id": p["ref_id"]})
+        if col and not col.get("funded") and col["total"] == p["amount"]:
+            rail.fund_collective(col["_id"], "razorpay-test", p["payment_id"])
+
+
+@router.get("/collectives/{collective_id}/replacements")
+def replacements(collective_id: str, user: dict = Depends(au.current_user)):
+    """Creators who could take a declined member's place, with why each fits."""
+    col = _own_collective(collective_id, user)
+    return {"items": collectives.candidates(col, get_db().brands.find_one({"_id": col["brand_id"]}))}
+
+
+class ReplaceIn(BaseModel):
+    out_id: str = Field(min_length=3, max_length=40)
+    in_id: str = Field(min_length=3, max_length=40)
+    price: int | None = Field(default=None, ge=500, le=10_000_000)
+
+
+@router.post("/collectives/{collective_id}/replace")
+def replace_member(collective_id: str, body: ReplaceIn, user: dict = Depends(au.current_user)):
+    col = _own_collective(collective_id, user)
+    collectives.replace(col, get_db().brands.find_one({"_id": col["brand_id"]}), body.out_id, body.in_id, body.price, user)
+    return rail.collective_view(collective_id)
 
 
 @router.post("/collectives/{collective_id}/release")
-def release_verified(collective_id: str):
-    """Confirm every live member post at once; each member is paid their split."""
+def release_verified(collective_id: str, user: dict = Depends(au.current_user)):
+    """Approve every submitted member post at once. Payouts follow the honest-payments rules."""
+    _own_collective(collective_id, user)
     db = get_db()
     for d in db.deals.find({"collective_id": collective_id, "stage": "live"}):
-        rail.act(d["_id"], "brand", "confirm", {})
+        rail.act(d["_id"], "brand", "approve", {})
     return rail.collective_view(collective_id)
 
 
 # ------------------------------------------------------------------ invoices
 @router.get("/invoices/{invoice_id}.pdf")
-def invoice_file(invoice_id: str):
+def invoice_file(invoice_id: str, user: dict = Depends(au.current_user)):
     db = get_db()
     inv = db.invoices.find_one({"_id": invoice_id})
     if not inv:
         raise HTTPException(404, "Invoice not found")
-    creator = db.creators.find_one({"_id": inv["creator_id"]}) or {}
     deal = db.deals.find_one({"_id": inv.get("deal_id")}) if inv.get("deal_id") else None
+    # The creator who issued it, or the brand on the deal it bills.
+    if not (user.get("role") == "creator" and user.get("creator_id") == inv["creator_id"]):
+        if not deal:
+            raise HTTPException(403, "Only the creator who issued this invoice can open it.")
+        au.deal_side(user, deal)
+    creator = db.creators.find_one({"_id": inv["creator_id"]}) or {}
     if deal and deal.get("listing_id"):
         listing = db.listings.find_one({"_id": deal["listing_id"]})
         deal = {**deal, "listing_title": listing["title"] if listing else None}
@@ -138,7 +296,7 @@ class InvoiceIn(BaseModel):
 
 
 @router.post("/creators/{creator_id}/invoices")
-def log_off_platform(creator_id: str, body: InvoiceIn):
+def log_off_platform(creator_id: str, body: InvoiceIn, _: dict = Depends(au.own_creator)):
     c = load_creator(creator_id)
     db = get_db()
     seq = db.invoices.count_documents({"creator_id": creator_id}) + 1
@@ -165,11 +323,12 @@ class InvoiceAction(BaseModel):
 
 
 @router.post("/invoices/{invoice_id}")
-def invoice_action(invoice_id: str, body: InvoiceAction):
+def invoice_action(invoice_id: str, body: InvoiceAction, user: dict = Depends(au.current_user)):
     db = get_db()
     inv = db.invoices.find_one({"_id": invoice_id})
     if not inv:
         raise HTTPException(404, "Invoice not found")
+    au.require_creator(user, inv["creator_id"])
     if body.action == "remind":
         db.invoices.update_one({"_id": invoice_id}, {"$push": {"reminders": {"at": now_iso(), "channel": "logged"}}})
     else:

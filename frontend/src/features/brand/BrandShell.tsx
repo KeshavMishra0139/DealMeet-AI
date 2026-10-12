@@ -1,14 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Handshake, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
+import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
+import { ActionAssistant } from "@/components/shared/ActionAssistant";
+import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
-import { useSharedDemo } from "@/lib/shared-demo";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useBrandId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,7 @@ const NAV = [
   { to: "/brand", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/brand/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/brand/deals", label: "Deals", icon: Handshake },
+  { to: "/brand/inbox", label: "Fan Inbox", icon: Inbox },
   { to: "/brand/profile", label: "Brand profile", icon: Building2 },
 ];
 
@@ -43,6 +46,14 @@ export function useBrand() {
 
 export default function BrandShell() {
   useTheme("brand");
+  return (
+    <RequireSession role="brand">
+      <Console />
+    </RequireSession>
+  );
+}
+
+function Console() {
   const brand = useBrand();
   const [open, setOpen] = useState(false);
 
@@ -90,6 +101,7 @@ export default function BrandShell() {
             <Plus aria-hidden /> New campaign
           </Link>
         </Button>
+        <ActionAssistant role="brand" className="mx-0.5 mt-2 justify-start" />
         <div className="mt-4 flex-1">{nav()}</div>
         <Controls />
       </aside>
@@ -99,6 +111,7 @@ export default function BrandShell() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
+          <ActionAssistant role="brand" compact />
           <Button asChild variant="primary" size="sm">
             <Link to="/brand/campaigns/new">
               <Plus aria-hidden /> New
@@ -150,34 +163,40 @@ function Controls({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
   const shared = useSharedDemo();
+  const demo = useDemoMode();
   return (
     <div className="space-y-0.5">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start"
-        onClick={() => {
-          onDone?.();
-          navigate("/login?role=brand");
-        }}
-      >
-        <Users aria-hidden /> Switch brand
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start"
-        loading={resetting}
-        onClick={async () => {
-          setResetting(true);
-          await post("/demo/reset");
-          await qc.invalidateQueries();
-          setResetting(false);
-          onDone?.();
-        }}
-      >
-        {!resetting && <RotateCcw aria-hidden />} Reset demo
-      </Button>
+      {demo && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => {
+            onDone?.();
+            navigate("/login?role=brand");
+          }}
+        >
+          <Users aria-hidden /> Switch brand
+        </Button>
+      )}
+      {demo && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          loading={resetting}
+          onClick={async () => {
+            setResetting(true);
+            await post("/demo/reset");
+            await qc.invalidateQueries();
+            setResetting(false);
+            onDone?.();
+          }}
+        >
+          {!resetting && <RotateCcw aria-hidden />} Reset demo
+        </Button>
+      )}
+      <SignOutButton role="brand" onDone={onDone} size="sm" className="w-full justify-start" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.</p>}
     </div>
   );

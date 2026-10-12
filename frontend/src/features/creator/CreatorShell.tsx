@@ -2,27 +2,34 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileText,
   Handshake,
+  Heart,
   Home,
   IndianRupee,
   Inbox,
   Languages,
+  Link2,
   Map as MapIcon,
   Menu,
   RotateCcw,
+  Send,
   ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
+import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
+import { ActionAssistant } from "@/components/shared/ActionAssistant";
+import { AskButton } from "./AskPanel";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { LangScope, useI18n } from "@/i18n";
 import type { Dict } from "@/i18n/en";
 import { api, post } from "@/lib/api";
-import { useSharedDemo } from "@/lib/shared-demo";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { isEmbedFrame, useCreatorId } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { Creator } from "@/lib/types";
@@ -38,6 +45,10 @@ const PRIMARY: NavItem[] = [
   { to: "/creator/deals", key: "nav.deals", icon: Handshake },
 ];
 const SECONDARY: NavItem[] = [
+  { to: "/creator/brands", key: "nav.dream", icon: Heart },
+  { to: "/creator/pitches", key: "nav.pitches", icon: Send },
+  { to: "/creator/profile", key: "nav.profile", icon: UserRound },
+  { to: "/creator/connections", key: "nav.connections", icon: Link2 },
   { to: "/creator/kit", key: "nav.kit", icon: FileText },
   { to: "/creator/privacy", key: "nav.privacy", icon: ShieldCheck },
 ];
@@ -50,7 +61,9 @@ export function useCreator() {
 export default function CreatorShell() {
   return (
     <LangScope>
-      <Studio />
+      <RequireSession role="creator">
+        <Studio />
+      </RequireSession>
     </LangScope>
   );
 }
@@ -80,6 +93,8 @@ function Studio() {
           <Wordmark />
         </Link>
         <ProfileCard creator={creator.data} className="mx-1 mt-6" />
+        <AskButton className="mx-1 mt-3 justify-start" />
+        <ActionAssistant role="creator" className="mx-1 mt-2 justify-start" />
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
           {[...PRIMARY, ...SECONDARY].map((item, i) => (
             <div key={item.to}>
@@ -97,6 +112,8 @@ function Studio() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
+          <AskButton compact />
+          <ActionAssistant role="creator" compact />
           <LangToggle compact />
           <Button variant="ghost" size="icon-sm" aria-label={t("nav.more")} onClick={() => setMoreOpen(true)}>
             {creator.data ? (
@@ -239,35 +256,41 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [resetting, setResetting] = useState(false);
   const shared = useSharedDemo();
+  const demo = useDemoMode();
   return (
     <div className="space-y-1">
       <div className="hidden lg:block">
         <LangToggle />
       </div>
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        onClick={() => {
-          onDone?.();
-          navigate("/login?role=creator");
-        }}
-      >
-        <Users aria-hidden /> {t("common.switchProfile")}
-      </Button>
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        loading={resetting}
-        onClick={async () => {
-          setResetting(true);
-          await post("/demo/reset");
-          await qc.invalidateQueries();
-          setResetting(false);
-          onDone?.();
-        }}
-      >
-        {!resetting && <RotateCcw aria-hidden />} {t("common.resetDemo")}
-      </Button>
+      {demo && (
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          onClick={() => {
+            onDone?.();
+            navigate("/login?role=creator");
+          }}
+        >
+          <Users aria-hidden /> {t("common.switchProfile")}
+        </Button>
+      )}
+      {demo && (
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          loading={resetting}
+          onClick={async () => {
+            setResetting(true);
+            await post("/demo/reset");
+            await qc.invalidateQueries();
+            setResetting(false);
+            onDone?.();
+          }}
+        >
+          {!resetting && <RotateCcw aria-hidden />} {t("common.resetDemo")}
+        </Button>
+      )}
+      <SignOutButton role="creator" onDone={onDone} className="w-full justify-start" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">{t("common.sharedDemo")}</p>}
     </div>
   );

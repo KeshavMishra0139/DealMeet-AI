@@ -46,6 +46,18 @@ def _env(name: str, default: str | None = None) -> str | None:
     return value if value not in (None, "") else default
 
 
+def _search_index() -> str:
+    """ATLAS_SEARCH_INDEX unset: "brands_search". Set to empty or "off": disabled."""
+    v = os.getenv("ATLAS_SEARCH_INDEX")
+    if v is None:
+        return "brands_search"
+    return "" if v.strip().lower() in ("", "off", "none") else v.strip()
+
+
+def _flag(name: str) -> bool:
+    return (_env(name, "0") or "0").strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class Settings:
     mongodb_uri: str | None
@@ -58,6 +70,36 @@ class Settings:
     demo_today: date
     # On a shared URL, put the demo data back to its seeded state every N minutes (0 = never).
     demo_reset_minutes: int = 0
+    # Persona sign-in, seeded data and the reset button exist only in demo mode (DEMO_MODE=1).
+    demo_mode: bool = False
+    # A seeded "Demo admin" persona for local walkthroughs of the admin console. Only with
+    # DEMO_MODE=1 and DEMO_ADMIN=1 on a demo that doesn't reset itself (not a shared URL).
+    demo_admin: bool = False
+    session_hours: int = 72
+    razorpay_webhook_secret: str | None = None
+    # In-memory mongomock instead of MONGODB_URI (tests and the local demo). Never a silent fallback.
+    use_mock_db: bool = False
+    firebase_service_account_json: str | None = None
+    google_application_credentials: str | None = None
+    youtube_api_key: str | None = None
+    token_enc_key: str | None = None
+    ig_app_id: str | None = None
+    ig_app_secret: str | None = None
+    ig_redirect_uri: str | None = None
+    frontend_url: str | None = None
+    # Meta Graph API version for graph.instagram.com calls, and the window for audience
+    # demographics. Check both against Meta's changelog; they're settings for that reason.
+    ig_graph_version: str = "v25.0"
+    ig_demographics_timeframe: str = "this_month"
+    # Atlas Search index on brands, used by the brand directory on Atlas. Empty: plain regex search.
+    atlas_search_index: str = "brands_search"
+    # Protected computation (services/tee.py). No endpoint: "not_configured", and the
+    # documented fallback runs. With one, attestation must verify against the trust root
+    # and the measurement policy below, or nothing is sent to it.
+    tee_endpoint: str | None = None
+    tee_trust_root: str | None = None  # PEM text, or a path to the PEM file
+    tee_measurements: str | None = None  # JSON: {"0": "<PCR0 hex>", "1": "...", "2": "..."}
+    tee_max_age_s: int = 300
 
     @property
     def has_ai(self) -> bool:
@@ -73,7 +115,8 @@ class Settings:
 
     @property
     def has_firebase(self) -> bool:
-        return bool(self.firebase_project_id)
+        """Server-side Firebase token checks need a service account."""
+        return bool(self.firebase_service_account_json or self.google_application_credentials)
 
 
 @lru_cache
@@ -86,9 +129,29 @@ def get_settings() -> Settings:
         ai_model=_env("AI_MODEL"),
         razorpay_key_id=_env("RAZORPAY_KEY_ID"),
         razorpay_key_secret=_env("RAZORPAY_KEY_SECRET"),
-        firebase_project_id=_env("VITE_FIREBASE_PROJECT_ID"),
+        firebase_project_id=_env("FIREBASE_PROJECT_ID") or _env("VITE_FIREBASE_PROJECT_ID"),
         demo_today=date.fromisoformat(_env("DEMO_TODAY", "2026-10-08") or "2026-10-08"),
         demo_reset_minutes=int(_env("DEMO_RESET_MINUTES", "0") or 0),
+        demo_mode=_flag("DEMO_MODE"),
+        demo_admin=_flag("DEMO_MODE") and _flag("DEMO_ADMIN") and int(_env("DEMO_RESET_MINUTES", "0") or 0) == 0,
+        session_hours=int(_env("SESSION_HOURS", "72") or 72),
+        razorpay_webhook_secret=_env("RAZORPAY_WEBHOOK_SECRET"),
+        use_mock_db=_flag("USE_MOCK_DB"),
+        firebase_service_account_json=_env("FIREBASE_SERVICE_ACCOUNT_JSON"),
+        google_application_credentials=_env("GOOGLE_APPLICATION_CREDENTIALS"),
+        youtube_api_key=_env("YOUTUBE_API_KEY"),
+        token_enc_key=_env("TOKEN_ENC_KEY"),
+        ig_app_id=_env("IG_APP_ID"),
+        ig_app_secret=_env("IG_APP_SECRET"),
+        ig_redirect_uri=_env("IG_REDIRECT_URI"),
+        frontend_url=(_env("FRONTEND_URL") or "").rstrip("/") or None,
+        ig_graph_version=_env("IG_GRAPH_VERSION", "v25.0") or "v25.0",
+        ig_demographics_timeframe=_env("IG_DEMOGRAPHICS_TIMEFRAME", "this_month") or "this_month",
+        atlas_search_index=_search_index(),
+        tee_endpoint=(_env("TEE_ENDPOINT") or "").rstrip("/") or None,
+        tee_trust_root=_env("TEE_TRUST_ROOT"),
+        tee_measurements=_env("TEE_MEASUREMENTS"),
+        tee_max_age_s=int(_env("TEE_ATTESTATION_MAX_AGE_S", "300") or 300),
     )
 
 

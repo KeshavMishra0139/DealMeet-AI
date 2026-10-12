@@ -1,9 +1,9 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BadgeIndianRupee, Lock, Play, Scale, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, Lock, Play, Scale, ShieldCheck, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ParallaxAurora, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Stage3D } from "@/components/three/Stage3D";
-import { useSharedDemo } from "@/lib/shared-demo";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { HeroOrbit } from "@/components/three/lazy";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const ease = [0.22, 1, 0.36, 1] as const;
 
 export default function Landing() {
   const shared = useSharedDemo();
+  const demo = useDemoMode();
   useTheme("creator");
   const reduce = useReducedMotion();
   const rise = (delay: number) =>
@@ -30,8 +31,16 @@ export default function Landing() {
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/demo/compare">Demo</Link>
+            <Link to="/worth">What am I worth?</Link>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Link to="/brands">Brands</Link>
+          </Button>
+          {demo && (
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link to="/demo/compare">Demo</Link>
+            </Button>
+          )}
           <Button asChild variant="outline" size="sm">
             <Link to="/login">Sign in</Link>
           </Button>
@@ -76,12 +85,21 @@ export default function Landing() {
         </section>
 
         <motion.div {...rise(0.3)} className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-7">
-          <Button asChild variant="outline" size="lg" className="h-11 sm:h-12">
-            <Link to="/demo/compare?guide=1">
-              <Play className="fill-current" aria-hidden /> Watch the demo
+          {demo && (
+            <>
+              <Button asChild variant="outline" size="lg" className="h-11 sm:h-12">
+                <Link to="/demo/compare?guide=1">
+                  <Play className="fill-current" aria-hidden /> Watch the demo
+                </Link>
+              </Button>
+              <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
+            </>
+          )}
+          <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-11 sm:h-12">
+            <Link to="/worth">
+              <Youtube aria-hidden /> What am I worth? Check your YouTube channel
             </Link>
           </Button>
-          <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
           {shared && <p className="w-full text-xs text-muted">Shared live demo: everyone sees the same data, and it resets automatically when idle.</p>}
         </motion.div>
 
@@ -104,7 +122,7 @@ export default function Landing() {
               {
                 icon: ShieldCheck,
                 title: "Paid through escrow",
-                body: "Brands fund escrow before a post goes live. Collective deals split payouts automatically over UPI.",
+                body: "Brands fund escrow before a post goes live and approve the post before the fee is released. Collective deals split one payment by member.",
               },
             ].map((p) => (
               <StaggerItem key={p.title} className="bg-[var(--bg)]/80 p-6">

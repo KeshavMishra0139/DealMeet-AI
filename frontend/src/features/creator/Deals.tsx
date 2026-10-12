@@ -46,7 +46,7 @@ export default function Deals() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[28px] font-semibold tracking-tight sm:text-[34px]">{t("deals.title")}</h1>
-          <p className="mt-1 text-[15px] text-fg-2">Every rupee is held in escrow before you post, and paid by UPI once it's verified.</p>
+          <p className="mt-1 text-[15px] text-fg-2">Brands fund escrow before you post. The fee is released after they approve your post.</p>
         </div>
         <Button variant="outline" onClick={() => setLogOpen(true)}>
           <Plus aria-hidden /> Log an outside deal
@@ -84,7 +84,7 @@ export default function Deals() {
                       <BellRing aria-hidden /> Remind
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => inv.mutate({ invoice: i.id, action: "mark_paid" })}>
-                      <Check aria-hidden /> Paid
+                      <Check aria-hidden /> Mark paid
                     </Button>
                   </>
                 )}
@@ -94,7 +94,7 @@ export default function Deals() {
         </section>
       )}
 
-      <Group title="Finished" eyebrow="History" rows={done} empty="Paid deals and their invoices show up here." />
+      <Group title="Finished" eyebrow="History" rows={done} empty="Finished deals and their invoices show up here." />
       <LogDealDialog open={logOpen} onOpenChange={setLogOpen} creatorId={id} />
     </div>
   );

@@ -33,6 +33,69 @@ def _pct(v: float) -> str:
     return f"{'+' if v > 0 else ''}{v * 100:.0f}%"
 
 
+def reach_base(median_views: float, niche: str) -> float:
+    """The price's starting point: median views x the niche's rupees per 1,000 views."""
+    return median_views / 1000 * NICHES[niche]["cpm"]
+
+
+# How many recent videos a public estimate needs before it prices anything.
+PUBLIC_MIN_VIDEOS = 3
+
+
+def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int = 0) -> dict:
+    """An estimate from public numbers only (a channel's recent views), for the public
+    'What am I worth?' page. Same base and production floor as fair_price; with no
+    engagement, audience or trust data there are no adjustments, so the range is wider
+    and the confidence lower. Too few videos -> no price, and it says so."""
+    label = {"shorts": "Shorts", "long": "long videos"}[fmt]
+    if len(views) < PUBLIC_MIN_VIDEOS:
+        return {
+            "format": fmt,
+            "enough_data": False,
+            "videos": len(views),
+            "reason": f"Not enough recent {label} to price: {len(views)} counted, at least {PUBLIC_MIN_VIDEOS} needed.",
+        }
+    from .common import safe_median
+
+    mv = safe_median(views)
+    base = reach_base(mv, niche)
+    floor = base < PRODUCTION_FLOOR
+    per = max(base, PRODUCTION_FLOOR)
+    cpm = NICHES[niche]["cpm"]
+    reasons = [
+        f"Priced on the median views of your last {len(views)} {label}: {short(mv)} views. Subscribers don't set the price.",
+        f"{inr(cpm)} per 1,000 views is JodiDar's seeded rate for {NICHES[niche]['label'].lower()}.",
+        "Engagement, audience fit and trust aren't in public data, so nothing is adjusted for them. The range is wider for that reason.",
+    ]
+    if newest_excluded:
+        reasons.append(f"{newest_excluded} video{'s' if newest_excluded != 1 else ''} from the last 3 days aren't counted yet: their views are still climbing.")
+    if floor:
+        reasons.append(f"Below this reach we price at least {inr_full(PRODUCTION_FLOOR)} per video, for the time it takes to make one.")
+    return {
+        "format": fmt,
+        "enough_data": True,
+        "videos": len(views),
+        "median_views": round(mv),
+        "per_video": round(per),
+        "estimate": estimate(per * 0.85, per * 1.15, "inr", "deal", reasons[:2] + ["No engagement, fit or trust adjustments"], "low" if len(views) < 6 else "medium"),
+        "why": reasons,
+    }
+
+
+def data_label(c: dict) -> tuple[str, str]:
+    """(label, source) for what a creator's price is built from. Connecting an account
+    changes the data source, not the certainty: the price stays an estimate."""
+    if c.get("insights_source") == "instagram_api" and metrics.prov(c, "reels.0.views") == "real":
+        return "Estimate from Instagram data", "instagram_api"
+    if not metrics.has_reels(c):
+        if (c.get("manual") or {}).get("avg_views"):
+            return "Estimate from self-reported numbers", "manual"
+        return "Estimate from your follower count", "manual"
+    if metrics.recent_simulated(c, "views") or metrics.prov(c, "reels.0.views") in ("simulated", "seed") or c.get("insights_source") == "synthetic":
+        return "Estimate from sample data", "synthetic"
+    return "Estimate from self-reported numbers", "manual"
+
+
 def follower_price(c: dict) -> int:
     return nice_round(c.get("followers", 0) * FOLLOWER_RATE)
 
@@ -135,7 +198,7 @@ def fair_price(
     f = factors(c, lister)
     adj = adjustments(f)
     mv = f["median_views"]
-    base = mv / 1000 * f["cpm"]
+    base = reach_base(mv, c["niche"])
     real_views = metrics.has_reels(c)
     sim_ss = metrics.fields_simulated(c, "reels.saves", "reels.shares")
     sim_aud = metrics.fields_simulated(c, "audience")
@@ -153,7 +216,11 @@ def fair_price(
                 f"Median of your last 6 reels is {short(mv)} views. At {inr(f['cpm'])} per 1,000 views for "
                 f"{niche['label'].lower()}, that's {inr_full(base)}."
                 if real_views
-                else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+                else (
+                    f"No connected reels yet, so we use the {short(mv)} average views you reported. At {inr(f['cpm'])} per 1,000 views, that's {inr_full(base)}."
+                    if (c.get("manual") or {}).get("avg_views")
+                    else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+                )
             ),
             "simulated": bool(sim_views),
             "simulated_fields": sim_views,
@@ -211,7 +278,7 @@ def fair_price(
     add(
         "trust",
         "Trust Score",
-        f"Trust {t['score']}/100: {t['reasons'][0].lower()}." if t else "Trust not yet measured; neutral.",
+        f"Trust {t['score']}/100: {t['reasons'][0].lower()}." if t else "Trust not yet measured; counted as 70/100.",
         sim_trust,
     )
     reach_per_reel = running  # what the market model is checked against
@@ -266,7 +333,10 @@ def fair_price(
         confidence = "high"
     fp = follower_price(c)
 
+    label, source = data_label(c)
     result = {
+        "data_label": label,
+        "data_source": source,
         "creator_id": c["_id"],
         "lister_id": lister["_id"] if lister else None,
         "lister_name": lister["name"] if lister else None,

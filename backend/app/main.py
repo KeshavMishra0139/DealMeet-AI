@@ -13,8 +13,9 @@ from fastapi.responses import JSONResponse
 
 from .config import ROOT, get_settings
 from .db import get_db
-from .routers import auth, brands, creators, deals, demo, kit, market, meta, profiles
+from .routers import admin, assistant, auth, brands, connect, creators, deals, demo, directory, kit, market, meta, pitches, pricing, profiles, reports, shortlist, youtube
 from .seed.load import seed_all
+from .services.auth import audit
 from .static import mount_spa
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -50,13 +51,38 @@ def _auto_reset(minutes: int) -> None:
         log.info("Shared demo reset to its seeded state")
 
 
+def _refresh_tokens():
+    from .services import instagram
+
+    time.sleep(60)
+    while True:
+        try:
+            n = instagram.refresh_due()
+            if n:
+                log.info("Refreshed %d Instagram token(s)", n)
+        except Exception:
+            log.exception("Instagram token refresh failed")
+        time.sleep(24 * 3600)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    seed_all(get_db())
+    settings = get_settings()
+    # Connect (and create indexes) first: without USE_MOCK_DB=1, a missing or unreachable
+    # MONGODB_URI stops startup here with a clear message.
+    db = get_db()
+    if settings.demo_mode:
+        seed_all(db)
     _warm_models()
-    minutes = get_settings().demo_reset_minutes
-    if minutes > 0:
-        threading.Thread(target=_auto_reset, args=(minutes,), daemon=True).start()
+    # Instagram long-lived tokens: an in-process daily job refreshes those that expire within
+    # 10 days (each sync also refreshes first, for hosts that sleep).
+    from .services import instagram
+
+    if instagram.configured():
+        threading.Thread(target=_refresh_tokens, daemon=True).start()
+    # The shared demo's timed reset never runs outside demo mode, so it can't touch real accounts.
+    if settings.demo_mode and settings.demo_reset_minutes > 0:
+        threading.Thread(target=_auto_reset, args=(settings.demo_reset_minutes,), daemon=True).start()
     yield
 
 
@@ -71,16 +97,40 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
+# Writes that arrive without the app's header are refused unless they carry a Bearer
+# token: a cross-site form can't add a custom header, so a session cookie alone is never
+# enough to change anything (CSRF). Provider webhooks prove themselves with a signature.
+CSRF_HEADER = "x-requested-with"
+CSRF_EXEMPT = ("/api/payments/razorpay/webhook",)
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
+    path = request.url.path
+    write = request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/")
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         size = request.headers.get("content-length")
         if size and size.isdigit() and int(size) > MAX_BODY:
             return JSONResponse({"detail": "Request too large"}, status_code=413)
-        if request.url.path.startswith("/api/") and request.url.path != "/api/demo/reset":
+        if write and path not in CSRF_EXEMPT and not request.headers.get(CSRF_HEADER):
+            if not request.headers.get("authorization", "").lower().startswith("bearer "):
+                return JSONResponse({"detail": "Missing the X-Requested-With header. Use the JodiDar app or send a Bearer token."}, status_code=403)
+        if write and path != "/api/demo/reset":
             _last_write[0] = time.monotonic()
     response = await call_next(request)
-    path = request.url.path
+    if write:
+        # Every write is audited: who, what route, and how it ended. Bodies are never stored.
+        try:
+            audit(
+                "write",
+                getattr(request.state, "user_id", None),
+                getattr(request.state, "role", None),
+                method=request.method,
+                path=path,
+                status=response.status_code,
+            )
+        except Exception:  # auditing must never break the request
+            log.exception("Audit write failed")
     if path.startswith("/assets/") and response.status_code == 200:
         # Built files have content hashes in their names, so they never change.
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -89,7 +139,7 @@ async def guard(request: Request, call_next):
     return response
 
 
-for r in (meta, auth, demo, profiles, creators, market, brands, deals, kit):
+for r in (meta, auth, demo, profiles, creators, market, brands, directory, admin, shortlist, pitches, deals, kit, pricing, youtube, connect, assistant, reports):
     app.include_router(r.router)
 
 # Single-port mode: serve the built web app when it exists (npm run build).

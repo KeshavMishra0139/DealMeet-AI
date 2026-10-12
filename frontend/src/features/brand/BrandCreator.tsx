@@ -1,11 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BarChart3, IndianRupee, Lock, Send, Users } from "lucide-react";
+import { ArrowLeft, BarChart3, Heart, IndianRupee, Lock, Send, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Waterfall } from "@/components/charts/Waterfall";
 import { Avatar, ErrorState, ReferenceNote } from "@/components/shared/Bits";
+import { ProtectedStatus, type TeeStatus } from "@/components/shared/ProtectedStatus";
 import { SafetyNote } from "@/components/shared/SafetyNote";
+import { SourceBadge } from "@/components/shared/SourceBadge";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { SimulatedChip } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +50,15 @@ interface CreatorView {
     provenance: { views: Provenance; saves: Provenance; topic: Provenance };
   } | null;
   demographics: { age: Record<string, number>; gender: Record<string, number>; cities: { name: string; share: number }[]; languages: Record<string, number>; provenance: Provenance } | null;
+  audience_overlap: {
+    dimensions: { key: string; label: string; share: number | null }[];
+    processed_in: "tee" | "server";
+    tee_status: TeeStatus;
+    note: string;
+  } | null;
   rate_card: { typical: number | null; provenance: Provenance } | null;
   listing: { id: string; title: string } | null;
+  fan_proof: { label: string; links: string[]; platforms: string[] } | null;
   deal: { stage: string } | null;
 }
 
@@ -104,6 +113,12 @@ export default function BrandCreator() {
             <p className="text-sm text-muted">
               @{c.handle} · {c.niche_label} · {c.languages.join(", ")} · {c.location} · {c.audience_stage} followers
             </p>
+            {c.fan_proof && (
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-2">
+                <Heart className="size-3.5 text-accent" aria-hidden /> {c.fan_proof.label} of your brand
+                <SourceBadge source={`${c.fan_proof.platforms[0]}_api`} />
+              </p>
+            )}
           </div>
         </div>
         <Button variant="primary" onClick={() => setOffer(true)} disabled={!!c.deal}>
@@ -214,6 +229,7 @@ export default function BrandCreator() {
                 ))}
               </ul>
               <p className="mt-3 text-xs text-muted">Top cities: {c.demographics.cities.slice(0, 4).map((x) => `${x.name} ${pct(x.share)}`).join(", ")}</p>
+              {c.audience_overlap && <Overlap o={c.audience_overlap} />}
             </section>
           ) : (
             <LockedCard scope="demographics" icon={Users} />
@@ -234,6 +250,28 @@ export default function BrandCreator() {
       </div>
 
       {offer && <OfferDialog match={{ id: c.id, name: c.name, fair: { ...c.fair, per_reel: c.fair.total } }} brandId={brandId} listing={c.listing} onClose={() => setOffer(false)} />}
+    </div>
+  );
+}
+
+/** How much of the audience matches this brand's target, and where that was computed. */
+function Overlap({ o }: { o: NonNullable<CreatorView["audience_overlap"]> }) {
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <h3 className="text-xs font-semibold">Overlap with your target</h3>
+      {o.dimensions.length ? (
+        <ul className="mt-1.5 space-y-1 text-[13px]">
+          {o.dimensions.map((d) => (
+            <li key={d.key} className="flex justify-between gap-3">
+              <span className="text-fg-2">{d.label}</span>
+              <span className="num shrink-0 font-medium">{d.share === null ? "No data" : d.share >= 0.995 ? "All" : pct(d.share)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-xs text-muted">Your brand profile has no target audience yet.</p>
+      )}
+      <ProtectedStatus className="mt-2" processedIn={o.processed_in} status={o.tee_status} note={o.note} />
     </div>
   );
 }

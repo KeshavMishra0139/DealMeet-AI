@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { EmbedBridge, PhoneStage, PhoneToggle, usePhoneShortcut } from "@/components/demo/PhoneMode";
+import { RequireSession } from "@/components/shared/AuthGate";
 import { LangScope } from "@/i18n";
 import { usePhoneMode } from "@/lib/phone";
 import { isEmbedFrame } from "@/lib/session";
@@ -29,8 +30,18 @@ const CreatorDeals = lazy(() => import("@/features/creator/Deals"));
 const CreatorKit = lazy(() => import("@/features/creator/Kit"));
 const DealView = lazy(() => import("@/features/deals/DealView"));
 const LinkInBio = lazy(() => import("@/features/public/LinkInBio"));
+const Worth = lazy(() => import("@/features/public/Worth"));
+const Brands = lazy(() => import("@/features/public/Brands"));
+const BrandPage = lazy(() => import("@/features/public/BrandPage"));
+const CreatorDreamBrands = lazy(() => import("@/features/creator/DreamBrands"));
+const CreatorPitches = lazy(() => import("@/features/creator/Pitches"));
+const PitchShare = lazy(() => import("@/features/public/PitchShare"));
+const BrandFanInbox = lazy(() => import("@/features/brand/FanInbox"));
+const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
+const CreatorProfile = lazy(() => import("@/features/creator/Profile"));
 const DemoCompare = lazy(() => import("@/features/demo/Compare"));
 const DemoLive = lazy(() => import("@/features/demo/Live"));
+const AdminConsole = lazy(() => import("@/features/admin/AdminConsole"));
 
 const embedded = isEmbedFrame();
 
@@ -59,12 +70,18 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
+        <Route path="/worth" element={<Worth />} />
+        <Route path="/brands" element={<Brands />} />
+        <Route path="/brands/:slug" element={<BrandPage />} />
+        <Route path="/p/:slug" element={<PitchShare />} />
 
         <Route
           path="/creator/onboarding"
           element={
             <LangScope>
-              <CreatorOnboarding />
+              <RequireSession role="creator" needsProfile={false}>
+                <CreatorOnboarding />
+              </RequireSession>
             </LangScope>
           }
         />
@@ -76,22 +93,36 @@ export default function App() {
           <Route path="deals" element={<CreatorDeals />} />
           <Route path="deals/:id" element={<DealView role="creator" />} />
           <Route path="kit" element={<CreatorKit />} />
+          <Route path="brands" element={<CreatorDreamBrands />} />
+          <Route path="pitches" element={<CreatorPitches />} />
           <Route path="privacy" element={<CreatorPrivacy />} />
+          <Route path="connections" element={<CreatorConnections />} />
+          <Route path="profile" element={<CreatorProfile />} />
         </Route>
 
-        <Route path="/brand/onboarding" element={<BrandOnboarding />} />
+        <Route
+          path="/brand/onboarding"
+          element={
+            <RequireSession role="brand" needsProfile={false}>
+              <BrandOnboarding />
+            </RequireSession>
+          }
+        />
         <Route path="/brand" element={<BrandShell />}>
           <Route index element={<BrandHome />} />
           <Route path="campaigns" element={<BrandCampaigns />} />
           <Route path="campaigns/new" element={<BrandNewCampaign />} />
+          <Route path="campaigns/:id/edit" element={<BrandNewCampaign />} />
           <Route path="campaigns/:id" element={<BrandCampaign />} />
           <Route path="creators/:id" element={<BrandCreator />} />
           <Route path="deals" element={<BrandDeals />} />
           <Route path="deals/:id" element={<DealView role="brand" />} />
           <Route path="collectives/:id" element={<CollectiveDetail />} />
           <Route path="profile" element={<BrandProfile />} />
+          <Route path="inbox" element={<BrandFanInbox />} />
         </Route>
 
+        <Route path="/admin" element={<AdminConsole />} />
         <Route path="/demo/compare" element={<DemoCompare />} />
         <Route path="/demo/live" element={<DemoLive />} />
 
