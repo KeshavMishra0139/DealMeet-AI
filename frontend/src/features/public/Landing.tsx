@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { DealMosaic } from "./DealMosaic";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -119,7 +120,7 @@ export default function Landing() {
   );
 }
 
-/** Video hero card with the headline and the floating navigation. */
+/** Video hero card with the tile mosaic, the headline and the floating navigation. */
 function Hero({ demo }: { demo: boolean }) {
   const reduce = useReducedMotion();
   return (
@@ -138,6 +139,8 @@ function Hero({ demo }: { demo: boolean }) {
         playsInline
         className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-105 object-cover transition-transform duration-1000"
       />
+      {/* Right of the headline on large screens; a band under it, fading in, on smaller ones. */}
+      <DealMosaic className="absolute inset-x-4 top-[62%] bottom-0 z-10 [mask-image:linear-gradient(to_bottom,transparent,black_45%)] md:inset-x-8 lg:inset-y-0 lg:right-12 lg:left-auto lg:w-[40%] lg:[mask-image:linear-gradient(to_bottom,transparent,black_12%,black_88%,transparent)] xl:w-[44%]" />
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
