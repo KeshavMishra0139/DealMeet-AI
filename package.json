@@ -2,7 +2,7 @@
   "name": "jodidar-ai",
   "private": true,
   "version": "0.1.0",
-  "description": "JodiDar AI: creator monetisation and brand opportunity engine",
+  "description": "DealMeet AI: creator monetisation and brand opportunity engine",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "demo": "node scripts/dev.mjs --single-port",

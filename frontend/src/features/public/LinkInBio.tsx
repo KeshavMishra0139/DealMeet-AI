@@ -75,7 +75,7 @@ export default function LinkInBio() {
           )}
         </main>
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-muted">
-          <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
+          <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
             <Wordmark />
           </Link>
           <span>· Fair prices and escrow</span>
@@ -98,7 +98,7 @@ function BookDialog({ kit, open, onOpenChange }: { kit: Kit; open: boolean; onOp
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent sheet title={`Book ${kit.name}`} description="Your request goes to their JodiDar deal inbox.">
+      <DialogContent sheet title={`Book ${kit.name}`} description="Your request goes to their DealMeet deal inbox.">
         {book.isSuccess ? (
           <div className="text-center">
             <p className="font-display text-lg font-semibold">Request sent</p>
@@ -183,7 +183,7 @@ function ShareCard({ name, handle }: { name: string; handle: string }) {
   const url = `${window.location.origin}/c/${handle}`;
   return (
     <section aria-labelledby="share-page" className="card-surface mt-4 flex flex-wrap items-center gap-5 rounded-[var(--radius-card)] p-5">
-      <QrCode url={url} label={`QR code for ${name}'s JodiDar page`} size={128} fileName={`jodidar-${handle}.png`} />
+      <QrCode url={url} label={`QR code for ${name}'s DealMeet page`} size={128} fileName={`dealmeet-${handle}.png`} />
       <div className="min-w-0 flex-1">
         <h2 id="share-page" className="text-sm font-semibold">
           Share this page

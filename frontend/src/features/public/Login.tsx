@@ -41,12 +41,12 @@ export default function Login() {
       </div>
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-lg flex-col px-4 py-5 sm:py-10">
         <header>
-          <Link to="/" className="inline-block rounded-lg" aria-label="JodiDar AI home">
+          <Link to="/" className="inline-block rounded-lg" aria-label="DealMeet AI home">
             <Wordmark />
           </Link>
         </header>
         <main id="main" className="mt-10 flex-1 sm:mt-14">
-          <h1 className="font-display text-[28px] font-semibold leading-tight sm:text-[32px]">Sign in to JodiDar</h1>
+          <h1 className="font-display text-[28px] font-semibold leading-tight sm:text-[32px]">Sign in to DealMeet</h1>
           <p className="mt-2 text-[15px] text-fg-2">
             {demo
               ? "Sign in to your account, or pick a demo profile below. Demo profiles run on sample data that resets."

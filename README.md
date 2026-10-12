@@ -1,6 +1,6 @@
-# JodiDar AI
+# DealMeet AI
 
-> Other dashboards tell creators how they're doing. JodiDar AI tells them what to do next, prices it fairly, and makes sure they get paid.
+> Other dashboards tell creators how they're doing. DealMeet AI tells them what to do next, prices it fairly, and makes sure they get paid.
 
 A creator monetisation and brand opportunity engine, built by **Team TheVortex** for **CodeX 3.0** (Problem Statement 3). It runs locally with one command and works fully offline on seeded mock data.
 
@@ -12,7 +12,7 @@ A creator monetisation and brand opportunity engine, built by **Team TheVortex**
 
 You need **Node 22.12+** (20.19+ also works) and **Python 3.10 to 3.14** (3.13 recommended). Nothing else: no keys, no database, and no internet after the first install.
 
-On Windows, clone or unzip the project into a short folder such as `C:\JodiDar-AI`: the Python packages have long file paths, and Windows limits a path to 260 characters unless long paths are turned on.
+On Windows, clone or unzip the project into a short folder such as `C:\DealMeet-AI`: the Python packages have long file paths, and Windows limits a path to 260 characters unless long paths are turned on.
 
 ```bash
 make dev        # or: npm run dev   (works on Windows too)
@@ -268,7 +268,7 @@ Before you start, click **Reset demo** (top of `/demo/compare`). On a shared URL
 | 2:15 | In the console: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. On the phone: **Submit post link** (any `instagram.com/reel/...` link). In the console: **Approve post**. | "Both sides sign. The brand funds escrow before the creator posts, then reviews the post and approves it. In the demo the payment and payout are simulated and say so; with Razorpay connected the deal stops at 'payout not connected' until a payout partner is added. Each side updates live." |
 | 2:35 | Open the Brand Console campaign (`/brand/campaigns/lst_senpai_hoodie?as=br_senpai`) and turn the **Match space**. | "Brands see every match by price, reach and trust. Up and to the left is more reach per rupee; hollow spheres are weak trust or unshared stats." |
 | 2:45 | Back on **Live deal demo**, switch the scenario to **Collective**. On the phone, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. The pack updates in the Thalam Foods console. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
-| 2:55 | Close. | "No guarantees, no scraping, and the reference creator stays anonymous. That's JodiDar AI." |
+| 2:55 | Close. | "No guarantees, no scraping, and the reference creator stays anonymous. That's DealMeet AI." |
 
 Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **→** move between steps and **Esc** ends it. Any link takes `?phone=1` to open in phone view and `?lang=hi` to open the Studio in Hindi.
 
@@ -325,8 +325,8 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 `/c/:handle` is the creator's full public page, under their sharing settings (Studio → Media kit → What your page shows: reach and engagement, audience demographics, rate card, past collaborations and case studies).
 
-- The media kit (stats with Live data / Self-reported / Sample data badges, best formats, audience snapshot, rates) plus niche tags, an estimated price range (labelled estimate), the 6 most-viewed posts synced through the official APIs, Fan Proof badges, collaborations completed on JodiDar and case studies.
-- **Badges appear only when data backs them**: Connected audience (a verified connection), On time (posts submitted by the deal's or campaign's deadline, shown as "X of Y posts"), Completed on JodiDar ×N (posts the brand approved), Brand rating (brands rate a creator once per approved deal), Collective member (accepted a collective place). No "Paid" counts: payouts aren't connected to a verified provider. Badges built on sample deals carry the Sample data label.
+- The media kit (stats with Live data / Self-reported / Sample data badges, best formats, audience snapshot, rates) plus niche tags, an estimated price range (labelled estimate), the 6 most-viewed posts synced through the official APIs, Fan Proof badges, collaborations completed on DealMeet and case studies.
+- **Badges appear only when data backs them**: Connected audience (a verified connection), On time (posts submitted by the deal's or campaign's deadline, shown as "X of Y posts"), Completed on DealMeet ×N (posts the brand approved), Brand rating (brands rate a creator once per approved deal), Collective member (accepted a collective place). No "Paid" counts: payouts aren't connected to a verified provider. Badges built on sample deals carry the Sample data label.
 - **Case studies**: predicted views are stored when the offer is accepted (with what they're based on); actual views come from the platform API by matching the submitted post, or from the creator's own number, labelled Self-reported. "Paid in X days" appears only from a verified provider payout event, so it's absent in the demo.
 - **Share**: the link and a QR code drawn in the browser (the `qrcode` package; no outside QR service), with a PNG download, on the page and in the Studio.
 - **Link previews**: in single-port mode (`static.py`), `/c/:handle` gets per-creator Open Graph and Twitter tags injected into `index.html` on the server, with every creator value HTML-escaped. Unknown or private pages get the plain app.
@@ -353,7 +353,7 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 - **Search on Atlas** uses an Atlas Search index with a `$search` query (autocomplete on the name, fuzzy text on name, category and description). If the index is missing, the directory falls back to a plain text match and says so. **Locally and on mongomock** (no `$search`) it uses a case-insensitive regex over **escaped** input.
 - **Atlas Search setup**: Atlas → your cluster → **Atlas Search** → **Create Search Index** → **JSON Editor** → database `jodidar` (or the one in your URI), collection `brands`, index name `brands_search` → paste `backend/atlas/brands_search.json` → Create. It takes a minute to build. `ATLAS_SEARCH_INDEX` names the index (empty or `off` turns it off).
 
-**Unclaimed brands**: brands that aren't on JodiDar AI show only their public name, category and public handles, no logo, and say "Not on JodiDar AI and not affiliated with us". Only admins add them (`POST /api/admin/brands`). Any visitor can ask for one to be removed (rate-limited per IP); an admin decides.
+**Unclaimed brands**: brands that aren't on DealMeet AI show only their public name, category and public handles, no logo, and say "Not on DealMeet AI and not affiliated with us". Only admins add them (`POST /api/admin/brands`). Any visitor can ask for one to be removed (rate-limited per IP); an admin decides.
 
 **Claim this page**: a brand account that doesn't manage a brand yet asks to own an unclaimed page; the page stays unclaimed until an admin approves (`/api/admin/claims`). Approval links the account to the page and rejects other pending claims.
 
@@ -383,7 +383,7 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 ## Brand profile and campaign lifecycle
 
-**Organisation profile** (Brand Console → Profile): name, address on JodiDar (a unique slug, checked and reserved-word safe), category, website (must be a full `https://` address), description, and a contact that only the brand account sees. Owner-only; every change is audited.
+**Organisation profile** (Brand Console → Profile): name, address on DealMeet (a unique slug, checked and reserved-word safe), category, website (must be a full `https://` address), description, and a contact that only the brand account sees. Owner-only; every change is audited.
 
 **Campaigns** have objectives, target audience (ages, gender), geography (Pan-India or regions, plus priority cities), languages, budget, deliverables, a start date and deadline, usage rights and exclusivity.
 

@@ -86,8 +86,8 @@ def creator_preview(handle: str) -> dict | None:
     branding = c.get("branding") or {}
     line = branding.get("positioning") if branding.get("show_on_page") else None
     return {
-        "title": f"{c['name']} · {niche} creator on JodiDar AI",
-        "description": line or f"{niche}{' in ' + langs if langs else ''}. See their media kit and book them with escrow on JodiDar AI.",
+        "title": f"{c['name']} · {niche} creator on DealMeet AI",
+        "description": line or f"{niche}{' in ' + langs if langs else ''}. See their media kit and book them with escrow on DealMeet AI.",
     }
 
 
@@ -98,7 +98,7 @@ def with_preview(index_html: str, preview: dict, url: str) -> str:
         "og:description": preview["description"],
         "og:type": "profile",
         "og:url": url,
-        "og:site_name": "JodiDar AI",
+        "og:site_name": "DealMeet AI",
         "twitter:card": "summary",
         "twitter:title": preview["title"],
         "twitter:description": preview["description"],

@@ -49,7 +49,7 @@ def create_order(amount_inr: int, kind: str, ref_id: str) -> dict:
     db = get_db()
     if not s.has_razorpay:
         if not s.demo_mode:
-            raise HTTPException(503, f"Payments aren't connected yet, so {NO_MONEY}. Ask the JodiDar team to connect Razorpay.")
+            raise HTTPException(503, f"Payments aren't connected yet, so {NO_MONEY}. Ask the DealMeet team to connect Razorpay.")
         ref = f"sim_{uuid.uuid4().hex[:10]}"
         db.payments.insert_one(
             {"_id": ref, "mode": "simulated", "kind": kind, "ref_id": ref_id, "amount": amount_inr, "status": "simulated", "created_at": now_iso()}
@@ -62,7 +62,7 @@ def create_order(amount_inr: int, kind: str, ref_id: str) -> dict:
         r = httpx.post(
             "https://api.razorpay.com/v1/orders",
             auth=(s.razorpay_key_id, s.razorpay_key_secret),
-            json={"amount": amount_inr * 100, "currency": "INR", "receipt": ref_id[:40], "notes": {"purpose": "JodiDar escrow (test mode)", "kind": kind, "ref": ref_id}},
+            json={"amount": amount_inr * 100, "currency": "INR", "receipt": ref_id[:40], "notes": {"purpose": "DealMeet escrow (test mode)", "kind": kind, "ref": ref_id}},
             timeout=10,
         )
         r.raise_for_status()

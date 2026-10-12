@@ -35,7 +35,7 @@ HANDLE = re.compile(r"^@?([A-Za-z0-9._-]{3,30})$")
 CHANNEL_ID = re.compile(r"^UC[A-Za-z0-9_-]{22}$")
 URL = re.compile(r"(?:https?://)?(?:www\.|m\.)?youtube\.com/(?:(@[A-Za-z0-9._-]{3,30})|channel/(UC[A-Za-z0-9_-]{22}))", re.I)
 
-# YouTube topic categories (Wikipedia links) -> JodiDar niche. A guess the creator can change.
+# YouTube topic categories (Wikipedia links) -> DealMeet niche. A guess the creator can change.
 TOPIC_NICHES = [
     ("video_game", "gaming"),
     ("anime", "anime_edits"),
@@ -95,7 +95,7 @@ def _call(endpoint: str, params: dict) -> tuple[dict, float]:
         except (ValueError, KeyError, TypeError):
             pass
         if reasons & {"quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded"}:
-            raise HTTPException(503, "YouTube's daily quota for JodiDar is used up. Cached channels still work; new lookups resume tomorrow.")
+            raise HTTPException(503, "YouTube's daily quota for DealMeet is used up. Cached channels still work; new lookups resume tomorrow.")
         if reasons & {"keyInvalid", "keyExpired", "accessNotConfigured", "forbidden", "ipRefererBlocked"}:
             raise HTTPException(503, "YouTube data isn't available: the server's API key isn't valid or the API isn't enabled.")
         if r.status_code == 404:
@@ -229,7 +229,7 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
     fetched = report["fetched_at"]
     owner = db.creators.find_one({"channels.youtube.channel_id": ch["id"], "_id": {"$ne": creator_id}}, {"_id": 1})
     if owner:
-        raise HTTPException(409, "That channel is already linked to another JodiDar profile.")
+        raise HTTPException(409, "That channel is already linked to another DealMeet profile.")
     summary = {
         "channel_id": ch["id"],
         "handle": ch["handle"],

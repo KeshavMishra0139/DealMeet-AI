@@ -61,7 +61,7 @@ export default function BrandOnboarding() {
     <div className="theme-brand min-h-dvh bg-bg text-fg">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-          <Link to="/" className="rounded-lg" aria-label="JodiDar AI home">
+          <Link to="/" className="rounded-lg" aria-label="DealMeet AI home">
             <Wordmark />
           </Link>
           <Link to="/login?role=brand" className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-fg">

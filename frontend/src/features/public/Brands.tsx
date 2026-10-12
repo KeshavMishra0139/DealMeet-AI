@@ -74,7 +74,7 @@ export default function Brands() {
       </div>
       <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 sm:py-10">
         <header className="flex items-center justify-between gap-3">
-          <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
+          <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
             <Wordmark />
           </Link>
           <Button asChild size="sm" variant="ghost">

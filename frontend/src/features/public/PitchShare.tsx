@@ -22,7 +22,7 @@ interface Shared {
   creator: { name: string; handle: string; niche: string; languages: string[]; avatar_hue: number; page: string | null };
 }
 
-/** A pitch a creator shared with a brand that isn't on JodiDar AI. */
+/** A pitch a creator shared with a brand that isn't on DealMeet AI. */
 export default function PitchShare() {
   useTheme("creator");
   const { slug = "" } = useParams();
@@ -78,7 +78,7 @@ export default function PitchShare() {
           )}
         </main>
         <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-muted">
-          <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
+          <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
             <Wordmark />
           </Link>
           <span>· Fair prices and escrow</span>

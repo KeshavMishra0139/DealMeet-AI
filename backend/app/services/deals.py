@@ -465,7 +465,7 @@ def view(d: dict, role: str) -> dict:
             {
                 "kind": "payout_not_connected",
                 "text": "Approved, payout not connected",
-                "detail": "Nothing has been paid out yet: JodiDar has no payout partner connected. The payment stays in escrow until one is.",
+                "detail": "Nothing has been paid out yet: DealMeet has no payout partner connected. The payment stays in escrow until one is.",
             }
         )
     invoice = db.invoices.find_one({"deal_id": d["_id"]})
@@ -527,9 +527,9 @@ def contract_terms(d: dict, creator: dict, brand: dict) -> list[str]:
     brand_name = (brand.get("name") or "the brand").rstrip(".")
     t = [
         f"{creator.get('name', 'The creator')} will publish {deliverables_label(terms)} for {brand_name}.",
-        f"Fee: {inr_full(d['amount'])}, paid into JodiDar escrow before the post goes live.",
+        f"Fee: {inr_full(d['amount'])}, paid into DealMeet escrow before the post goes live.",
         f"The brand reviews the post and approves it or asks for a revision. If the brand doesn't respond, the post is approved automatically {VERIFY_DAYS + GRACE_DAYS} days after it's submitted.",
-        "The fee is released to the creator after approval, through JodiDar's payout partner.",
+        "The fee is released to the creator after approval, through DealMeet's payout partner.",
         "The post carries a paid-partnership label and stays up for at least 30 days.",
     ]
     if d.get("post_by"):

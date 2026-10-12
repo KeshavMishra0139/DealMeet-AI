@@ -365,8 +365,8 @@ def build_collective(listing_id: str, body: CollectiveIn, user: dict = Depends(a
 
 OVERLAP_NOTE = {
     "tee": "Computed inside an attested enclave (AWS Nitro Enclaves); its measurements matched our policy.",
-    "not_configured": "Computed on JodiDar's server, from only the percentages this needs.",
-    "failed": "Nothing was sent to it. Computed on JodiDar's server, from only the percentages this needs.",
+    "not_configured": "Computed on DealMeet's server, from only the percentages this needs.",
+    "failed": "Nothing was sent to it. Computed on DealMeet's server, from only the percentages this needs.",
 }
 
 

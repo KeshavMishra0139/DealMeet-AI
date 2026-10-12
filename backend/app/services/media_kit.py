@@ -128,7 +128,7 @@ def _copy(c: dict, pub: dict, lang: Lang) -> tuple[KitCopy, str]:
                 bio += f" हाल की रील्स के मीडियन व्यूज़ {short(metrics.median_views(c))} हैं।"
             if best:
                 bio += f" दर्शकों को सबसे ज़्यादा {best} पसंद आता है।"
-            bio += " ब्रैंड रील्स, कलेक्टिव्स और लंबी पार्टनरशिप के लिए JodiDar एस्क्रो के ज़रिए उपलब्ध।"
+            bio += " ब्रैंड रील्स, कलेक्टिव्स और लंबी पार्टनरशिप के लिए DealMeet एस्क्रो के ज़रिए उपलब्ध।"
             return KitCopy(headline=head, bio=bio)
 
         prompt = (
@@ -149,7 +149,7 @@ def _copy(c: dict, pub: dict, lang: Lang) -> tuple[KitCopy, str]:
             bio += f" Recent reels have a median of {short(metrics.median_views(c))} views."
         if best:
             bio += f" {best} is the format audiences respond to most."
-        bio += " Available for brand reels, collectives and long-term partnerships through JodiDar escrow."
+        bio += " Available for brand reels, collectives and long-term partnerships through DealMeet escrow."
         return KitCopy(headline=head, bio=bio)
 
     prompt = (
@@ -253,7 +253,7 @@ def build_kit(c: dict, lang: Lang = "en") -> dict:
         "safety_note": (tx["unsafe"].format(label=flag["label"].lower(), fix=flag["fix"].lower()) if flag else tx["safe"]),
         "public": pub,
         "sections": {s: True for s in SECTIONS},
-        "link": f"jodidar.ai/c/{c['handle']}",
+        "link": f"dealmeet.ai/c/{c['handle']}",
         "path": f"/c/{c['handle']}",
         "generated_on": _date(lang),
         "has_simulated": has_sim,
