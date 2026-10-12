@@ -34,10 +34,30 @@ make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
 make e2e        # or: npm run e2e     click through 30 key journeys in a real browser
+make accounts   # or: npm run accounts  real accounts with demo mode OFF, at 390 px and 1280 px (starts its own API)
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
 ```
+
+## Setup: from the demo to real services
+
+The demo needs nothing. To run with real accounts and live data, set these up in order. Each step works on its own: anything you skip says "not connected" in the app instead of showing made-up numbers. Put values in `.env` locally (copy `.env.example`) or in your host's environment (secrets on Render), never in the repository.
+
+1. **Real accounts, no demo**: set `DEMO_MODE=0`. No seeded data, no persona sign-in, no reset; people sign up with email and password. Check it with `make accounts` (below).
+2. **Database (MongoDB Atlas)**: follow [Atlas setup](#database), then set `MONGODB_URI`, `MONGODB_DB=jodidar` and `USE_MOCK_DB=0`. For the brand directory's full-text search, create the Atlas Search index from `backend/atlas/brands_search.json` (name `brands_search`, or set `ATLAS_SEARCH_INDEX`); without it the directory uses a plain text match.
+3. **Sample data (optional)**: `make seed` loads the synthetic sample data into empty collections, every record marked `source: "synthetic"` and shown as "Sample data". `make seed ARGS="--reset --confirm-reset"` replaces only synthetic records.
+4. **YouTube API key**: follow [Google Cloud setup](#real-youtube-data-and-what-am-i-worth) and set `YOUTUBE_API_KEY`. Turns on `/worth` and linking a channel by @handle.
+5. **Firebase (Google and phone sign-in)**: follow [Firebase setup](#firebase-setup-one-time) and set the four `VITE_FIREBASE_*` values (build-time) and `FIREBASE_SERVICE_ACCOUNT_JSON` (server).
+6. **Google OAuth test users (YouTube Analytics)**: in the Firebase project's Google Cloud console, enable the YouTube Analytics API, add the `youtube.readonly` and `yt-analytics.readonly` scopes to the OAuth consent screen, keep the app in **Testing** and add each creator's Google account as a **test user** ([details](#youtube-analytics-optional)).
+7. **Meta app with Instagram Testers**: follow the [Meta dashboard steps](#connecting-instagram); set `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` (HTTPS), `FRONTEND_URL` and `TOKEN_ENC_KEY`. Each creator who connects must be an Instagram Tester with a Creator or Business account while the app is in development mode.
+8. **Payments (optional)**: Razorpay test keys `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and the webhook secret `RAZORPAY_WEBHOOK_SECRET` (webhook URL: `/api/payments/razorpay/webhook`).
+9. **Live AI (optional)**: `ANTHROPIC_API_KEY` and `AI_MODEL`, with `AI_MAX_CALLS_PER_HOUR` as a cap.
+10. **An admin**: sign up, then on the server `python -m app.admin_cli grant <email>` (in `backend/`).
+
+**Switching between sample and real data**: `make dev` with no `MONGODB_URI` runs the in-memory demo (`USE_MOCK_DB=1`, `DEMO_MODE=1`). With `MONGODB_URI` set, `make dev` uses that database instead; add `DEMO_MODE=0` for real accounts only. The API never falls back to the in-memory database on its own: if `MONGODB_URI` is set and unreachable, it stops with a clear message. Every number in the app carries its source: "Live data" (from YouTube or Instagram), "Self-reported" (typed by the creator) or "Sample data" (seeded).
+
+Every variable is listed in [Environment variables](#environment-variables) and in `.env.example` with a comment.
 
 ## Environment variables
 
@@ -57,10 +77,12 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI`, `FRONTEND_URL`, `TOKEN_ENC_KEY` | Connecting Instagram with its official login (read-only), real post checks on deals | Instagram shows "not available"; post checks read "not checked" |
 | `IG_GRAPH_VERSION`, `IG_DEMOGRAPHICS_TIMEFRAME` | Meta Graph API version and the audience-demographics window | `v25.0`, `this_month` |
 | `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
+| `DEMO_ADMIN` | `1`: a "Demo admin" persona for walking through `/admin` locally. Ignored outside demo mode and on a demo that resets itself. `make dev` sets it | No demo admin; admins only via `python -m app.admin_cli grant <email>` |
 | `SESSION_HOURS` | How long a sign-in lasts | 72 |
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
 | `DEMO_RESET_MINUTES` | On a shared URL, put the demo data back to its seeded state every N minutes (skipped while someone changed something in the last 5 minutes). The Docker image sets 30 | Never resets on its own |
 | `AI_MAX_CALLS_PER_HOUR` | Cap on live AI calls across all visitors; beyond it, templates are used | 100 |
+| `TEE_ENDPOINT`, `TEE_TRUST_ROOT`, `TEE_MEASUREMENTS`, `TEE_ATTESTATION_MAX_AGE_S` | Protected computation in an AWS Nitro enclave, accepted only when its attestation verifies against the trust root and PCR policy ([details](#protected-computation-tee-status-and-fallback)) | TEE status `not_configured`; the audience overlap runs on the server from minimised data, and says so |
 
 Every AI call goes through one function with a fallback: if the key is missing, the call fails, the reply breaks the copy rules, or it quotes a number that isn't in our data, the template is used instead. Answers are cached.
 
@@ -508,11 +530,16 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 362 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
+| `make test` | 425 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
+| `make accounts` | Real accounts with demo mode off, at 390 px and 1280 px, on its own API (:8010) and a fresh web build: email sign-up and onboarding, profile edits, Money, Roadmap and Opportunities on a new marketplace, a campaign from draft to live, an application, an offer the creator signs, and signing out. Every write is followed by a reload to check it was saved |
 | `make e2e` | 30 journeys in a real browser (below). `QA_ONLY="Admin" make e2e` runs only the journeys whose names contain that text |
 | `make shots` | 98 screenshots (49 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
+**CI**: `.github/workflows/test.yml` runs `make test` on every push and pull request, then the demo journeys (`make e2e`) and the real-account journeys (`make accounts`) in headless Chromium. No secrets are needed; everything runs on the in-memory database. Failure screenshots are kept as a build artifact for a week.
+
 The API tests cover:
+
+- Acceptance across areas (profile, campaigns, campaign status, matching, shortlist, contracts, payments, rates, media kit, pitches, Dream Brands, brand profile, YouTube linking, Instagram OAuth, assistant tools, reports, admin): no session is 401, an expired session is 401, another account is 403, invalid input is a clear 4xx, a new marketplace with nothing seeded works, and writes are read back by a new session.
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.

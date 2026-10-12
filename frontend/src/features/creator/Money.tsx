@@ -122,7 +122,7 @@ function FairPriceCard({
               <span className="text-gradient">{inrRange(data.range.low, data.range.high)}</span>
             </p>
             <p className="mt-2 text-sm text-fg-2">
-              For <span className="font-medium text-fg">{data.lister_name}</span>. Priced on followers alone:{" "}
+              For <span className="font-medium text-fg">{data.lister_name ?? "a typical brand in your niche"}</span>. Priced on followers alone:{" "}
               <span className="num font-medium text-fg">{inr(data.follower_price)}</span>
               {data.uplift_vs_followers && data.uplift_vs_followers > 1.2 && (
                 <span className="num"> ({data.uplift_vs_followers.toFixed(1)}x less)</span>

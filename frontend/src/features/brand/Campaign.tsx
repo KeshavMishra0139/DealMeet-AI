@@ -240,9 +240,10 @@ function MatchList({
         <StaggerItem
           as="li"
           key={m.id}
-          className={cn("grid gap-3 px-4 py-3.5 md:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,1.6fr)_auto] md:items-center", m.trust && m.trust.score < 50 && "bg-danger-soft/40")}
+          className={cn("grid gap-3 px-4 py-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)_auto] md:items-center", m.trust && m.trust.score < 50 && "bg-danger-soft/40")}
         >
-          <div className="flex items-center gap-3 md:contents">
+          {/* min-w-0 lets long handles and reasons wrap or truncate instead of pushing the columns over. */}
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="num w-5 text-xs text-muted">{i + 1}</span>
               <Avatar name={m.name} hue={m.avatar_hue} size={36} generic={m.is_reference} />

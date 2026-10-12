@@ -1,4 +1,4 @@
-.PHONY: dev demo setup test shots e2e reset seed
+.PHONY: dev demo setup test shots e2e accounts reset seed
 
 # Start API (:8000) and web (:5173). Installs dependencies on first run.
 dev:
@@ -25,6 +25,11 @@ shots:
 e2e:
 	npm install --no-audit --no-fund --silent
 	node qa/flows.mjs
+
+# Real-account journeys with demo mode OFF at 390 px and 1280 px (starts its own API on :8010).
+accounts:
+	npm install --no-audit --no-fund --silent
+	node qa/accounts.mjs
 
 # Reset the in-memory demo data while the app is running.
 reset:

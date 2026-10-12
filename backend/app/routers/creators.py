@@ -91,8 +91,10 @@ def money(creator_id: str, _: dict = Depends(au.own_creator)):
     )
     best = ctx["brand"]
     options = [{"id": b["_id"], "name": b["name"], "category": b["category"], "fit": audience_fit(c, b)["score"]} for b in brands]
-    first = next((o for o in options if best and o["id"] == best["_id"]), options[0])
-    options = [first, options[-1]] + [o for o in options if o not in (first, options[-1])]
+    if options:  # a new marketplace may have no verified brands yet
+        first = next((o for o in options if best and o["id"] == best["_id"]), options[0])
+        ordered = [first, options[-1]] + options
+        options = [o for i, o in enumerate(ordered) if o not in ordered[:i]]
     return {
         "creator": _summary(c),
         "stage": ctx["stage"],
