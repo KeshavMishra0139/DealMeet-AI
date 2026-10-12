@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarCheck, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -10,7 +10,7 @@ import { Input, Label, Segmented, Skeleton, Textarea } from "@/components/ui/for
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import { inr } from "@/lib/format";
-import type { Kit } from "@/lib/kit-types";
+import type { Kit, KitLang } from "@/lib/kit-types";
 import { useTheme } from "@/lib/theme";
 import NotFound from "./NotFound";
 
@@ -18,7 +18,8 @@ export default function LinkInBio() {
   useTheme("creator");
   const { handle = "" } = useParams();
   const [open, setOpen] = useState(false);
-  const q = useQuery({ queryKey: ["public", handle], queryFn: () => api<Kit>(`/public/${handle}`), retry: false });
+  const [lang, setLang] = useState<KitLang>("en");
+  const q = useQuery({ queryKey: ["public", handle, lang], queryFn: () => api<Kit>(`/public/${handle}?lang=${lang}`), retry: false, placeholderData: keepPreviousData });
   if (q.isError && (q.error as { status?: number }).status === 404) return <NotFound />;
 
   return (
@@ -30,6 +31,20 @@ export default function LinkInBio() {
         <main id="main">
           {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
           {!q.data && !q.isError && <Skeleton className="h-[640px] rounded-[28px]" />}
+          {q.data && !q.data.version && (
+            <div className="mb-3 flex justify-end">
+              <Segmented
+                label="Media kit language"
+                size="sm"
+                value={lang}
+                onChange={setLang}
+                options={[
+                  { value: "en", label: "English" },
+                  { value: "hi", label: "हिंदी" },
+                ]}
+              />
+            </div>
+          )}
           {q.data && (
             <KitCard
               kit={q.data}

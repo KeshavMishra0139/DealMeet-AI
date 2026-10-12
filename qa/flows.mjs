@@ -215,7 +215,29 @@ await step("Coach: ask about views, see the numbers used with their sources, the
   await page.getByRole("heading", { name: "Your goals" }).waitFor();
 });
 
+await step("Rates and media kit: save your rate next to the estimate, save a Hindi kit version, show it on the public page", async () => {
+  await reset();
+  await page.goto(`${BASE}/creator/money?as=cr_a`);
+  await page.getByText("Missing, not guessed").or(page.getByText("Numbers used")).first().waitFor();
+  await page.getByLabel("Your rate (₹)").fill("21000");
+  await page.getByRole("button", { name: "Save as your rate" }).click();
+  await page.getByText("Estimated range", { exact: true }).first().waitFor();
+  await page.getByText("₹21,000").first().waitFor();
+  await page.goto(`${BASE}/creator/kit?as=cr_a`);
+  await page.getByRole("radio", { name: "हिंदी" }).click();
+  await page.getByText("फ़ॉलोअर्स").first().waitFor();
+  await page.getByLabel("Headline").fill("हिंदी और अंग्रेज़ी में एनिमे एडिट्स");
+  await page.getByRole("button", { name: /Save as version/ }).click();
+  await page.getByText("Version 1 saved").waitFor();
+  await page.getByRole("button", { name: "Show version 1 on your public page" }).click();
+  await page.getByText("On your public page").waitFor();
+  await page.goto(`${BASE}/c/creator.a`);
+  await page.getByText("हिंदी और अंग्रेज़ी में एनिमे एडिट्स", { exact: true }).waitFor();
+  await page.getByText(/वर्शन 1/).waitFor();
+});
+
 await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () => {
+  await reset();
   await page.goto(`${BASE}/creator?as=cr_a&lang=en`);
   await page.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
   await page.getByRole("button", { name: /Switch to Hindi/ }).click();

@@ -55,6 +55,8 @@ export async function api<T>(path: string, init?: ApiInit): Promise<T> {
 }
 
 export const post = <T>(path: string, json?: unknown) => api<T>(path, { method: "POST", json: json ?? {} });
+export const put = <T>(path: string, json?: unknown) => api<T>(path, { method: "PUT", json: json ?? {} });
+export const del = <T>(path: string) => api<T>(path, { method: "DELETE" });
 
 /** A 401 anywhere means the session ended: re-check it, so the shell signs in again or sends you to sign-in. */
 function onAuthError(err: unknown, key?: readonly unknown[]) {
