@@ -133,7 +133,7 @@ function NotAdmin() {
     <div className="theme-brand mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5">
       <Wordmark />
       <h1 className="font-display text-2xl font-semibold">Admins only</h1>
-      <p className="text-fg-2">This account isn't an admin. The admin role is given on the server by whoever runs JodiDar AI; there's no way to ask for it here.</p>
+      <p className="text-fg-2">This account isn't an admin. The admin role is given on the server by whoever runs DealMeet AI; there's no way to ask for it here.</p>
       <Button asChild variant="outline" className="self-start">
         <Link to="/">Back home</Link>
       </Button>
@@ -688,7 +688,7 @@ function BrandPagesTab() {
           ))}
         </ul>
       </Panel>
-      <Panel title="Add a brand that isn't on JodiDar AI" icon={<Building2 className="size-4 text-accent" aria-hidden />}>
+      <Panel title="Add a brand that isn't on DealMeet AI" icon={<Building2 className="size-4 text-accent" aria-hidden />}>
         <p className="text-sm text-muted">Public name, category and public handles only. It's listed as unclaimed until the brand claims it.</p>
         <form
           className="mt-3 grid gap-3 sm:grid-cols-2"

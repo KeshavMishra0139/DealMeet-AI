@@ -83,7 +83,7 @@ function YouTubeCard({ creatorId, status }: { creatorId: string; status: Platfor
     mutationFn: () => api<LinkedYouTube>(`/creators/${creatorId}/youtube/link`, { method: "DELETE" }),
     onSuccess: (d) => {
       done(d);
-      toast.success("Channel unlinked", { description: "Its videos and snapshots were deleted from JodiDar." });
+      toast.success("Channel unlinked", { description: "Its videos and snapshots were deleted from DealMeet." });
     },
   });
   const d = q.data;
@@ -213,7 +213,7 @@ function InstagramCard({ creatorId, status }: { creatorId: string; status: Platf
     onSuccess: (d) => {
       setConfirmOff(false);
       refresh(d);
-      toast.success("Instagram disconnected", { description: "The access token and all Instagram data were deleted from JodiDar." });
+      toast.success("Instagram disconnected", { description: "The access token and all Instagram data were deleted from DealMeet." });
     },
   });
   const acct = q.data?.account;
@@ -254,7 +254,7 @@ function InstagramCard({ creatorId, status }: { creatorId: string; status: Platf
           <p className="rounded-2xl border border-line bg-surface-2 p-4 text-sm leading-relaxed">{q.data?.consent}</p>
           <p className="mt-3 flex gap-2 text-xs text-muted">
             <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
-            Your account must be a Creator or Business account. While the JodiDar app is in development mode, only accounts added as Instagram
+            Your account must be a Creator or Business account. While the DealMeet app is in development mode, only accounts added as Instagram
             Testers can connect.
           </p>
           <div className="mt-5 flex justify-end gap-2">
@@ -269,7 +269,7 @@ function InstagramCard({ creatorId, status }: { creatorId: string; status: Platf
       </Dialog>
 
       <Dialog open={confirmOff} onOpenChange={setConfirmOff}>
-        <DialogContent title="Disconnect Instagram?" description="JodiDar deletes the access token and every Instagram post, insight and audience number it stored.">
+        <DialogContent title="Disconnect Instagram?" description="DealMeet deletes the access token and every Instagram post, insight and audience number it stored.">
           <div className="mt-2 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setConfirmOff(false)}>
               Keep connected
@@ -399,7 +399,7 @@ function AnalyticsPanel({ data, onChange }: { data: LinkedYouTube; onChange: (d:
         <DialogContent title="Connect YouTube Analytics" description="Google's official sign-in. Read-only.">
           <p className="rounded-2xl border border-line bg-surface-2 p-4 text-sm leading-relaxed">{data.analytics_consent}</p>
           <p className="mt-3 text-xs text-muted">
-            Sign in with the Google account that owns {data.channel?.title}. JodiDar reads the last 28 days once and doesn't keep Google's access, so
+            Sign in with the Google account that owns {data.channel?.title}. DealMeet reads the last 28 days once and doesn't keep Google's access, so
             Refresh asks again.
           </p>
           <div className="mt-5 flex justify-end gap-2">

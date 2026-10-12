@@ -214,7 +214,7 @@ await step("Shortlist: save two matches with a note, compare them, then send a d
   await page.getByText(/Offer sent to Kabir Malhotra/).waitFor();
 });
 
-await step("Brands: search the directory, save a Dream Brand, see it in the Studio; unclaimed pages say they aren't on JodiDar", async () => {
+await step("Brands: search the directory, save a Dream Brand, see it in the Studio; unclaimed pages say they aren't on DealMeet", async () => {
   await reset();
   await page.goto(`${BASE}/brands?as=cr_a`);
   await page.getByLabel("Search").fill("senpai");
@@ -226,7 +226,7 @@ await step("Brands: search the directory, save a Dream Brand, see it in the Stud
   await page.goto(`${BASE}/creator/brands?as=cr_a`);
   await page.getByText("Senpai Supply Co.").first().waitFor();
   await page.goto(`${BASE}/brands/notebook-nagar`);
-  await page.getByText("Not on JodiDar AI and not affiliated with us.").first().waitFor();
+  await page.getByText("Not on DealMeet AI and not affiliated with us.").first().waitFor();
   await page.getByRole("button", { name: "Request removal" }).waitFor();
 });
 
@@ -522,9 +522,9 @@ await step("Phone view: P puts the app in a 390 x 844 phone and back", async () 
   await desk.goto(`${BASE}/creator?as=cr_b&phone=0`);
   await desk.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
   await desk.keyboard.press("p");
-  const phone = desk.frameLocator('iframe[title="JodiDar AI on a phone"]');
+  const phone = desk.frameLocator('iframe[title="DealMeet AI on a phone"]');
   await phone.getByRole("heading", { name: /Post 2 Tamil quick-breakfast reels/ }).waitFor();
-  const box = await desk.locator('iframe[title="JodiDar AI on a phone"]').boundingBox();
+  const box = await desk.locator('iframe[title="DealMeet AI on a phone"]').boundingBox();
   if (!box || Math.abs(box.width / box.height - 390 / (844 - 47 - 21)) > 0.02) throw new Error(`Unexpected frame size ${JSON.stringify(box)}`);
   await phone.getByRole("link", { name: "Money", exact: true }).click();
   await desk.waitForURL(/\/creator\/money/);

@@ -174,7 +174,7 @@ function NewPitch({
                   className="rounded-full border border-line px-3 py-1 text-xs hover:border-accent/60 aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent"
                 >
                   {b.name}
-                  {!b.claimed && " · not on JodiDar"}
+                  {!b.claimed && " · not on DealMeet"}
                 </button>
               </li>
             ))}
@@ -302,7 +302,7 @@ function Editor({ creatorId, pitch, onDone }: { creatorId: string; pitch: Pitch;
           title={pitch.on_platform === false ? `Make a share link for ${pitch.brand_name}?` : `Send this pitch to ${pitch.brand_name}?`}
           description={
             pitch.on_platform === false
-              ? "They aren't on JodiDar AI, so you'll get a private link to send them yourself. You can turn it off any time. It counts toward your 5 a week."
+              ? "They aren't on DealMeet AI, so you'll get a private link to send them yourself. You can turn it off any time. It counts toward your 5 a week."
               : "It goes to their Fan Inbox. It counts toward your 5 pitches a week."
           }
         >

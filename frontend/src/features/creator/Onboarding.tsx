@@ -122,7 +122,7 @@ export default function Onboarding() {
       </div>
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-xl flex-col px-4 py-5 sm:py-8">
         <header className="flex items-center justify-between">
-          <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
+          <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
             <Wordmark />
           </Link>
           <span className="text-xs text-muted">About {secondsLeft} seconds left</span>
@@ -320,7 +320,7 @@ export default function Onboarding() {
                 {step === 4 && (
                   <div className="mt-6 space-y-6">
                     <p className="text-[15px] text-fg-2">
-                      Connect Instagram or YouTube after setup, from your Studio: official login, read-only. Until then JodiDar uses only what you
+                      Connect Instagram or YouTube after setup, from your Studio: official login, read-only. Until then DealMeet uses only what you
                       type. We never ask for passwords, and we never scrape.
                     </p>
                     <ul className="grid gap-2 sm:grid-cols-2">

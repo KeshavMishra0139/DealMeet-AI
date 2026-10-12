@@ -42,7 +42,7 @@ def test_on_time_delivery_completed_count_and_brand_rating(client, login, db):
     a, s = login("cr_a"), login("br_senpai")
     _complete(db, "dl_a_senpai", submitted="2026-10-10T10:00:00+05:30")  # campaign deadline 2026-10-25
     badges = {b["key"]: b for b in _page(client)["badges"]}
-    assert badges["completed"]["label"] == "Completed on JodiDar ×1"
+    assert badges["completed"]["label"] == "Completed on DealMeet ×1"
     assert badges["on_time"]["label"].startswith("On time:")
     # Rating: the brand, once, after approval.
     assert a.post("/api/deals/dl_a_senpai/rating", json={"stars": 5}).status_code == 403

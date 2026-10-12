@@ -74,14 +74,14 @@ def badges(c: dict) -> list[dict]:
                     "percent": round(on_time / len(timed) * 100), "sample": any(d.get("source") == "synthetic" for d, _, _ in timed)})
     done = _completed(c["_id"])
     if done:
-        out.append({"key": "completed", "label": f"Completed on JodiDar ×{len(done)}", "detail": "Posts approved by the brand", "sample": any(d.get("source") == "synthetic" for d in done)})
+        out.append({"key": "completed", "label": f"Completed on DealMeet ×{len(done)}", "detail": "Posts approved by the brand", "sample": any(d.get("source") == "synthetic" for d in done)})
     rated = [d for d in done if (d.get("rating") or {}).get("stars")]
     if rated:
         avg = sum(d["rating"]["stars"] for d in rated) / len(rated)
         out.append({"key": "rating", "label": f"Brand rating {avg:.1f}/5", "detail": f"From {len(rated)} brand{'s' if len(rated) != 1 else ''} after completed deals", "sample": any(d.get("source") == "synthetic" for d in rated)})
     joined = list(db.deals.find({"creator_id": c["_id"], "kind": "collective", "stage": {"$nin": ["offer", "declined"]}}, {"source": 1}))
     if joined:  # accepted a place in a collective
-        out.append({"key": "collective", "label": "Collective member", "detail": "Accepted a place in a creator collective on JodiDar", "sample": any(d.get("source") == "synthetic" for d in joined)})
+        out.append({"key": "collective", "label": "Collective member", "detail": "Accepted a place in a creator collective on DealMeet", "sample": any(d.get("source") == "synthetic" for d in joined)})
     return out
 
 

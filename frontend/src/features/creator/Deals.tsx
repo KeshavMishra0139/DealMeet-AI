@@ -58,7 +58,7 @@ export default function Deals() {
 
       {q.data.invoices.length > 0 && (
         <section aria-labelledby="inv" className="mt-8">
-          <SectionTitle id="inv" eyebrow="Outside JodiDar" title="Invoices you're chasing" />
+          <SectionTitle id="inv" eyebrow="Outside DealMeet" title="Invoices you're chasing" />
           <ul className="space-y-2">
             {q.data.invoices.map((i) => (
               <li key={i.id} className="card-surface flex flex-wrap items-center gap-3 rounded-2xl p-4">
@@ -167,7 +167,7 @@ function LogDealDialog({ open, onOpenChange, creatorId }: { open: boolean; onOpe
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent sheet title="Log a deal made outside JodiDar" description="We'll make the invoice and remind you when payment is late.">
+      <DialogContent sheet title="Log a deal made outside DealMeet" description="We'll make the invoice and remind you when payment is late.">
         <form
           className="space-y-4"
           onSubmit={(e) => {

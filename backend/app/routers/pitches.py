@@ -71,7 +71,7 @@ def delete_pitch(creator_id: str, pitch_id: str, _: dict = Depends(au.own_creato
 
 @router.get("/p/{slug}")
 def shared_pitch(slug: str):
-    """Public: a pitch the creator shared with a brand that isn't on JodiDar AI."""
+    """Public: a pitch the creator shared with a brand that isn't on DealMeet AI."""
     return pt.public(slug)
 
 

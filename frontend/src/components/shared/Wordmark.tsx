@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-/** Two linked rings: a jodi (pair) of creator and brand, meeting at a fair dar (rate). */
+/** Two linked rings: a creator and a brand meeting on a fair deal. */
 export function LogoMark({ className }: { className?: string }) {
   const id = useId();
   return (
@@ -25,11 +25,11 @@ export function Wordmark({ className, compact = false }: { className?: string; c
       <LogoMark />
       {!compact && (
         <span className="font-display text-[17px] font-semibold tracking-tight text-fg">
-          JodiDar
+          DealMeet
           <span className="text-gradient ml-1 font-bold">AI</span>
         </span>
       )}
-      {compact && <span className="sr-only">JodiDar AI</span>}
+      {compact && <span className="sr-only">DealMeet AI</span>}
     </span>
   );
 }

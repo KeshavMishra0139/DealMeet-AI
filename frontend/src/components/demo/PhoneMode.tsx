@@ -20,7 +20,7 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { PHONE_OUTER, PhoneFrame, useFitScale } from "./Frames";
 
-/** Listens for JodiDar messages from same-origin frames; the handler gets the sending window to tell frames apart. */
+/** Listens for DealMeet messages from same-origin frames; the handler gets the sending window to tell frames apart. */
 export function useFrameMessages(handler: (msg: FrameMessage, source: MessageEventSource | null) => void) {
   const ref = useRef(handler);
   ref.current = handler;
@@ -125,7 +125,7 @@ export function PhoneStage() {
         <span />
       </div>
       <header className="relative z-10 flex items-center justify-between gap-4 px-6 py-4">
-        <Link to="/" className="rounded-lg" aria-label="JodiDar AI home">
+        <Link to="/" className="rounded-lg" aria-label="DealMeet AI home">
           <Wordmark />
         </Link>
         <p className="hidden text-sm text-muted md:block">
@@ -143,9 +143,9 @@ export function PhoneStage() {
         </div>
       </header>
       <main id="main" ref={area} className="relative z-10 flex justify-center px-4">
-        <h1 className="sr-only">JodiDar AI in phone view</h1>
+        <h1 className="sr-only">DealMeet AI in phone view</h1>
         <motion.div initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 220, damping: 26 }}>
-          <PhoneFrame src={src.current} title="JodiDar AI on a phone" tone={tone} scale={scale} frameRef={frame} />
+          <PhoneFrame src={src.current} title="DealMeet AI on a phone" tone={tone} scale={scale} frameRef={frame} />
         </motion.div>
       </main>
     </div>

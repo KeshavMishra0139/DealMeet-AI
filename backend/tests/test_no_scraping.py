@@ -1,4 +1,4 @@
-"""JodiDar AI only uses data a creator connects via official OAuth, types or uploads,
+"""DealMeet AI only uses data a creator connects via official OAuth, types or uploads,
 plus seeded mock data. This test fails if scraping tools or direct page fetches
 of social platforms appear anywhere in the app code."""
 import re

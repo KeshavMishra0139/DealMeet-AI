@@ -64,7 +64,7 @@ def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int
     cpm = NICHES[niche]["cpm"]
     reasons = [
         f"Priced on the median views of your last {len(views)} {label}: {short(mv)} views. Subscribers don't set the price.",
-        f"{inr(cpm)} per 1,000 views is JodiDar's seeded rate for {NICHES[niche]['label'].lower()}.",
+        f"{inr(cpm)} per 1,000 views is DealMeet's seeded rate for {NICHES[niche]['label'].lower()}.",
         "Engagement, audience fit and trust aren't in public data, so nothing is adjusted for them. The range is wider for that reason.",
     ]
     if newest_excluded:
