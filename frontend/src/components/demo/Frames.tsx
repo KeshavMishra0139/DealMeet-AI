@@ -161,7 +161,7 @@ export function BrowserFrame({
         <span className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-white px-3 text-xs">
           <Lock className="size-3 shrink-0" aria-hidden />
           <span className="truncate">
-            <span className="text-[#6B6783]">jodidar.app</span>
+            <span className="text-[#6B6783]">dealmeet.app</span>
             {url}
           </span>
         </span>

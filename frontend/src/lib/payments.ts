@@ -38,7 +38,7 @@ export async function fundEscrow(path: string, label: string): Promise<void> {
       order_id: order.order_id,
       amount: order.amount * 100,
       currency: "INR",
-      name: "JodiDar escrow (test mode)",
+      name: "DealMeet escrow (test mode)",
       description: label,
       handler: async (r: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
         try {

@@ -114,7 +114,7 @@ export default function Compare() {
       </a>
       <header className="relative z-10 border-b border-line">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link to="/" className="rounded-lg" aria-label="JodiDar AI home">
+          <Link to="/" className="rounded-lg" aria-label="DealMeet AI home">
             <Wordmark />
           </Link>
           <nav aria-label="Demo" className="flex flex-wrap items-center gap-1.5">

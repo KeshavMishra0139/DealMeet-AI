@@ -735,7 +735,7 @@ export function PayDialog({
         }
       >
         <div className="rounded-2xl border border-line bg-surface-2 p-4 text-center">
-          <p className="text-xs text-muted">Pay into JodiDar escrow</p>
+          <p className="text-xs text-muted">Pay into DealMeet escrow</p>
           <p className="num mt-1 font-display text-3xl font-semibold">{inr(total)}</p>
           <p className="mt-1 text-xs text-muted">Held until the post is approved{deal?.kind === "collective" ? ", for each member" : ""}.</p>
         </div>

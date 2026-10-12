@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------------
-   JodiDar AI design tokens
+   DealMeet AI design tokens
    One brand, two moods: .theme-creator (dark aurora, mobile-first) and
    .theme-brand (light, calm, desktop-first). Components only use semantic
    tokens, so the same component reads correctly in both.

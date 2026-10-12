@@ -1,4 +1,4 @@
-# JodiDar AI as one container: the API serves the built web app on $PORT.
+# DealMeet AI as one container: the API serves the built web app on $PORT.
 # Build:  docker build -t jodidar-ai .
 # Run:    docker run -p 8000:8000 jodidar-ai   ->  http://localhost:8000
 

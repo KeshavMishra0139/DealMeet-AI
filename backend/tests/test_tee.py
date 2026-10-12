@@ -73,7 +73,7 @@ class FailingVerifier:
 def test_not_configured_is_said_plainly_and_the_fallback_runs(client, login, db):
     assert client.get("/api/health").json()["modes"]["tee"] == "not_configured"
     r = login("br_thalam").get(VIEW).json()["audience_overlap"]
-    assert r["processed_in"] == "server" and r["tee_status"] == "not_configured" and "JodiDar's server" in r["note"]
+    assert r["processed_in"] == "server" and r["tee_status"] == "not_configured" and "DealMeet's server" in r["note"]
     assert [d["key"] for d in r["dimensions"]] and all(d["share"] is None or 0 <= d["share"] <= 1 for d in r["dimensions"])
     ev = db.audit.find_one({"action": "tee_fallback_used"}, sort=[("ts", -1)])
     assert ev["job"] == "audience_overlap" and ev["reason_code"] == "not_configured"

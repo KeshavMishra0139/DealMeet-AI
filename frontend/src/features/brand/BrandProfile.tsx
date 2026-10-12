@@ -133,9 +133,9 @@ function OrgForm({ org }: { org: Org }) {
         </div>
       </div>
       <div>
-        <Label htmlFor="bp-slug">Address on JodiDar</Label>
+        <Label htmlFor="bp-slug">Address on DealMeet</Label>
         <Input id="bp-slug" value={f.slug} onChange={(e) => set("slug", e.target.value.toLowerCase())} minLength={3} maxLength={40} pattern="[a-z0-9-]+" />
-        <FieldHint>jodidar.ai/brands/{f.slug || "your-brand"} · lowercase letters, numbers and hyphens.</FieldHint>
+        <FieldHint>dealmeet.ai/brands/{f.slug || "your-brand"} · lowercase letters, numbers and hyphens.</FieldHint>
       </div>
       <div>
         <Label htmlFor="bp-site">Website</Label>

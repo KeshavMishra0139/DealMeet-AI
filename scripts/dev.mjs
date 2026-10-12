@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One command to run JodiDar AI locally: installs what's missing on first run,
+// One command to run DealMeet AI locally: installs what's missing on first run,
 // then starts the API (FastAPI, :8000) and the web app (Vite, :5173) together.
 // Works on macOS, Linux and Windows with only Node 22.12+ (or 20.19+) and Python 3.10 to 3.14.
 import { spawn, spawnSync } from "node:child_process";
@@ -81,7 +81,7 @@ function warnLongPaths() {
   if (/LongPathsEnabled\s+REG_DWORD\s+0x1\b/i.test(reg.stdout ?? "")) return;
   log(
     "warning: this folder path is long, and Windows may refuse to install some packages.\n" +
-      "  If the install fails, move the project to a shorter path (for example C:\\JodiDar-AI)\n" +
+      "  If the install fails, move the project to a shorter path (for example C:\\DealMeet-AI)\n" +
       "  or enable long paths: https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation",
   );
 }
@@ -215,7 +215,7 @@ if (singlePort) {
 setTimeout(() => {
   if (singlePort) {
     console.log(
-      `\n${bold("JodiDar AI is starting (single port)")}\n` +
+      `\n${bold("DealMeet AI is starting (single port)")}\n` +
         `  App   ${cyan("http://localhost:8000")}\n` +
         `  Demo  ${cyan("http://localhost:8000/demo/compare")}\n` +
         dim("  Press Ctrl+C to stop.\n"),
@@ -223,7 +223,7 @@ setTimeout(() => {
     return;
   }
   console.log(
-    `\n${bold("JodiDar AI is starting")}\n` +
+    `\n${bold("DealMeet AI is starting")}\n` +
       `  App   ${cyan("http://localhost:5173")}\n` +
       `  Demo  ${cyan("http://localhost:5173/demo/compare")}\n` +
       `  API   ${magenta("http://localhost:8000/api/health")}\n` +

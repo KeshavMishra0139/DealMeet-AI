@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /** A QR code drawn in the browser (no outside QR service), with a PNG download. */
-export function QrCode({ url, label, size = 168, fileName = "jodidar-qr.png" }: { url: string; label: string; size?: number; fileName?: string }) {
+export function QrCode({ url, label, size = 168, fileName = "dealmeet-qr.png" }: { url: string; label: string; size?: number; fileName?: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
