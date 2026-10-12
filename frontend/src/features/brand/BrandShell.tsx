@@ -3,6 +3,7 @@ import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, Ro
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
+import { ActionAssistant } from "@/components/shared/ActionAssistant";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
@@ -100,6 +101,7 @@ function Console() {
             <Plus aria-hidden /> New campaign
           </Link>
         </Button>
+        <ActionAssistant role="brand" className="mx-0.5 mt-2 justify-start" />
         <div className="mt-4 flex-1">{nav()}</div>
         <Controls />
       </aside>
@@ -109,6 +111,7 @@ function Console() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
+          <ActionAssistant role="brand" compact />
           <Button asChild variant="primary" size="sm">
             <Link to="/brand/campaigns/new">
               <Plus aria-hidden /> New

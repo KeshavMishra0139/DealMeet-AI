@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 27 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 28 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -263,6 +263,24 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Assistant actions
+
+The **Assistant** (Creator Studio and Brand Console) does things for the signed-in user with a small set of tools (`services/assistant_tools.py`):
+
+| Tool | Who | Runs |
+| --- | --- | --- |
+| Explain a number, explain my price | Creator | Directly (read-only) |
+| Growth plan, media kit version, draft a pitch | Creator | Directly (saves drafts only) |
+| Send a pitch | Creator | After you confirm |
+| Campaign status | Brand | Directly (read-only) |
+| Draft a campaign brief, draft an offer | Brand | Directly (drafts, hidden from creators / not sent) |
+| Send an offer, publish a campaign, pause a campaign | Brand | After you confirm |
+
+- Every tool runs as the signed-in user: creator and brand ids come from the session, never from the arguments, and each tool runs the same ownership checks and service functions as the app's own endpoints. No database access beyond those, no admin tools.
+- Anything that sends, publishes or touches money returns a **proposal**. Nothing happens until you press Confirm; a proposal expires after 10 minutes and runs at most once (and re-runs every check when it does).
+- A language model, when configured, only **chooses a tool and fills its arguments** from the user's own ids; Pydantic validates them before anything runs. Without a model, simple rules pick the tool.
+- Every tool call, confirmation and cancellation goes to the audit log.
+
 ## Creator collectives
 
 - **Creators** find group campaigns under Opportunities → Collectives and opt in; an opted-in creator always gets a place in the brand's pack.
@@ -462,14 +480,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 309 API tests (below), the copy rules on about 5,400 UI strings, and the TypeScript type check |
-| `make e2e` | 27 journeys in a real browser (below) |
+| `make test` | 318 API tests (below), the copy rules on about 5,500 UI strings, and the TypeScript type check |
+| `make e2e` | 28 journeys in a real browser (below) |
 | `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Assistant actions: tools by role, read tools running directly, a brand unable to act on another brand's campaign (directly or through the model), invalid arguments never running, proposals doing nothing until confirmed, running once, expiring and cancelling, and audit entries.
 - Collectives: the builder's method and reasons, adjusted fees and deliverables, activation only when every member confirms, replacing a member who declined, members seeing only their own terms, and nothing charged before activation.
 - Contracts: version 1 from the brand, proposals as new versions with hashes, agreement only on the same version, refused proposals (same terms, not your turn, bad terms, collectives), audited status transitions, multi-link submissions with revision rounds, and idempotent repeats and request keys.
 - The public creator page: sharing settings, no private fields, badges only with data (connected, on time, completed, brand rating once per approved deal), case studies with predicted views and labelled actual views, positioning that shows only when chosen, and escaped link-preview tags.
@@ -499,6 +518,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Pausing a campaign through the Assistant: nothing changes until Confirm.
 - A brand adjusting a collective's fee and sending it; funding only after every member confirms.
 - A creator proposing new terms and the brand accepting that version.
 - Writing a positioning and showing it on the public page with badges, an estimate and a QR code.

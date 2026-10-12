@@ -52,6 +52,7 @@ COLLECTIONS = [
     "claim_requests",
     "removal_requests",
     "pitches",
+    "assistant_proposals",
     "ai_cache",
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
@@ -174,6 +175,7 @@ def ensure_indexes(db) -> None:
     db.pitches.create_index([("brand_id", 1), ("status", 1)])
     db.pitches.create_index("share_slug", unique=True, partialFilterExpression={"share_slug": text})
     db.fan_proof.create_index("brand_id")
+    db.assistant_proposals.create_index([("user_id", 1), ("status", 1)])
 
 
 def out(doc: dict[str, Any] | None) -> dict[str, Any] | None:
