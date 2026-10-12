@@ -207,6 +207,23 @@ await step("Brands: search the directory, save a Dream Brand, see it in the Stud
   await page.getByRole("button", { name: "Request removal" }).waitFor();
 });
 
+await step("Pitch: a creator writes a pitch from their own numbers and sends it; the brand accepts it from the Fan Inbox", async () => {
+  await reset();
+  await page.goto(`${BASE}/brands/thalam-foods?as=cr_b`);
+  await page.getByRole("link", { name: "Pitch this brand" }).click();
+  await page.getByRole("button", { name: "Write my pitch to Thalam Foods" }).click();
+  await page.getByRole("heading", { name: /Pitch to Thalam Foods/ }).waitFor();
+  await page.getByText("Numbers it can use").waitFor();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await page.getByText("Sent to Thalam Foods").waitFor();
+  await page.goto(`${BASE}/brand/inbox?as=br_thalam`);
+  await page.getByRole("heading", { name: "Fan Inbox" }).waitFor();
+  await page.getByRole("button", { name: "Accept" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Send offer" }).click();
+  await page.getByText(/Offer sent to/).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();

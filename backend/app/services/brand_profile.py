@@ -3,6 +3,7 @@ category, website, description and a private contact."""
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -65,6 +66,22 @@ class OrgIn(BaseModel):
     website: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=400)
     contact: Contact | None = None
+    public_handles: dict[Literal["instagram", "youtube"], str | None] | None = None
+
+    @field_validator("public_handles")
+    @classmethod
+    def _handles(cls, v: dict | None) -> dict | None:
+        if v is None:
+            return v
+        out = {}
+        for k, h in v.items():
+            if h in (None, ""):
+                continue
+            h = h.strip()
+            if not re.match(r"^@?[A-Za-z0-9._-]{2,40}$", h):
+                raise ValueError("Enter a public handle like @brandname")
+            out[k] = h if h.startswith("@") else f"@{h}"
+        return out
 
     @field_validator("website")
     @classmethod
@@ -84,6 +101,7 @@ def view(b: dict, owner: bool) -> dict:
         "hue": b.get("hue", 260),
         "verified": bool(b.get("verified")),
         "source": b.get("source"),
+        "public_handles": b.get("public_handles") or {},
     }
     if owner:
         d["contact"] = b.get("contact") or {"name": None, "email": None, "phone": None}

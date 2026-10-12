@@ -23,6 +23,7 @@ interface Org {
   verified: boolean;
   source: string | null;
   contact: { name: string | null; email: string | null; phone: string | null };
+  public_handles: { instagram?: string; youtube?: string };
   updated_at: string | null;
 }
 
@@ -87,6 +88,8 @@ function OrgForm({ org }: { org: Org }) {
     contact_name: org.contact.name ?? "",
     contact_email: org.contact.email ?? "",
     contact_phone: org.contact.phone ?? "",
+    instagram: org.public_handles.instagram ?? "",
+    youtube: org.public_handles.youtube ?? "",
   });
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
   const save = useMutation({
@@ -100,6 +103,7 @@ function OrgForm({ org }: { org: Org }) {
           website: f.website.trim() || null,
           description: f.description,
           contact: { name: f.contact_name || null, email: f.contact_email || null, phone: f.contact_phone || null },
+          public_handles: { instagram: f.instagram || null, youtube: f.youtube || null },
         },
       }),
     onSuccess: (o) => {
@@ -136,6 +140,17 @@ function OrgForm({ org }: { org: Org }) {
       <div>
         <Label htmlFor="bp-site">Website</Label>
         <Input id="bp-site" type="url" value={f.website} onChange={(e) => set("website", e.target.value)} placeholder="https://" maxLength={200} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="bp-ig">Instagram handle</Label>
+          <Input id="bp-ig" value={f.instagram} onChange={(e) => set("instagram", e.target.value)} placeholder="@yourbrand" maxLength={41} />
+        </div>
+        <div>
+          <Label htmlFor="bp-yt">YouTube handle</Label>
+          <Input id="bp-yt" value={f.youtube} onChange={(e) => set("youtube", e.target.value)} placeholder="@yourbrand" maxLength={41} />
+        </div>
+        <FieldHint className="sm:col-span-2">Fan Proof looks for these handles and #{f.name.toLowerCase().replace(/[^a-z0-9]/g, "")} in creators' synced posts.</FieldHint>
       </div>
       <div>
         <Label htmlFor="bp-desc">About</Label>

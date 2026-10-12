@@ -20,6 +20,7 @@ from ..config import get_settings, now_iso
 from ..db import db_mode, get_db
 from ..seed.catalog import LANGS
 from . import auth as au
+from . import fan_proof
 from .brand_profile import unique_slug
 
 log = logging.getLogger("jodidar.directory")
@@ -191,7 +192,8 @@ def dream_list(creator_id: str) -> dict:
     brands = list(db.brands.find({"$and": [{"_id": {"$in": list(saves)}}, VISIBLE]}))
     live = _live_counts([b["_id"] for b in brands])
     items = sorted(
-        ({**card(b, live.get(b["_id"], 0)), "saved_at": saves[b["_id"]].get("at"), "show_name": bool(saves[b["_id"]].get("show_name"))} for b in brands),
+        ({**card(b, live.get(b["_id"], 0)), "saved_at": saves[b["_id"]].get("at"), "show_name": bool(saves[b["_id"]].get("show_name")),
+          "fan_proof": fan_proof.summary(creator_id, b["_id"])} for b in brands),
         key=lambda x: x["saved_at"] or "",
         reverse=True,
     )

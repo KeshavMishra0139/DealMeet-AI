@@ -33,6 +33,7 @@ PUBLIC = {
     ("GET", "/api/directory/facets"),
     ("GET", "/api/directory/brands/{slug}"),
     ("POST", "/api/directory/brands/{slug}/removal-request"),  # anyone may ask; rate-limited per IP
+    ("GET", "/api/p/{slug}"),  # a pitch share link: unguessable, revocable, no private data
 }
 
 

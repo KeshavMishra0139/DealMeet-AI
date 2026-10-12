@@ -1,11 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BarChart3, IndianRupee, Lock, Send, Users } from "lucide-react";
+import { ArrowLeft, BarChart3, Heart, IndianRupee, Lock, Send, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Waterfall } from "@/components/charts/Waterfall";
 import { Avatar, ErrorState, ReferenceNote } from "@/components/shared/Bits";
 import { SafetyNote } from "@/components/shared/SafetyNote";
+import { SourceBadge } from "@/components/shared/SourceBadge";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { SimulatedChip } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,7 @@ interface CreatorView {
   demographics: { age: Record<string, number>; gender: Record<string, number>; cities: { name: string; share: number }[]; languages: Record<string, number>; provenance: Provenance } | null;
   rate_card: { typical: number | null; provenance: Provenance } | null;
   listing: { id: string; title: string } | null;
+  fan_proof: { label: string; links: string[]; platforms: string[] } | null;
   deal: { stage: string } | null;
 }
 
@@ -104,6 +106,12 @@ export default function BrandCreator() {
             <p className="text-sm text-muted">
               @{c.handle} · {c.niche_label} · {c.languages.join(", ")} · {c.location} · {c.audience_stage} followers
             </p>
+            {c.fan_proof && (
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-2">
+                <Heart className="size-3.5 text-accent" aria-hidden /> {c.fan_proof.label} of your brand
+                <SourceBadge source={`${c.fan_proof.platforms[0]}_api`} />
+              </p>
+            )}
           </div>
         </div>
         <Button variant="primary" onClick={() => setOffer(true)} disabled={!!c.deal}>

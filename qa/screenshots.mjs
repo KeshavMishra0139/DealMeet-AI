@@ -41,6 +41,8 @@ const ROUTES = [
   ["brand-page", "/brands/senpai-supply-co?as=cr_a"],
   ["brand-page-unclaimed", "/brands/notebook-nagar"],
   ["creator-dream-brands", "/creator/brands?as=cr_a"],
+  ["creator-pitches", "/creator/pitches?as=cr_b&brand=br_thalam&name=Thalam%20Foods"],
+  ["brand-fan-inbox", "/brand/inbox?as=br_thalam"],
   ["brand-home", "/brand?as=br_senpai"],
   ["brand-campaigns", "/brand/campaigns?as=br_senpai"],
   ["brand-new-campaign", "/brand/campaigns/new?as=br_senpai"],

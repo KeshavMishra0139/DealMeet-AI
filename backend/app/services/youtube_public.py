@@ -276,8 +276,9 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
         },
         upsert=True,
     )
-    from . import coach
+    from . import coach, fan_proof
 
+    fan_proof.recompute(creator_id, "youtube")
     coach.on_new_data(creator_id, "New YouTube data")
     return summary
 
@@ -287,6 +288,9 @@ def unlink(creator_id: str) -> None:
     db.creators.update_one({"_id": creator_id}, {"$unset": {"channels.youtube": ""}})
     db.posts.delete_many({"creator_id": creator_id, "platform": "youtube"})
     db.metric_snapshots.delete_many({"creator_id": creator_id, "platform": "youtube"})
+    from . import fan_proof_hooks
+
+    fan_proof_hooks.on_disconnect(creator_id, "youtube")
 
 
 def status(creator: dict) -> dict:
