@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConfirmationResult } from "firebase/auth";
-import { ArrowRight, Building2, Phone, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, Building2, Phone, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -270,8 +270,14 @@ function DemoProfiles({ role, next }: { role: Role; next: string | null }) {
   const qc = useQueryClient();
   const personas = useQuery({ queryKey: ["personas"], queryFn: () => api<Persona[]>("/auth/personas", { role: null }) });
   const login = useMutation({
-    mutationFn: (p: Persona) => api<{ token: string; persona: Persona }>("/auth/demo", { method: "POST", json: { persona: p.id, cookie: false }, role: null }),
+    // The demo admin (local demos only) uses the cookie, like a real admin account.
+    mutationFn: (p: Persona) =>
+      api<{ token?: string; persona: Persona }>("/auth/demo", { method: "POST", json: { persona: p.id, cookie: p.role === "admin" }, role: null }),
     onSuccess: async ({ token, persona }) => {
+      if (persona.role === "admin" || !token) {
+        await qc.invalidateQueries({ queryKey: ["session"] });
+        return navigate("/admin");
+      }
       rememberDemoToken(persona.role, token);
       await qc.invalidateQueries({ queryKey: ["session"] });
       if (persona.id === "new_creator") return navigate("/creator/onboarding");
@@ -280,7 +286,7 @@ function DemoProfiles({ role, next }: { role: Role; next: string | null }) {
       navigate(next && next.startsWith(home) ? next : home);
     },
   });
-  const list = personas.data?.filter((p) => p.role === role) ?? [];
+  const list = personas.data?.filter((p) => p.role === role || p.role === "admin") ?? [];
 
   return (
     <section aria-labelledby="demo-profiles" className="mt-6">
@@ -306,6 +312,10 @@ function DemoProfiles({ role, next }: { role: Role; next: string | null }) {
               {isNew ? (
                 <span className="grid size-11 place-items-center rounded-full bg-surface-3 text-fg-2">
                   {p.role === "creator" ? <UserPlus className="size-5" /> : <Building2 className="size-5" />}
+                </span>
+              ) : p.role === "admin" ? (
+                <span className="grid size-11 place-items-center rounded-full bg-surface-3 text-fg-2">
+                  <ShieldCheck className="size-5" />
                 </span>
               ) : (
                 <Avatar name={p.title} hue={HUES[p.id]} size={44} generic={p.id === "cr_a"} />

@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import logging
 
-from ..config import now_iso
+from ..config import get_settings, now_iso
 from ..db import COLLECTIONS
 from . import creator_a
 from .creators import build_creator_b, build_roster
@@ -14,6 +14,7 @@ log = logging.getLogger("jodidar.seed")
 
 CONSENT_DEFAULTS = {"stats": True, "demographics": False, "rate_card": False}
 SYNTHETIC = "synthetic"  # data source of everything seeded: sample data, never shown as real
+DEMO_ADMIN_ID = "us_demo_admin"
 SEEDED = ("creators", "brands", "listings", "consents", "consent_audit", "deals", "invoices")
 
 
@@ -97,6 +98,10 @@ def seed_users(db, creators: list[dict], drop_sandbox_accounts: bool = True) -> 
         {"_id": f"us_{b['_id']}", "role": "brand", "name": b["name"], "creator_id": None, "brand_id": b["_id"]}
         for b in LISTERS
     ]
+    if get_settings().demo_admin:  # local walkthroughs only; see DEMO_ADMIN in .env.example
+        users.append({"_id": DEMO_ADMIN_ID, "role": "admin", "name": "Demo admin", "creator_id": None, "brand_id": None})
+    else:
+        db.users.delete_one({"_id": DEMO_ADMIN_ID})
     for u in users:
         u.update({"email": None, "demo": True, "seeded": True, "suspended": False, "created_at": now_iso()})
         db.users.replace_one({"_id": u["_id"]}, u, upsert=True)

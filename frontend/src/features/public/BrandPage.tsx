@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +161,11 @@ export default function BrandPage() {
                     </Button>
                   )}
                   <RemovalButton page={p} />
+                </div>
+              )}
+              {p.claimed && !p.owner && (
+                <div className="mt-6 flex justify-end border-t border-line pt-3">
+                  <ReportButton type="profile" id={p.id} role={role} label="Report this brand" />
                 </div>
               )}
             </article>

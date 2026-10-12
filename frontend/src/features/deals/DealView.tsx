@@ -20,6 +20,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Rail } from "@/components/deals/Rail";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Skeleton, Textarea } from "@/components/ui/form";
@@ -293,6 +294,9 @@ export default function DealView({ role }: { role: Role }) {
           <span className="font-medium text-fg">Message from {d.brand.name}:</span> {d.message}
         </p>
       )}
+      <div className="flex justify-end">
+        <ReportButton type="deal" id={d.id} role={role} label="Report a problem with this deal" />
+      </div>
 
       {dialog === "counter" && <CounterDialog deal={d} onClose={() => setDialog(null)} onSubmit={(amount, note) => act.mutate({ action: "counter", amount, note })} pending={act.isPending} />}
       {dialog === "url" && <PostDialog onClose={() => setDialog(null)} onSubmit={(links, note) => act.mutate({ action: "submit_post", links, note: note || null })} pending={act.isPending} />}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
+import { ReportButton } from "@/components/shared/ReportButton";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,7 @@ function PitchCard({ p }: { p: InboxItem }) {
             Sent {shortDate(p.sent_at)}
             {p.suggested_price_range && ` · their estimated rate ${inrRange(p.suggested_price_range.range.low, p.suggested_price_range.range.high)} for ${p.suggested_price_range.deliverables} (an estimate)`}
           </p>
+          <ReportButton type="pitch" id={p.id} role="brand" className="-ml-2 mt-1" />
         </div>
         {p.status === "sent" && (
           <div className="flex gap-2">

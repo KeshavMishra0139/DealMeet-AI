@@ -15,7 +15,9 @@ if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE)) throw new Error("Q
 
 const results = [];
 let page;
+// QA_ONLY="Admin" runs only the journeys whose names contain that text.
 async function step(name, fn) {
+  if (process.env.QA_ONLY && !name.includes(process.env.QA_ONLY)) return;
   try {
     await fn();
     results.push(["PASS", name]);
@@ -427,6 +429,52 @@ await step("Accounts: sign up as a brand, set up the brand, sign out", async () 
   await p.waitForURL(/\/login/);
   await p.goto(`${BASE}/brand`);
   await p.waitForURL(/\/login\?role=brand/);
+  await ctx.close();
+});
+
+await step("Admin: a deal party reports a problem; the admin resolves it, suspends and restores an account, each with a reason", async () => {
+  await reset();
+  // Its own browser context: the admin's session is a cookie, kept apart from the other journeys.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  page = await ctx.newPage();
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
+  await page.getByRole("button", { name: "Report a problem with this deal" }).click();
+  await page.getByLabel("What's wrong").selectOption("harassment");
+  await page.getByRole("dialog").getByRole("button", { name: "Send report" }).click();
+  await page.getByText("Report sent").first().waitFor();
+  // Admin is never a sign-up option: locally, a demo admin persona signs in with a cookie.
+  await page.goto(`${BASE}/login`);
+  await page.getByRole("button", { name: /Demo admin/ }).click();
+  await page.waitForURL(/\/admin$/);
+  await page.getByRole("heading", { name: "Admin console" }).waitFor();
+  await page.getByText("Open reports").waitFor();
+  await page.getByRole("tab", { name: "Reports" }).click();
+  await page.getByRole("list", { name: "Reports" }).getByText("Harassment").waitFor();
+  await page.getByRole("button", { name: "Resolve" }).first().click();
+  const dlg = page.getByRole("dialog");
+  if (!(await dlg.getByRole("button", { name: "Resolve" }).isDisabled())) throw new Error("resolved without a reason");
+  await dlg.getByLabel("Reason").fill("Spoke to both sides; no further action.");
+  await dlg.getByRole("button", { name: "Resolve" }).click();
+  await page.getByText("No open reports").waitFor();
+  await page.getByRole("tab", { name: "Accounts" }).click();
+  await page.getByLabel("Search name, email or id").fill("us_cr_b");
+  await page.getByRole("button", { name: "Suspend Creator B" }).click();
+  await page.getByRole("dialog").getByLabel("Reason").fill("Two reports of fake numbers; checking.");
+  await page.getByRole("dialog").getByRole("button", { name: "Suspend account" }).click();
+  await page.getByRole("list", { name: "Accounts" }).getByText("Suspended", { exact: true }).waitFor();
+  const refused = await fetch(`${API}/api/auth/demo`, { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: false }) });
+  if (refused.status !== 403) throw new Error(`suspended account signed in: ${refused.status}`);
+  await page.getByRole("button", { name: "Restore Creator B" }).click();
+  await page.getByRole("dialog").getByLabel("Reason").fill("Numbers match the connected account.");
+  await page.getByRole("dialog").getByRole("button", { name: "Restore account" }).click();
+  await page.getByRole("button", { name: "Suspend Creator B" }).waitFor();
+  await page.getByRole("tab", { name: "Audit log" }).click();
+  await page.getByLabel("Action starts with").fill("admin_");
+  await page.getByRole("list", { name: "Audit events" }).getByText("admin_restore").first().waitFor();
+  await page.getByRole("list", { name: "Audit events" }).getByText("admin_suspend").first().waitFor();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.waitForURL(/\/login/);
   await ctx.close();
 });
 

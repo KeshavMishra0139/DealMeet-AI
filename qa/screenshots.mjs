@@ -61,6 +61,13 @@ const ROUTES = [
   ["demo-live", "/demo/live?phone=0"],
   ["creator-home-hi", "/creator?as=cr_a&lang=hi"],
   ["not-found", "/this-does-not-exist"],
+  // Admin screens sign in with the local demo admin's cookie, in a context of their own.
+  ["admin-overview", "/admin"],
+  ["admin-accounts", "/admin?tab=accounts"],
+  ["admin-campaigns", "/admin?tab=campaigns"],
+  ["admin-reports", "/admin?tab=reports"],
+  ["admin-brands", "/admin?tab=brands"],
+  ["admin-audit", "/admin?tab=audit"],
 ];
 const VIEWPORTS = [
   { name: "390", width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 },
@@ -97,8 +104,14 @@ for (const vp of VIEWPORTS) {
     hasTouch: vp.isMobile,
     reducedMotion: "reduce",
   });
+  let adminContext = null;
   for (const [name, path] of routes) {
-    const page = await context.newPage();
+    if (path.startsWith("/admin") && !adminContext) {
+      adminContext = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.deviceScaleFactor, isMobile: vp.isMobile, hasTouch: vp.isMobile, reducedMotion: "reduce" });
+      const r = await adminContext.request.post(`${BASE}/api/auth/demo`, { data: { persona: "demo_admin", cookie: true }, headers: { "X-Requested-With": "qa" } });
+      if (!r.ok()) throw new Error(`Demo admin sign-in failed (${r.status()}). Run the API with DEMO_MODE=1 and DEMO_ADMIN=1 (make dev does).`);
+    }
+    const page = await (path.startsWith("/admin") ? adminContext : context).newPage();
     const errors = [];
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
     page.on("pageerror", (e) => errors.push(String(e)));
@@ -132,6 +145,7 @@ for (const vp of VIEWPORTS) {
     await page.close();
   }
   await context.close();
+  await adminContext?.close();
 }
 await browser.close();
 mkdirSync(join(here, "report"), { recursive: true });

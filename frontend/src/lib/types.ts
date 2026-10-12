@@ -27,7 +27,7 @@ export interface Estimate {
 
 export interface Persona {
   id: string;
-  role: "creator" | "brand";
+  role: "creator" | "brand" | "admin";
   title: string;
   subtitle: string;
   tag: string;
