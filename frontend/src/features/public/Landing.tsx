@@ -1,10 +1,11 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BadgeIndianRupee, ChevronRight, Lock, Play, Scale, ShieldCheck, Sparkles, Youtube } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Play, Scale, ShieldCheck, Youtube } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { siClaude, siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
 import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Wordmark } from "@/components/shared/Wordmark";
+import { WorthLink } from "@/components/shared/WorthLink";
 import { Button } from "@/components/ui/button";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
@@ -198,13 +199,7 @@ function FloatingNav({ demo }: { demo: boolean }) {
         <span aria-hidden>✦</span>
       </Link>
       {/* The tool creators come for: a fair price from their own channel. Emphasised on purpose. */}
-      <NavItem
-        to="/worth"
-        className="gap-1.5 bg-linear-to-r from-violet-500/10 via-pink-500/10 to-orange-400/10 font-semibold text-[#0a1b33] ring-1 ring-violet-500/25 ring-inset hover:bg-transparent hover:ring-violet-500/50"
-      >
-        <Sparkles className="size-3.5 text-violet-600" aria-hidden />
-        Check your worth
-      </NavItem>
+      <WorthLink variant="pill" />
       <NavItem to="/brands" className="hidden sm:inline-flex">
         Brands
       </NavItem>
@@ -275,10 +270,11 @@ function WorksWith() {
 }
 
 function CreatorEntry() {
+  // What the Studio gives you each week. Features, not figures: real numbers come from your own accounts.
   const moves = [
-    { t: "Raise your reel rate", v: "₹17K–18K" },
-    { t: "Post 2 more beat-sync edits", v: "+2.8L–3.5L views" },
-    { t: "Apply to 2 matched offers", v: "₹21K–33K" },
+    { t: "Your fair rate for a reel", v: "A range, with reasons" },
+    { t: "What to post next", v: "From your own numbers" },
+    { t: "Offers that fit your audience", v: "You choose who sees what" },
   ];
   return (
     <Link
@@ -314,7 +310,7 @@ function CreatorEntry() {
               </span>
               {m.t}
             </span>
-            <span className="num font-medium text-fg">{m.v}</span>
+            <span className="hidden text-right text-xs text-muted md:block">{m.v}</span>
           </li>
         ))}
       </ol>
@@ -323,10 +319,11 @@ function CreatorEntry() {
 }
 
 function BrandEntry() {
+  // What the Console does for each campaign. Features, not figures.
   const rows = [
-    { n: "Anime edits · Hindi", fit: 92 },
-    { n: "Gaming · Hinglish", fit: 86 },
-    { n: "Anime edits · Marathi", fit: 79 },
+    { n: "Creators ranked by audience fit", d: "With the reasons" },
+    { n: "A fair price for each creator", d: "From their real reach" },
+    { n: "One creator or a whole collective", d: "Paid through escrow" },
   ];
   return (
     <Link
@@ -347,18 +344,16 @@ function BrandEntry() {
       </div>
       <div aria-hidden className="relative mt-5 hidden rounded-2xl border border-line bg-white p-3 sm:block">
         <div className="mb-2 flex items-center justify-between px-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-          <span>12 creators fit · 3 strong</span>
+          <span>For every campaign</span>
           <span className="flex items-center gap-1">
             <BadgeIndianRupee className="size-3.5" /> Fair price
           </span>
         </div>
         {rows.map((r) => (
           <div key={r.n} className="flex items-center gap-3 rounded-lg px-1 py-1.5 text-[13px]">
-            <span className="w-40 shrink-0 truncate text-fg-2">{r.n}</span>
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
-              <span className="block h-full rounded-full bg-signature" style={{ width: `${r.fit}%` }} />
-            </span>
-            <span className="num w-8 text-right font-semibold">{r.fit}</span>
+            <Check className="size-4 shrink-0 text-accent" />
+            <span className="min-w-0 flex-1 truncate text-fg-2">{r.n}</span>
+            <span className="hidden shrink-0 text-xs text-muted md:block">{r.d}</span>
           </div>
         ))}
       </div>

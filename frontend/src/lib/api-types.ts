@@ -216,3 +216,17 @@ export interface Roadmap {
   topics: { language: string; ideas: { native: string; english: string; why: string }[]; source: "ai" | "cache" | "template" };
   plan: { week: number; title: string; items: { kind: string; title: string }[] }[];
 }
+
+/** GET /creators/{id}/weekly-report (backend services/weekly_report.py). "dealmeet": the app's own records. */
+export type WeeklySource = "dealmeet" | "synthetic" | "manual" | "instagram_api" | "youtube_api";
+
+export interface WeeklyReport {
+  week: { start: string; end: string; previous_start: string };
+  profile_views: { this: number; last: number; brands: number; source: WeeklySource };
+  offers: { this: number; last: number; value: number; last_value: number; source: WeeklySource };
+  paid: { this: number; last: number; deals: number; simulated: boolean; source: WeeklySource };
+  /** Null when the creator has no reels at all. */
+  reach: { this: number; last: number; reels: number; last_reels: number; source: WeeklySource } | null;
+  followers: { platform: "instagram" | "youtube"; now: number; before: number; source: WeeklySource }[];
+  quiet: boolean;
+}

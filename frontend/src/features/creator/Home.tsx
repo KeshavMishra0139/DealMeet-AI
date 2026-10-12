@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { CountUp, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { MoveCard } from "./MoveCard";
 import { ReachCard } from "./ReachCard";
+import { WeeklyReport } from "./WeeklyReport";
 
 export function useHome(id: string) {
   return useQuery({ queryKey: ["home", id], queryFn: () => api<HomeData>(`/creators/${id}/home`) });
@@ -56,6 +57,8 @@ export default function Home() {
         {t("home.greeting")}
       </h1>
       {creator.reference_note && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
+
+      <WeeklyReport creatorId={id} className="mt-5" />
 
       {plan.changes.length > 0 && plan.week > 1 && (
         <motion.div
