@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 21 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 22 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -256,6 +256,28 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Matches, shortlist, compare and draft offers
+
+**How matches are ranked** (`engines/brand_matching.py`). Each part is scored from 0 to 1, then weighted; the criteria and each creator's scores come back with every result ("Why ranked here").
+
+| Part | Weight | How it's scored |
+| --- | --- | --- |
+| Audience fit | 45% | Niche, language, region and audience match with the campaign (0 to 100) |
+| Reach | 20% | Median views of recent posts on a log scale: 1K views scores 0, 300K scores 1 |
+| Engagement | 15% | Saves and shares per view against the niche's typical rate; typical scores 0.5 |
+| Trust Score | 10% | The Trust Score out of 100 |
+| Budget fit | 10% | 1 when the estimated price is within the per-creator cap, lower the further above it |
+
+- Missing data gets a **neutral** score and a "data missing" note, never a penalty: no posts → engagement 0.5 (typical for the niche); no Trust Score yet → 0.75 (the score the fair price treats as neutral); no audience numbers at all → reach 0.5.
+- Scores built from stats a creator hasn't shared with the brand are used to rank but returned as hidden.
+- Each match lists why it matched, the **evidence the creator chose to share** with this brand (each with its Live data / Self-reported / Sample data badge), an **estimated price range**, and its **limitations** (missing data, what isn't shared, sample data, what the price is estimated from).
+
+**Shortlist** (per campaign): add, remove, and a private note per creator. Shortlisting an applicant marks their application Shortlisted, and the other way round. A creator who stops sharing with the brand shows only as "a creator who stopped sharing with you".
+
+**Compare** 2 to 4 shortlisted creators side by side. Opening it is recorded in each creator's consent ledger as a profile view.
+
+**Draft offers** from the shortlist start at the estimated fair price, stay editable, and are sent only with an explicit confirm (`{"confirm": true}`; the UI asks first). One draft per creator per campaign, and never a second open offer to the same creator for the same campaign, whether by draft or directly. Sending a draft twice returns the deal it already made; a draft can't be sent while the campaign isn't live.
+
 ## Brand profile and campaign lifecycle
 
 **Organisation profile** (Brand Console → Profile): name, address on JodiDar (a unique slug, checked and reserved-word safe), category, website (must be a full `https://` address), description, and a contact that only the brand account sees. Owner-only; every change is audited.
@@ -387,14 +409,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 256 API tests (below), the copy rules on about 4,400 UI strings, and the TypeScript type check |
-| `make e2e` | 21 journeys in a real browser (below) |
+| `make test` | 267 API tests (below), the copy rules on about 4,500 UI strings, and the TypeScript type check |
+| `make e2e` | 22 journeys in a real browser (below) |
 | `make shots` | 72 screenshots (36 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Matches and the shortlist: ranking criteria and weights on every result, evidence that follows what each creator shares, neutral scores for missing data, owner-only shortlists with notes, compare limits and ledger entries, drafts sent only on confirm, no duplicate open offers, no sending while paused, and private fields kept out.
 - Campaigns: owner-only access, invalid input, drafts hidden from creators (opportunities, the campaign page, applying and offers), publishing that lists what's missing, live campaigns that can't be edited into invalid ones, pause, resume (re-checked) and close (final), repeated requests, applications by state, and audit entries; the brand profile's owner-only access, validation (address, website, contact) and unique addresses.
 - Rates and the media kit: owner-only access, invalid input, estimates that name missing metrics, YouTube formats with and without a linked channel, saved rates next to the estimate, the Hindi live kit and PDF (with the font embedded), a Hindi PDF without text shaping, a failed AI call, versions that never change and keep their own PDF, duplicate saves, the version limit, promises refused, and the public page following the chosen version and the sharing settings.
 - The coach: creators only, answers listing their numbers and sources, no trend under 6 posts, price from the fair-price engine, caching and the hourly limit, model answers with promises or invented numbers rejected, measurable goals, and recalculation when new data arrives.
@@ -418,6 +441,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Shortlisting two matches with a note, comparing them, and sending a drafted offer after confirming.
 - A campaign saved as a draft lists what's missing, then is edited, published, paused and resumed.
 - Saving a rate next to its estimate, saving a Hindi media kit version and showing it on the public page.
 - Asking the coach: the numbers used with their sources, then making a plan.

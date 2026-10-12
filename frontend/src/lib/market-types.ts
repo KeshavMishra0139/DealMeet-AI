@@ -81,12 +81,25 @@ export interface BrandMatch {
   cautions: string[];
   trust: TrustInfo | null;
   safety?: Safety;
-  fair: { range: { low: number; high: number }; total: number; per_reel: number; deliverables: string };
+  fair: { range: { low: number; high: number }; total: number; per_reel: number; deliverables: string; estimate?: boolean };
   within_budget: boolean;
   rate_card: number | null;
   scopes: Scopes;
   application: string | null;
   deal_stage: string | null;
+  /** How the rank was built: each part scored 0 to 1 and weighted. A null score is hidden (not shared). */
+  ranking?: { key: string; label: string; weight: number; score: number | null; missing: boolean; note: string | null }[];
+  /** What the creator chose to share with this brand, with sources. */
+  evidence?: { key: string; label: string; value: string; source: string }[];
+  limitations?: string[];
+  shortlisted?: boolean;
+}
+
+export interface RankCriterion {
+  key: string;
+  label: string;
+  weight: number;
+  how: string;
 }
 
 export interface Matches {
@@ -95,6 +108,33 @@ export interface Matches {
   detail: string;
   items: BrandMatch[];
   total: number;
+  criteria?: RankCriterion[];
+}
+
+export interface OfferDraft {
+  id: string;
+  listing_id: string;
+  creator_id: string;
+  creator_name: string | null;
+  avatar_hue: number;
+  is_reference: boolean;
+  amount: number;
+  message: string | null;
+  fair_estimate: { total: number; range: { low: number; high: number } } | null;
+  status: "draft" | "sending" | "sent";
+  deal_id: string | null;
+  updated_at: string | null;
+}
+
+export type ShortlistItem =
+  | (BrandMatch & { available: true; note: string | null; added_at: string; draft: { id: string; status: string; amount: number } | null })
+  | { id: string; available: false; note: string | null; added_at: string; draft: null; deal_stage: null };
+
+export interface Shortlist {
+  listing_id: string;
+  items: ShortlistItem[];
+  max: number;
+  criteria: RankCriterion[];
 }
 
 export interface CollectiveMember {
