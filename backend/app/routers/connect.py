@@ -29,7 +29,7 @@ def _frontend(request: Request) -> str:
 
 @router.get("/connect/instagram/consent")
 def consent():
-    """What connecting lets JodiDar see, shown before the Instagram login opens."""
+    """What connecting lets DealMeet see, shown before the Instagram login opens."""
     return {"text": ig.CONSENT_TEXT, "scopes": ig.SCOPES, "configured": ig.configured()}
 
 
@@ -82,7 +82,7 @@ def sync_now(user: dict = Depends(au.current_user)):
         ig.sync(creator_id)
     except ig.IGError as e:
         code = {"expired": 401, "rate_limit": 429, "network": 502, "not_connected": 409, "personal": 409, "permission": 403}.get(e.kind, 502)
-        # 401 here would sign the user out of JodiDar; an expired Instagram token is a 409.
+        # 401 here would sign the user out of DealMeet; an expired Instagram token is a 409.
         raise HTTPException(409 if code == 401 else code, e.message) from None
     return instagram_data(creator_id, user)
 

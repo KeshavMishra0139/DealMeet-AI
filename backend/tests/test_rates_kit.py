@@ -151,7 +151,7 @@ def test_a_failed_ai_call_falls_back_to_the_template(login, monkeypatch, db):
     monkeypatch.setattr(llm, "_client", Down())
     try:
         k = login("cr_a").get("/api/creators/cr_a/kit?lang=hi").json()
-        assert k["copy_source"] == "template" and "JodiDar" in k["copy"]["bio"]
+        assert k["copy_source"] == "template" and "DealMeet" in k["copy"]["bio"]
     finally:
         config.get_settings.cache_clear()
 

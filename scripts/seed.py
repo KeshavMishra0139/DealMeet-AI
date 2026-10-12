@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load JodiDar's sample data (every record marked source: "synthetic") into the
+"""Load DealMeet's sample data (every record marked source: "synthetic") into the
 configured database: MONGODB_URI, or the in-memory one with USE_MOCK_DB=1.
 
 From the repo root, with the API's virtual environment:
@@ -24,7 +24,7 @@ from app.seed.load import SEEDED, seed_all  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Load JodiDar's sample (synthetic) data.")
+    ap = argparse.ArgumentParser(description="Load DealMeet's sample (synthetic) data.")
     ap.add_argument("--reset", action="store_true", help="replace the sample data even if collections aren't empty")
     ap.add_argument("--confirm-reset", action="store_true", help="required with --reset on a real (non-mock) database")
     args = ap.parse_args(argv)

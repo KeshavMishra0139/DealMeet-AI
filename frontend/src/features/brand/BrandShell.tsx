@@ -92,7 +92,7 @@ function Console() {
         Skip to content
       </a>
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[232px] flex-col border-r border-line bg-surface px-3 py-4 lg:flex">
-        <Link to="/" className="mx-1.5 rounded-lg" aria-label="JodiDar AI home">
+        <Link to="/" className="mx-1.5 rounded-lg" aria-label="DealMeet AI home">
           <Wordmark />
         </Link>
         <BrandSwitcher className="mt-5" />
@@ -107,7 +107,7 @@ function Console() {
       </aside>
 
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur lg:hidden">
-        <Link to="/" className="rounded-lg" aria-label="JodiDar AI home">
+        <Link to="/" className="rounded-lg" aria-label="DealMeet AI home">
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">

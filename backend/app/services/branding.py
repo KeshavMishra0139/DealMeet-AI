@@ -58,7 +58,7 @@ def _template(c: dict, posts: list[str]) -> Branding:
         pillars=pillars,
         bio_suggestions=[
             f"{niche} in {langs}. New posts every week.",
-            f"Making {niche.lower()} simple, in {langs}. Collabs via JodiDar.",
+            f"Making {niche.lower()} simple, in {langs}. Collabs via DealMeet.",
         ],
     )
 

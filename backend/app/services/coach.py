@@ -136,7 +136,7 @@ def _template(intent: str, c: dict, raw: dict) -> CoachAnswer:
         e = raw["earnings"]
         return CoachAnswer(
             answer=f"You've logged {inr(e['total'])} across {e['count']} payments in the last 3 months." if e["count"] else "There's no income logged for the last 3 months.",
-            uncertain="This counts only income logged in JodiDar; payments made elsewhere aren't included.",
+            uncertain="This counts only income logged in DealMeet; payments made elsewhere aren't included.",
             next_steps=["Log off-platform deals under Deals, so invoices and reminders cover them."],
         )
     if intent == "opportunities":

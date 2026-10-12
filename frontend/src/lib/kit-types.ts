@@ -21,7 +21,7 @@ export interface Kit {
   formats: { topic: string; views: string; simulated: boolean; source?: DataSource }[] | null;
   audience: { line: string; simulated: boolean; source?: DataSource } | null;
   rates: { label: string; value: string; kind?: "your_rate" | "estimate" }[] | null;
-  /** "your_rate" when the creator saved their own rates, else JodiDar's estimated ranges. */
+  /** "your_rate" when the creator saved their own rates, else DealMeet's estimated ranges. */
   rates_kind?: "your_rate" | "estimate" | null;
   /** Null when the creator hides rates on the public page. */
   from_rate: number | null;

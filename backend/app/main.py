@@ -1,4 +1,4 @@
-"""JodiDar AI API."""
+"""DealMeet AI API."""
 from __future__ import annotations
 
 import logging
@@ -86,7 +86,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="JodiDar AI API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="DealMeet AI API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -114,7 +114,7 @@ async def guard(request: Request, call_next):
             return JSONResponse({"detail": "Request too large"}, status_code=413)
         if write and path not in CSRF_EXEMPT and not request.headers.get(CSRF_HEADER):
             if not request.headers.get("authorization", "").lower().startswith("bearer "):
-                return JSONResponse({"detail": "Missing the X-Requested-With header. Use the JodiDar app or send a Bearer token."}, status_code=403)
+                return JSONResponse({"detail": "Missing the X-Requested-With header. Use the DealMeet app or send a Bearer token."}, status_code=403)
         if write and path != "/api/demo/reset":
             _last_write[0] = time.monotonic()
     response = await call_next(request)

@@ -111,7 +111,7 @@ export function PageSections({ page }: { page: PublicPage }) {
       {page.collaborations && page.collaborations.length > 0 && (
         <section aria-labelledby="pg-collabs" className="card-surface rounded-[var(--radius-card)] p-5">
           <h2 id="pg-collabs" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
-            <Link2 className="size-3.5" aria-hidden /> Completed on JodiDar
+            <Link2 className="size-3.5" aria-hidden /> Completed on DealMeet
           </h2>
           <ul className="mt-2 space-y-1.5 text-sm">
             {page.collaborations.map((c, i) => (

@@ -89,7 +89,7 @@ function Studio() {
 
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[248px] flex-col border-r border-line bg-[var(--bg)]/85 px-3 py-5 lg:flex">
-        <Link to="/" className="mx-2 rounded-lg" aria-label="JodiDar AI home">
+        <Link to="/" className="mx-2 rounded-lg" aria-label="DealMeet AI home">
           <Wordmark />
         </Link>
         <ProfileCard creator={creator.data} className="mx-1 mt-6" />
@@ -108,7 +108,7 @@ function Studio() {
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-[var(--bg)]/92 px-4 lg:hidden">
-        <Link to={embedded ? "/creator" : "/"} aria-label="JodiDar AI home" className="rounded-lg">
+        <Link to={embedded ? "/creator" : "/"} aria-label="DealMeet AI home" className="rounded-lg">
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">

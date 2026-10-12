@@ -26,7 +26,7 @@ export default function Landing() {
       <ParallaxAurora />
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-5">
-        <Link to="/" aria-label="JodiDar AI home" className="rounded-lg">
+        <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
           <Wordmark />
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
@@ -66,7 +66,7 @@ export default function Landing() {
             className="max-w-[18ch] font-display text-[29px] font-semibold leading-[1.12] tracking-[-0.03em] sm:max-w-[22ch] sm:text-5xl sm:leading-[1.06] lg:max-w-[24ch] lg:text-[60px] xl:max-w-[17ch]"
           >
             <span className="text-muted">Other dashboards tell creators how they're doing. </span>
-            JodiDar AI tells them <span className="text-gradient">what to do next</span>, prices it fairly, and makes
+            DealMeet AI tells them <span className="text-gradient">what to do next</span>, prices it fairly, and makes
             sure they get paid.
           </motion.h1>
         </section>
@@ -105,7 +105,7 @@ export default function Landing() {
 
         <section aria-labelledby="principles" className="mt-28 pb-10 sm:mt-36">
           <h2 id="principles" className="sr-only">
-            How JodiDar AI works
+            How DealMeet AI works
           </h2>
           <Stagger className="grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
             {[

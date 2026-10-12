@@ -4,7 +4,7 @@ creators' Dream Brands.
 Search uses Atlas Search ($search) when the app runs on MongoDB Atlas with an index
 configured, and a case-insensitive regex over escaped input otherwise (mongomock has
 no $search). Unclaimed brands are added by admins only, show just their public name,
-category and public handles, and say plainly that they aren't on JodiDar AI.
+category and public handles, and say plainly that they aren't on DealMeet AI.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from .brand_profile import unique_slug
 
 log = logging.getLogger("jodidar.directory")
 
-UNCLAIMED_NOTE = "Not on JodiDar AI and not affiliated with us."
+UNCLAIMED_NOTE = "Not on DealMeet AI and not affiliated with us."
 # Spam examples, guest bookings and removed pages never appear.
 VISIBLE = {"_id": {"$not": {"$regex": "^xx_"}}, "guest": {"$ne": True}, "removed": {"$ne": True}}
 PAGE_SIZE = 24

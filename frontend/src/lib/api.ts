@@ -44,7 +44,7 @@ export async function api<T>(path: string, init?: ApiInit): Promise<T> {
       body: json !== undefined ? JSON.stringify(json) : rest.body,
     });
   } catch {
-    throw new ApiError(0, "Can't reach JodiDar right now. Check your connection and try again.");
+    throw new ApiError(0, "Can't reach DealMeet right now. Check your connection and try again.");
   }
   if (!res.ok) {
     let detail = res.statusText;

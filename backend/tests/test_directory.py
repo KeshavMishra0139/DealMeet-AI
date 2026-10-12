@@ -58,7 +58,7 @@ def test_brand_page_shows_live_campaigns_only(client, login, db):
 
 def test_unclaimed_pages_show_only_public_basics(client):
     p = client.get("/api/directory/brands/notebook-nagar").json()
-    assert p["claimed"] is False and p["note"] == "Not on JodiDar AI and not affiliated with us."
+    assert p["claimed"] is False and p["note"] == "Not on DealMeet AI and not affiliated with us."
     assert {"description", "website", "campaigns", "hue"}.isdisjoint(p)
     assert p["source"] == "synthetic"
 

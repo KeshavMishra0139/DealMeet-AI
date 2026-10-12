@@ -71,7 +71,7 @@ for (const file of walk(join(web, "src"))) {
 }
 
 if (problems.length) {
-  console.error(`Copy rules failed. JodiDar AI never promises results:\n\n${problems.join("\n")}\n`);
+  console.error(`Copy rules failed. DealMeet AI never promises results:\n\n${problems.join("\n")}\n`);
   process.exit(1);
 }
 console.log(`Copy rules passed (${checked} UI strings checked, no promises found).`);

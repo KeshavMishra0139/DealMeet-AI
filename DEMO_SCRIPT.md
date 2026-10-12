@@ -1,4 +1,4 @@
-# JodiDar AI: demo script
+# DealMeet AI: demo script
 
 Exact click paths for the four walkthroughs judges ask about. Every path here is also checked by a browser test (named in each section), so the labels match the app.
 
@@ -32,7 +32,7 @@ Needs a Meta app, an HTTPS redirect URI and the creator added as an Instagram Te
 
 1. Sign in as a creator whose Instagram account is a **Creator or Business** account and an **Instagram Tester** on your Meta app (a real account, not a demo profile: use **Create an account** on `/login`).
 2. Open **Connections** (`/creator/connections`).
-3. Click **Connect Instagram**. Read the consent aloud: what JodiDar can see, what it can't (post, read DMs, see your password), and that you can disconnect anytime.
+3. Click **Connect Instagram**. Read the consent aloud: what DealMeet can see, what it can't (post, read DMs, see your password), and that you can disconnect anytime.
 4. Click **Continue to Instagram**, sign in on Instagram's own page and approve the two read-only permissions.
 5. Back on **Connections**: followers, the latest posts, reel insights and (from 100 followers) audience age, gender and city, each labelled **Live data** with when it was fetched.
 6. Open **Money**: the fair price now runs on the real reels and says "Estimate from Instagram data".

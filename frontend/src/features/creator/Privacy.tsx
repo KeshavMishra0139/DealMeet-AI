@@ -94,14 +94,14 @@ export default function Privacy() {
           </ul>
           <p className="mt-3 flex gap-2 text-[13px] leading-relaxed text-fg-2">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
-            JodiDar uses only what you connect through official logins, what you type, and what you upload. We never scrape, and we never
+            DealMeet uses only what you connect through official logins, what you type, and what you upload. We never scrape, and we never
             read accounts that haven't connected.
           </p>
           {p.is_reference && (
             <p className="mt-2 text-xs text-muted">This reference profile's real values come from a creator interview; the rest is sample data, marked simulated.</p>
           )}
           <Button asChild variant="outline" size="sm" className="mt-4">
-            <a href={`/api/creators/${id}/export`} download={`jodidar-${id}.json`}>
+            <a href={`/api/creators/${id}/export`} download={`dealmeet-${id}.json`}>
               <Download aria-hidden /> Download my data
             </a>
           </Button>

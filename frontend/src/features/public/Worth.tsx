@@ -43,7 +43,7 @@ export default function Worth() {
       </div>
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-4xl flex-col px-4 py-5 sm:px-6 sm:py-8">
         <header className="flex items-center justify-between">
-          <Link to="/" className="rounded-lg" aria-label="JodiDar AI home">
+          <Link to="/" className="rounded-lg" aria-label="DealMeet AI home">
             <Wordmark />
           </Link>
           <Button asChild variant="outline" size="sm">

@@ -91,7 +91,7 @@ class AdminUnclaimedIn(dr.UnclaimedIn):
 
 @router.post("/brands")
 def add_unclaimed(body: AdminUnclaimedIn, admin: dict = Depends(require_admin)):
-    """List a brand that isn't on JodiDar AI: public name, category and public handles only."""
+    """List a brand that isn't on DealMeet AI: public name, category and public handles only."""
     return dr.add_unclaimed(body, admin, body.reason)
 
 

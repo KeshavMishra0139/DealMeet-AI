@@ -230,7 +230,7 @@ def answer_request(creator_id: str, request_id: str, body: RequestAnswer):
 
 @router.get("/export")
 def export(creator_id: str):
-    """Everything JodiDar holds about this creator, as JSON."""
+    """Everything DealMeet holds about this creator, as JSON."""
     c = load_creator(creator_id)
     db = get_db()
     c = dict(c)

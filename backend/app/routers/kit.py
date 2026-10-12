@@ -1,4 +1,4 @@
-"""Auto media kit (PDF) and the public JodiDar link-in-bio page."""
+"""Auto media kit (PDF) and the public DealMeet link-in-bio page."""
 from __future__ import annotations
 
 import uuid
@@ -51,7 +51,7 @@ def update_public(creator_id: str, body: PublicIn, lang: str = LangQ, _: dict = 
 def kit_pdf(creator_id: str, request: Request, lang: str = LangQ, _: dict = Depends(au.own_creator)):
     k = mk.build_kit(load_creator(creator_id), lang)
     return Response(mk.render_pdf(k, _host(request)), media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-{k["handle"]}{"-hi" if lang == "hi" else ""}.pdf"'})
+                    headers={"Content-Disposition": f'inline; filename="dealmeet-media-kit-{k["handle"]}{"-hi" if lang == "hi" else ""}.pdf"'})
 
 
 # ------------------------------------------------------------------ saved versions
@@ -81,7 +81,7 @@ def version_pdf(creator_id: str, version_id: str, _: dict = Depends(au.own_creat
     """The PDF stored when the version was saved, byte for byte."""
     v = mk.get_version(load_creator(creator_id), version_id)
     return Response(bytes(v["pdf"]), media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-v{v["number"]}.pdf"'})
+                    headers={"Content-Disposition": f'inline; filename="dealmeet-media-kit-v{v["number"]}.pdf"'})
 
 
 @router.delete("/creators/{creator_id}/kit/versions/{version_id}")

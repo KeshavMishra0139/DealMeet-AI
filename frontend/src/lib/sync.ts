@@ -1,4 +1,4 @@
-// Live sync between open JodiDar windows and demo frames.
+// Live sync between open DealMeet windows and demo frames.
 // Every successful write (POST) is announced on a BroadcastChannel; every
 // other frame refetches what it shows. The creator phone and the brand
 // console on /demo/live stay in step without a server push.

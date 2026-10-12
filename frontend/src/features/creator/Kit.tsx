@@ -72,13 +72,13 @@ export default function Kit() {
 
         <div className="space-y-4">
           <section aria-labelledby="share" className="card-surface rounded-[var(--radius-card)] p-5">
-            <SectionTitle id="share" eyebrow="Link-in-bio" title="Your JodiDar page" />
+            <SectionTitle id="share" eyebrow="Link-in-bio" title="Your DealMeet page" />
             <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-sm">
               <Link2 className="size-4 shrink-0 text-accent" aria-hidden />
               <span className="truncate">{`${window.location.host}${k.path}`}</span>
             </div>
             <div className="mt-3 flex justify-center">
-              <QrCode url={url} label={`QR code for your JodiDar page, ${url}`} size={120} fileName={`jodidar-${k.handle}.png`} />
+              <QrCode url={url} label={`QR code for your DealMeet page, ${url}`} size={120} fileName={`dealmeet-${k.handle}.png`} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
