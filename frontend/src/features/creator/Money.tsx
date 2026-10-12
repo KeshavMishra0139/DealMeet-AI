@@ -26,6 +26,7 @@ import { SourceBadge } from "@/components/shared/SourceBadge";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { StagePill } from "./Home";
+import { RateCards } from "./RateCards";
 
 const ICONS: Record<string, typeof IndianRupee> = {
   brand: Megaphone,
@@ -57,6 +58,8 @@ export default function Money() {
       {m.creator.is_reference && m.creator.reference_note && <ReferenceNote text={m.creator.reference_note} className="mt-2" />}
 
       <FairPriceCard creatorId={id} initial={m.fair} options={m.brand_options} />
+
+      <RateCards creatorId={id} />
 
       <Reveal as="section" aria-labelledby="goal" className="mt-8">
         <div className="card-surface flex flex-col gap-3 rounded-[var(--radius-card)] p-5 sm:flex-row sm:items-center sm:justify-between">

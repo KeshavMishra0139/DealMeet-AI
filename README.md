@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 19 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 20 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -256,6 +256,21 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
+## Rates and the media kit
+
+**Your rates** (Money) is a pricing form and a saved rate per format.
+
+- Pick a format (Instagram reel, story, carousel, live session, YouTube Short, YouTube video), how many, paid usage rights and exclusivity. The estimate uses the same fair-price engine as the rest of the app, and lists the **numbers used** (each with its source badge), the **missing** ones (named, with what the estimate does instead and how to add them), and its **assumptions**. Nothing missing is filled in: with no audience numbers at all there's no estimate, and a YouTube video needs a linked channel.
+- YouTube formats use the linked channel's median views (public data, wider range); a Short with no channel linked is priced like a reel and says so.
+- **Save as your rate** keeps the creator's own price per format (`rate_cards`, `source: "manual"`), shown as **Your rate** next to the current **Estimated range**. Saving a format again replaces it. A saved per-reel rate becomes the rate the rate-gap line compares with.
+
+**Media kit** (Studio → Media kit):
+
+- The **live view** is rebuilt from current data on every request, in **English or Hindi**, with a Live data / Self-reported / Sample data badge on each number. When rates are public it shows the creator's saved rates, or estimated ranges if none are saved.
+- The PDF comes from the same ReportLab exporter, in either language (`/kit.pdf?lang=hi`). Hindi uses the bundled Noto Sans Devanagari (OFL) and HarfBuzz shaping (`uharfbuzz`) so conjuncts and vowel signs render correctly. If `uharfbuzz` isn't installed the Hindi PDF answers 503 and says so; the English PDF still works.
+- **Saved versions**: edit the headline, bio and which sections show (reach, best formats, rates, audience, trust and brand safety), then save. Each version keeps its content and its own PDF (stored with a SHA-256) and never changes; saving identical content again returns the existing version. Text that promises results is refused (copy rules). Up to 20 versions; the one on the public page can't be deleted.
+- The **public page** (`/c/:handle`) shows the version the creator picks, or the live view (with an English/हिंदी switch). Either way, today's sharing settings apply: switching off reach, demographics or rates hides them from a saved version too.
+
 ## AI growth coach
 
 **Ask** (in the Studio sidebar, and the phone header) answers questions about the signed-in creator's own numbers: views, best format, fair rate, brands that fit, deals, readiness.
@@ -359,14 +374,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 226 API tests (below), the copy rules on about 3,900 UI strings, and the TypeScript type check |
-| `make e2e` | 19 journeys in a real browser (below) |
-| `make shots` | 62 screenshots (31 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 246 API tests (below), the copy rules on about 4,100 UI strings, and the TypeScript type check |
+| `make e2e` | 20 journeys in a real browser (below) |
+| `make shots` | 68 screenshots (34 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Rates and the media kit: owner-only access, invalid input, estimates that name missing metrics, YouTube formats with and without a linked channel, saved rates next to the estimate, the Hindi live kit and PDF (with the font embedded), a Hindi PDF without text shaping, a failed AI call, versions that never change and keep their own PDF, duplicate saves, the version limit, promises refused, and the public page following the chosen version and the sharing settings.
 - The coach: creators only, answers listing their numbers and sources, no trend under 6 posts, price from the fair-price engine, caching and the hourly limit, model answers with promises or invented numbers rejected, measurable goals, and recalculation when new data arrives.
 - Profile: owner-only access, edits that persist, invalid input, completeness, readiness with and without a connected account, self-reported numbers with history that never replace connected ones, preferences filtering opportunities, and private fields kept from brands and public pages.
 - YouTube Analytics: 28-day numbers, a token that's never stored, another account's channel refused, no channel, a declined permission, disconnect, and owner-only access.
@@ -388,6 +404,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- Saving a rate next to its estimate, saving a Hindi media kit version and showing it on the public page.
 - Asking the coach: the numbers used with their sources, then making a plan.
 - Editing the profile: completeness rises and the edit survives a reload.
 - The public "What am I worth?" page saying plainly when YouTube data isn't connected.

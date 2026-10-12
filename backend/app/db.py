@@ -44,6 +44,8 @@ COLLECTIONS = [
     "oauth_states",
     "fan_proof",
     "coach_answers",
+    "rate_cards",
+    "kit_versions",
     "ai_cache",
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
@@ -155,6 +157,9 @@ def ensure_indexes(db) -> None:
     db.rate_limits.create_index("expires")
     db.oauth_states.create_index("expires")
     db.fan_proof.create_index([("creator_id", 1), ("platform", 1)])
+    db.rate_cards.create_index("creator_id")
+    db.kit_versions.create_index([("creator_id", 1), ("number", 1)], unique=True)
+    db.kit_versions.create_index([("creator_id", 1), ("content_sha256", 1)], unique=True)
 
 
 def out(doc: dict[str, Any] | None) -> dict[str, Any] | None:

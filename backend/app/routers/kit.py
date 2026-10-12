@@ -3,144 +3,32 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from ..ai.llm import generate
-from ..config import get_settings, now_iso, today
+from ..config import get_settings, now_iso
 from ..db import get_db
-from ..engines import brand_safety, metrics
-from ..engines.common import inr, inr_range, short
 from ..engines.fair_price import fair_price
-from ..engines.trust import trust_score
-from ..seed.catalog import LANGS, NICHES
 from ..services import auth as au
-from ..services.creator_ctx import best_fit_brand, load_creator
-from ..services.pdf import media_kit_pdf
+from ..services import media_kit as mk
+from ..services.creator_ctx import load_creator
 
 router = APIRouter(prefix="/api", tags=["kit"])
 
 
-class KitCopy(BaseModel):
-    headline: str = Field(max_length=120)
-    bio: str = Field(max_length=420)
+LangQ = Query("en", pattern="^(en|hi)$")
 
 
-def _public(c: dict) -> dict:
-    p = c.get("public_scopes")
-    if p is None:
-        d = c.get("consent_defaults") or {}
-        p = {"stats": d.get("stats", True), "demographics": d.get("demographics", False), "rates": True}
-    return p
-
-
-def _copy(c: dict, pub: dict) -> tuple[KitCopy, str]:
-    """Headline and bio for the public kit. They quote reach numbers only when the
-    creator shows stats publicly."""
-    niche = NICHES[c["niche"]]["label"]
-    langs = " and ".join(LANGS[x]["label"] for x in c.get("languages") or [] if x in LANGS)
-    has = pub["stats"] and metrics.has_reels(c)
-    ratio = metrics.reach_ratio(c) if has else 0
-    # Only cite the best format when its label is real data, not simulated.
-    best = metrics.by_topic(c)[0]["topic"] if has and metrics.by_topic(c) and metrics.prov(c, "reels.0.topic") != "simulated" else None
-    noun = niche if niche.lower().endswith("edits") else f"{niche} reels"
-    facts = (
-        f"Niche: {niche}. Languages: {langs}. "
-        + (f"Followers: {short(c.get('followers', 0))}. " if pub["stats"] else "")
-        + (f"Median views of last 6 reels: {short(metrics.median_views(c))}. Reach ratio: about {ratio:.0f}x followers. Best format: {best}. " if has else "")
-        + (f"City: {c.get('city')}." if c.get("city") else f"Region: {c.get('region')}.")
-    )
-
-    def fallback() -> KitCopy:
-        head = f"{niche} in {langs}"
-        if has and ratio >= 2:
-            head += f", reaching about {ratio:.0f}x the follower count"
-        bio = f"{noun} in {langs}."
-        if has:
-            bio += f" Recent reels have a median of {short(metrics.median_views(c))} views."
-        if best:
-            bio += f" {best} is the format audiences respond to most."
-        bio += " Available for brand reels, collectives and long-term partnerships through JodiDar escrow."
-        return KitCopy(headline=head, bio=bio)
-
-    prompt = (
-        f"{facts}\nWrite a media-kit headline (under 12 words) and a 2-sentence bio in the third person, "
-        "describing the content and audience for brands. Do not quote the creator or invent opinions, numbers or past brand names."
-    )
-    return generate("media_kit_copy", prompt, KitCopy, fallback, facts=facts, max_tokens=400)
-
-
-def build_kit(c: dict) -> dict:
-    pub = _public(c)
-    brand = best_fit_brand(c)
-    fp1 = fair_price(c, brand, None, with_model=False)
-    fp2 = fair_price(c, brand, {"deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}]}, with_model=False)
-    fp3 = fair_price(c, brand, {"deliverables": [{"kind": "reel", "count": 2}]}, with_model=False)
-    copy, source = _copy(c, pub)
-    sim_views = metrics.prov(c, "reels.0.views") == "simulated"
-    sim_saves = metrics.prov(c, "reels.0.saves") == "simulated"
-    stats = None
-    if pub["stats"] and metrics.has_reels(c):
-        stats = [
-            {"label": "Followers", "value": short(c.get("followers", 0)), "simulated": metrics.prov(c, "followers") == "simulated"},
-            {"label": "Median views, last 6", "value": short(metrics.median_views(c)), "simulated": sim_views},
-            {"label": "Reach vs followers", "value": f"{metrics.reach_ratio(c):.1f}x", "simulated": sim_views},
-            {"label": "Saves + shares / view", "value": f"{metrics.ss_rate(c) * 100:.1f}%", "simulated": sim_saves},
-        ]
-    formats = None
-    if pub["stats"] and metrics.has_reels(c):
-        sim_topic = metrics.prov(c, "reels.0.topic") == "simulated"
-        formats = [{"topic": t["topic"], "views": short(t["median_views"]), "simulated": sim_topic} for t in metrics.by_topic(c) if t["count"] >= 2][:3]
-    audience = None
-    if pub["demographics"] and c.get("audience"):
-        a = c["audience"]
-        top_age = max(a["age"].items(), key=lambda kv: kv[1])
-        cities = ", ".join(x["name"] for x in a.get("cities", [])[:3])
-        audience = {
-            "line": f"Mostly {top_age[0]} ({round(top_age[1] * 100)}%), {round(a['gender'].get('female', 0) * 100)}% women, top cities {cities}.",
-            "simulated": metrics.prov(c, "audience") == "simulated",
-        }
-    rates = None
-    if pub["rates"]:
-        rates = [
-            {"label": "1 reel", "value": inr_range(fp1["range"]["low"], fp1["range"]["high"])},
-            {"label": "1 reel + 2 stories", "value": inr_range(fp2["range"]["low"], fp2["range"]["high"])},
-            {"label": "2-reel bundle", "value": inr_range(fp3["range"]["low"], fp3["range"]["high"])},
-        ]
-    safety = brand_safety.assess(c)
-    t = trust_score(c)
-    has_sim = any(x.get("simulated") for x in (stats or []) + (formats or [])) or bool(audience and audience["simulated"])
-    return {
-        "creator_id": c["_id"],
-        "name": c["name"],
-        "handle": c["handle"],
-        "avatar_hue": c.get("avatar_hue", 260),
-        "is_reference": c.get("is_reference", False),
-        "reference_note": c.get("reference_note") if c.get("is_reference") else None,
-        "niche": NICHES[c["niche"]]["label"],
-        "languages": [LANGS[x]["label"] for x in c.get("languages") or [] if x in LANGS],
-        "location": c.get("city") or c.get("region"),
-        "copy": copy.model_dump(),
-        "copy_source": source,
-        "stats": stats,
-        "formats": formats,
-        "audience": audience,
-        "rates": rates,
-        "from_rate": fp1["range"]["low"] if pub["rates"] else None,
-        "trust": {"score": t["score"], "level": t["level"], "reasons": t["reasons"], "simulated": t.get("simulated", [])} if t else None,
-        "safety_note": f"Brand safety: {safety['flags'][0]['label'].lower()}; {safety['flags'][0]['fix'].lower()}" if safety["flags"] else "Brand safety: no concerns found.",
-        "public": pub,
-        "link": f"jodidar.ai/c/{c['handle']}",
-        "path": f"/c/{c['handle']}",
-        "generated_on": today().strftime("%d %b %Y"),
-        "has_simulated": has_sim,
-    }
+def _host(request: Request) -> str:
+    return request.url.netloc
 
 
 @router.get("/creators/{creator_id}/kit")
-def kit(creator_id: str, _: dict = Depends(au.own_creator)):
-    return build_kit(load_creator(creator_id))
+def kit(creator_id: str, lang: str = LangQ, _: dict = Depends(au.own_creator)):
+    """The live media kit, rebuilt from current data."""
+    c = load_creator(creator_id)
+    return {**mk.build_kit(c, lang), "public_version": c.get("kit_public_version")}
 
 
 class PublicIn(BaseModel):
@@ -150,26 +38,73 @@ class PublicIn(BaseModel):
 
 
 @router.post("/creators/{creator_id}/kit")
-def update_public(creator_id: str, body: PublicIn, _: dict = Depends(au.own_creator)):
+def update_public(creator_id: str, body: PublicIn, lang: str = LangQ, _: dict = Depends(au.own_creator)):
     load_creator(creator_id)
     get_db().creators.update_one({"_id": creator_id}, {"$set": {"public_scopes": body.model_dump()}})
-    return build_kit(load_creator(creator_id))
+    c = load_creator(creator_id)
+    return {**mk.build_kit(c, lang), "public_version": c.get("kit_public_version")}
 
 
 @router.get("/creators/{creator_id}/kit.pdf")
-def kit_pdf(creator_id: str, request: Request, _: dict = Depends(au.own_creator)):
-    k = build_kit(load_creator(creator_id))
-    k["link"] = request.url.netloc + k["path"]  # the address this demo is served from
-    return Response(media_kit_pdf(k), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-{k["handle"]}.pdf"'})
+def kit_pdf(creator_id: str, request: Request, lang: str = LangQ, _: dict = Depends(au.own_creator)):
+    k = mk.build_kit(load_creator(creator_id), lang)
+    return Response(mk.render_pdf(k, _host(request)), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-{k["handle"]}{"-hi" if lang == "hi" else ""}.pdf"'})
+
+
+# ------------------------------------------------------------------ saved versions
+@router.get("/creators/{creator_id}/kit/versions")
+def versions(creator_id: str, _: dict = Depends(au.own_creator)):
+    c = load_creator(creator_id)
+    return {"versions": mk.list_versions(c), "public_version": c.get("kit_public_version"), "max": mk.MAX_VERSIONS}
+
+
+@router.post("/creators/{creator_id}/kit/versions")
+def save_version(creator_id: str, body: mk.VersionIn, request: Request, response: Response, _: dict = Depends(au.own_creator)):
+    """Save the kit as it is now, with these edits, as a version that never changes."""
+    summary, created = mk.create_version(load_creator(creator_id), body, _host(request))
+    response.status_code = 201 if created else 200
+    return {**summary, "created": created}
+
+
+@router.get("/creators/{creator_id}/kit/versions/{version_id}")
+def version(creator_id: str, version_id: str, _: dict = Depends(au.own_creator)):
+    c = load_creator(creator_id)
+    v = mk.get_version(c, version_id)
+    return {"id": v["_id"], "number": v["number"], "created_at": v["created_at"], "pdf_sha256": v["pdf_sha256"], "kit": v["content"]}
+
+
+@router.get("/creators/{creator_id}/kit/versions/{version_id}/pdf")
+def version_pdf(creator_id: str, version_id: str, _: dict = Depends(au.own_creator)):
+    """The PDF stored when the version was saved, byte for byte."""
+    v = mk.get_version(load_creator(creator_id), version_id)
+    return Response(bytes(v["pdf"]), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="jodidar-media-kit-v{v["number"]}.pdf"'})
+
+
+@router.delete("/creators/{creator_id}/kit/versions/{version_id}")
+def remove_version(creator_id: str, version_id: str, _: dict = Depends(au.own_creator)):
+    mk.delete_version(load_creator(creator_id), version_id)
+    return {"ok": True}
+
+
+class PublicViewIn(BaseModel):
+    version_id: str | None = Field(default=None, max_length=40)
+
+
+@router.put("/creators/{creator_id}/kit/public-view")
+def public_view(creator_id: str, body: PublicViewIn, _: dict = Depends(au.own_creator)):
+    """Which kit the public page shows: a saved version, or the live view (null)."""
+    mk.set_public_version(load_creator(creator_id), body.version_id)
+    return {"public_version": body.version_id}
 
 
 @router.get("/public/{handle}")
-def public_page(handle: str):
+def public_page(handle: str, lang: str | None = Query(None, pattern="^(en|hi)$")):
     c = get_db().creators.find_one({"handle": handle.lstrip("@")})
     if not c or c.get("public_page") is False:
         raise HTTPException(404, "This page isn't here")
-    k = build_kit(c)
-    return {kk: v for kk, v in k.items() if kk not in ("public",)}
+    return mk.public_kit(c, lang)
 
 
 class BookIn(BaseModel):
@@ -255,7 +190,7 @@ def book(handle: str, body: BookIn, user: dict | None = Depends(au.optional_user
     )
     return {
         "ok": True,
-        "fair": fp["total"] if _public(c)["rates"] else None,
+        "fair": fp["total"] if mk.public_scopes(c)["rates"] else None,
         "message": f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow on this booking's page. Nothing is emailed in this demo, so use Follow this booking to get back to it."
         if guest
         else f"Sent to {c['name']}. Nothing is charged yet: if they accept, you e-sign and fund escrow from Deals in your Brand Console.",

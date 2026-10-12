@@ -278,7 +278,7 @@ def fair_price(
     add(
         "trust",
         "Trust Score",
-        f"Trust {t['score']}/100: {t['reasons'][0].lower()}." if t else "Trust not yet measured; neutral.",
+        f"Trust {t['score']}/100: {t['reasons'][0].lower()}." if t else "Trust not yet measured; counted as 70/100.",
         sim_trust,
     )
     reach_per_reel = running  # what the market model is checked against
