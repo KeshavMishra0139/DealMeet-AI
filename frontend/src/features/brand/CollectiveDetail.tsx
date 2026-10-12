@@ -32,6 +32,8 @@ export default function CollectiveDetail() {
   if (!q.data) return <Skeleton className="h-96 rounded-xl" />;
   const c = q.data;
   const live = c.members.filter((m) => m.stage === "live").length;
+  const conf = c.confirmations;
+  const declined = c.members.filter((m) => m.stage === "declined");
 
   return (
     <div>
@@ -63,9 +65,24 @@ export default function CollectiveDetail() {
         ) : (
           <>
             <p className="flex-1 text-sm">
-              <span className="font-semibold">Fund once for the whole pack.</span> <span className="text-fg-2">Any share a creator declines comes back to you.</span>
+              {conf.status === "active" ? (
+                <>
+                  <span className="font-semibold">Everyone confirmed.</span> <span className="text-fg-2">Fund once for the whole pack; each share is released after you approve that member's post.</span>
+                </>
+              ) : conf.status === "needs_replacement" ? (
+                <>
+                  <span className="font-semibold">{declined.length} member{declined.length === 1 ? "" : "s"} declined.</span> <span className="text-fg-2">Replace them below before funding. Nothing has been charged.</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">
+                    {conf.confirmed} of {conf.required} members confirmed.
+                  </span>{" "}
+                  <span className="text-fg-2">The collective starts, and can be funded, once everyone has confirmed their own terms. Nothing has been charged.</span>
+                </>
+              )}
             </p>
-            <Button variant="primary" onClick={() => setPay(true)}>
+            <Button variant="primary" onClick={() => setPay(true)} disabled={conf.status !== "active"}>
               <Lock aria-hidden /> Fund escrow {inr(c.total)}
             </Button>
           </>
@@ -82,7 +99,9 @@ export default function CollectiveDetail() {
           <thead className="border-b border-line bg-surface-2 text-xs text-muted">
             <tr>
               <th scope="col" className="px-4 py-2 font-medium">Creator</th>
+              <th scope="col" className="px-3 py-2 font-medium">Terms</th>
               <th scope="col" className="px-3 py-2 font-medium">Stage</th>
+              <th scope="col" className="px-3 py-2 font-medium">Payment</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Split</th>
               <th scope="col" className="px-4 py-2 text-right font-medium">Fee</th>
             </tr>
@@ -96,11 +115,13 @@ export default function CollectiveDetail() {
                     {m.name}
                   </Link>
                 </td>
+                <td className="px-3 py-2.5 text-xs text-fg-2">{m.deliverables ?? "Private"}</td>
                 <td className="px-3 py-2.5">
-                  <Badge size="sm" variant={m.paid ? "success" : m.stage === "live" ? "warn" : "outline"}>
-                    {STAGE_LABEL[m.stage] ?? m.stage}
+                  <Badge size="sm" variant={m.paid ? "success" : m.stage === "declined" ? "danger" : m.stage === "live" ? "warn" : "outline"}>
+                    {m.stage === "offer" ? "Waiting to confirm" : m.stage === "contract" ? "Confirmed" : (STAGE_LABEL[m.stage] ?? m.stage)}
                   </Badge>
                 </td>
+                <td className="px-3 py-2.5 text-xs text-fg-2">{m.payment_status ?? "—"}</td>
                 <td className="num px-3 py-2.5 text-right">{m.split != null ? pct(m.split, 1) : "Private"}</td>
                 <td className="num px-4 py-2.5 text-right font-medium">{m.price != null ? inr(m.price) : "Private"}</td>
               </tr>
@@ -108,6 +129,8 @@ export default function CollectiveDetail() {
           </tbody>
         </table>
       </div>
+
+      {declined.length > 0 && !c.funded && <Replace collectiveId={id} declined={declined.map((m) => ({ id: m.creator_id, name: m.name }))} />}
 
       {pay && (
         <PayDialog
@@ -123,5 +146,57 @@ export default function CollectiveDetail() {
         />
       )}
     </div>
+  );
+}
+
+interface Candidate {
+  id: string;
+  name: string;
+  handle: string;
+  avatar_hue: number;
+  is_reference: boolean;
+  price: number;
+  fit: number;
+  why: string[];
+}
+
+/** Swap a member who declined for another creator who fits. */
+function Replace({ collectiveId, declined }: { collectiveId: string; declined: { id: string; name: string }[] }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["replacements", collectiveId], queryFn: () => api<{ items: Candidate[] }>(`/collectives/${collectiveId}/replacements`) });
+  const replace = useMutation({
+    mutationFn: (v: { out: string; inn: string }) => post<CollectiveView>(`/collectives/${collectiveId}/replace`, { out_id: v.out, in_id: v.inn }),
+    onSuccess: (c) => {
+      qc.setQueryData(["collective-view", collectiveId], c);
+      void qc.invalidateQueries({ queryKey: ["replacements", collectiveId] });
+      toast.success("Replacement invited", { description: "They confirm their own terms like everyone else." });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const out = declined[0];
+  return (
+    <section aria-labelledby="replace" className="card-surface mt-4 rounded-xl p-4">
+      <h2 id="replace" className="text-sm font-semibold">
+        Replace {out.name}
+      </h2>
+      {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+      {q.data && q.data.items.length === 0 && <p className="mt-2 text-sm text-fg-2">No other creators fit this campaign right now.</p>}
+      <ul className="mt-2 divide-y divide-line">
+        {q.data?.items.slice(0, 5).map((cand) => (
+          <li key={cand.id} className="flex flex-wrap items-center gap-3 py-2.5">
+            <Avatar name={cand.name} hue={cand.avatar_hue} size={28} generic={cand.is_reference} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {cand.name} <span className="text-xs font-normal text-muted">· fit {cand.fit} · {inr(cand.price)}</span>
+              </p>
+              <p className="truncate text-xs text-muted">{cand.why[0]}</p>
+            </div>
+            <Button size="sm" variant="outline" loading={replace.isPending && replace.variables?.inn === cand.id} onClick={() => replace.mutate({ out: out.id, inn: cand.id })}>
+              Invite instead
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

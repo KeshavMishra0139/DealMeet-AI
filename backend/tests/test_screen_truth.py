@@ -82,17 +82,18 @@ def test_late_confirmation_alerts_describe_real_behaviour(login, db):
     assert f"approved automatically in {left} day" in item["detail"]
 
 
-def test_declined_collective_shares_return_to_the_brand(login, db):
+def test_nothing_is_charged_for_a_collective_until_every_member_confirms(login, db):
     thalam = login("br_thalam")
     pack = thalam.post("/api/listings/lst_thalam_collective/collective", json={}).json()
     booked = thalam.post("/api/listings/lst_thalam_collective/collective/book", json={"member_ids": [m["id"] for m in pack["members"]]}).json()
-    col = thalam.post(f"/api/collectives/{booked['id']}/fund").json()
-    assert col["refunded"] == 0
-    first, second = col["members"][:2]
-    for m in (first, second):
-        login(m["creator_id"]).post(f"/api/deals/{m['deal_id']}/action", json={"action": "decline"})
     col = thalam.get(f"/api/collectives/{booked['id']}").json()
-    assert col["refunded"] == first["price"] + second["price"]
+    first = col["members"][0]
+    login(first["creator_id"]).post(f"/api/deals/{first['deal_id']}/action", json={"action": "decline"})
+    r = thalam.post(f"/api/collectives/{booked['id']}/fund")
+    assert r.status_code == 409 and "Replace" in r.json()["detail"]
+    col = thalam.get(f"/api/collectives/{booked['id']}").json()
+    assert col["funded"] is False and col["refunded"] == 0 and col["confirmations"]["status"] == "needs_replacement"
+    assert not db.payments.count_documents({"ref_id": booked["id"]})
 
 
 def test_onboarding_sample_insights_are_labelled_simulated(login, db):

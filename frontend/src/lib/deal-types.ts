@@ -117,8 +117,14 @@ export interface CollectiveView {
     stage: Stage;
     proof_url: string | null;
     paid: boolean;
+    confirmed: boolean;
+    /** The member's own deliverables and payment status; null for other members. */
+    deliverables: string | null;
+    payment_status: string | null;
+    fair: number | null;
   }[];
   stages: Record<string, number>;
+  confirmations: { status: "awaiting_confirmations" | "needs_replacement" | "active" | "funded" | "completed"; confirmed: number; declined: string[]; waiting: number; required: number };
   created_at: string;
   payments_mode: PaymentsMode;
 }

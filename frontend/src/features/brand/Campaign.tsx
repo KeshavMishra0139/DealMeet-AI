@@ -12,7 +12,7 @@ import { SafetyNote } from "@/components/shared/SafetyNote";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Skeleton, Slider, Textarea } from "@/components/ui/form";
+import { Checkbox, Input, Label, Skeleton, Slider, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent, Popover, PopoverContent, PopoverTrigger } from "@/components/ui/overlays";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, post } from "@/lib/api";
@@ -310,15 +310,39 @@ function CollectivePanel({ listing }: { listing: Listing }) {
     queryKey: ["collective", listing.id, applied],
     queryFn: () => post<Collective>(`/listings/${listing.id}/collective`, applied),
   });
+  // The brand's adjustments before sending: fee and reel/story counts per member, and who's in.
+  const [edits, setEdits] = useState<Record<string, { price?: string; reels?: string; stories?: string; out?: boolean }>>({});
+  const edit = (id: string, k: "price" | "reels" | "stories" | "out", v: string | boolean) => setEdits((e) => ({ ...e, [id]: { ...e[id], [k]: v } }));
+  const num = (v: string | undefined) => (v === undefined ? undefined : Number(v.replace(/[^\d]/g, "")) || 0);
+  const c = q.data;
+  const chosen = (c?.members ?? []).filter((m) => !edits[m.id]?.out);
+  const feeOf = (m: { id: string; price: number }) => num(edits[m.id]?.price) ?? m.price;
+  const total = chosen.reduce((a, m) => a + feeOf(m), 0);
   const book = useMutation({
-    mutationFn: () => post<{ members: number; total: number }>(`/listings/${listing.id}/collective/book`, { member_ids: q.data?.members.map((m) => m.id) ?? [], combined_reach: q.data?.combined_reach ?? null }),
+    mutationFn: () => {
+      const adjust: Record<string, { price?: number; deliverables?: { kind: string; count: number }[] }> = {};
+      for (const m of chosen) {
+        const e = edits[m.id];
+        if (!e) continue;
+        const base = Object.fromEntries(m.deliverables.map((d) => [d.kind, d.count]));
+        const reels = num(e.reels) ?? base.reel ?? 0;
+        const stories = num(e.stories) ?? base.story ?? 0;
+        adjust[m.id] = {
+          ...(e.price !== undefined ? { price: feeOf(m) } : {}),
+          ...(e.reels !== undefined || e.stories !== undefined
+            ? { deliverables: [...(reels ? [{ kind: "reel", count: reels }] : []), ...(stories ? [{ kind: "story", count: stories }] : []), ...m.deliverables.filter((d) => d.kind !== "reel" && d.kind !== "story")] }
+            : {}),
+        };
+      }
+      return post<{ id: string; members: number; total: number }>(`/listings/${listing.id}/collective/book`, { member_ids: chosen.map((m) => m.id), combined_reach: c?.combined_reach ?? null, adjust });
+    },
     onSuccess: async (r) => {
       await qc.invalidateQueries();
-      toast.success(`Offer sent to ${r.members} creators`, { description: `One escrow payment of ${inr(r.total)}, split by member once each post is approved.` });
-      navigate("/brand");
+      toast.success(`Sent to ${r.members} creators`, { description: `Each confirms their own terms. You fund ${inr(r.total)} once everyone has.` });
+      navigate(`/brand/collectives/${r.id}`);
     },
+    onError: (e) => toast.error((e as Error).message),
   });
-  const c = q.data;
 
   return (
     <div>
@@ -368,22 +392,37 @@ function CollectivePanel({ listing }: { listing: Listing }) {
             </ul>
           )}
 
+          <details className="card-surface mt-3 rounded-xl px-4 py-3 text-xs text-fg-2">
+            <summary className="cursor-pointer text-sm font-medium text-fg">How the builder picks</summary>
+            <p className="mt-2">{c.method.objective}</p>
+            <p className="mt-1">Effective reach: {c.method.effective_reach}</p>
+            <p className="mt-1">Overlap: {c.method.overlap}</p>
+            <ul className="mt-1 list-disc pl-5">
+              {c.method.thresholds.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+            <p className="mt-1">{c.method.privacy}</p>
+          </details>
+
           <div className="card-surface mt-4 overflow-x-auto rounded-xl">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
+            <table className="w-full min-w-[760px] text-left text-[13px]">
               <thead className="border-b border-line bg-surface-2 text-xs text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-2 font-medium">Creator</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Reach</th>
                   <th scope="col" className="px-3 py-2 font-medium">Overlap</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Price</th>
-                  <th scope="col" className="w-40 px-4 py-2 font-medium">Split</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Deliverables</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Fee</th>
+                  <th scope="col" className="w-40 px-4 py-2 font-medium">Share</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {c.members.map((m) => (
-                  <tr key={m.id}>
+                  <tr key={m.id} className={edits[m.id]?.out ? "opacity-50" : undefined}>
                     <td className="px-4 py-2">
                       <span className="flex items-center gap-2.5">
+                        <Checkbox checked={!edits[m.id]?.out} onCheckedChange={(v) => edit(m.id, "out", !v)} aria-label={`Include ${m.name}`} />
                         <Avatar name={m.name} hue={m.avatar_hue} size={26} generic={m.is_reference} />
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5 font-medium">
@@ -394,6 +433,16 @@ function CollectivePanel({ listing }: { listing: Listing }) {
                           <span className="block text-xs text-muted">
                             {m.language} · {m.city}
                           </span>
+                          <Popover>
+                            <PopoverTrigger className="text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-fg">Why picked</PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <ul className="list-disc space-y-1 pl-4 text-xs text-fg-2">
+                                {m.why.map((w) => (
+                                  <li key={w}>{w}</li>
+                                ))}
+                              </ul>
+                            </PopoverContent>
+                          </Popover>
                         </span>
                       </span>
                     </td>
@@ -417,14 +466,45 @@ function CollectivePanel({ listing }: { listing: Listing }) {
                           : `High with ${m.overlap_with}`
                         : "Low"}
                     </td>
-                    <td className="num px-3 py-2 text-right font-medium">{inr(m.price)}</td>
-                    <td className="px-4 py-2">
-                      <span className="flex items-center gap-2">
-                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
-                          <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(2, m.split * 100 * 2.5)}%` }} />
-                        </span>
-                        <span className="num w-11 text-right text-xs">{pct(m.split, 1)}</span>
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-1 text-xs">
+                        <Input
+                          value={edits[m.id]?.reels ?? String(m.deliverables.find((d) => d.kind === "reel")?.count ?? 0)}
+                          onChange={(e) => edit(m.id, "reels", e.target.value)}
+                          inputMode="numeric"
+                          aria-label={`Reels from ${m.name}`}
+                          className="h-8 w-11 px-2 text-center text-xs"
+                        />
+                        reels
+                        <Input
+                          value={edits[m.id]?.stories ?? String(m.deliverables.find((d) => d.kind === "story")?.count ?? 0)}
+                          onChange={(e) => edit(m.id, "stories", e.target.value)}
+                          inputMode="numeric"
+                          aria-label={`Stories from ${m.name}`}
+                          className="h-8 w-11 px-2 text-center text-xs"
+                        />
+                        stories
                       </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Input
+                        value={edits[m.id]?.price ?? String(m.price)}
+                        onChange={(e) => edit(m.id, "price", e.target.value)}
+                        inputMode="numeric"
+                        aria-label={`Fee for ${m.name}`}
+                        className="num ml-auto h-8 w-24 px-2 text-right text-xs"
+                      />
+                      {edits[m.id]?.price !== undefined && <span className="block text-[11px] text-muted">fair {inr(m.price)}</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {!edits[m.id]?.out && total > 0 && (
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                            <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.max(2, (feeOf(m) / total) * 100 * 2.5)}%` }} />
+                          </span>
+                          <span className="num w-11 text-right text-xs">{pct(feeOf(m) / total, 1)}</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -452,11 +532,13 @@ function CollectivePanel({ listing }: { listing: Listing }) {
 
           <div className="sticky bottom-0 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/95 p-3 backdrop-blur">
             <p className="text-sm">
-              <span className="font-semibold">One offer, one escrow payment of {inr(c.total)}.</span>{" "}
-              <span className="text-fg-2">Each member's share is released after you approve their post.</span>
+              <span className="font-semibold">
+                {chosen.length} creators, {inr(total)} in all.
+              </span>{" "}
+              <span className="text-fg-2">Each confirms their own terms; you fund once, after everyone has.</span>
             </p>
-            <Button variant="primary" onClick={() => book.mutate()} loading={book.isPending} disabled={c.size < 2}>
-              {!book.isPending && <Check aria-hidden />} Book this collective
+            <Button variant="primary" onClick={() => book.mutate()} loading={book.isPending} disabled={chosen.length < 2}>
+              {!book.isPending && <Check aria-hidden />} Send to {chosen.length} creators
             </Button>
           </div>
         </>

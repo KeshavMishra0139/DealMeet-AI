@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 26 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 27 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -212,7 +212,7 @@ Offer → Contract (both sides accept the same version) → Escrow funded → Po
 - The brand reviews the post link and approves it or asks for a revision with a reason. If the brand doesn't respond within 3 days of the review deadline, the post is approved automatically.
 - Automatic post checks need the creator's connected account. Until then each check reads "not checked" and the brand's review decides.
 - **There is no payout integration.** A deal funded through Razorpay stops at "Approved, payout not connected". In demo mode a simulated payment gets a simulated payout, labelled so, with no bank reference. Nothing is called paid unless it was.
-- Collectives fund once for the whole pack; each member's share is released after their post is approved.
+- Collectives fund once for the whole pack, only after every member has confirmed their own terms; each member's share is released after their post is approved.
 - `/api/health` reports the real modes of payments, payouts, social data and post checks.
 
 **Contract versions** (`services/contracts.py`). An offer carries full terms: deliverables, a posting deadline, the fee, usage rights and exclusivity. Each set of terms is an immutable version with a SHA-256 hash of its terms, its author and time; the brand's offer is version 1, accepted by the brand. Either side can **propose changes** to any term on their turn (the creator's "Counter" changes just the fee); every proposal is a new version, never an edit. Each acceptance records who, when and which version, and the contract is agreed only when both sides accept the same, latest version. The agreed version's hash is on the contract.
@@ -262,6 +262,14 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - **Self-reported numbers**: followers, average views and engagement, stored with `source: "manual"` and their history, labelled **Self-reported**. They feed the price only where no connected account provides the number ("Estimate from self-reported numbers"), and never replace connected numbers.
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
+
+## Creator collectives
+
+- **Creators** find group campaigns under Opportunities → Collectives and opt in; an opted-in creator always gets a place in the brand's pack.
+- **The builder** (`engines/collective.py`) shows its method and thresholds: it adds one creator at a time, the one with the most effective reach × audience fit per rupee; effective reach is median views × (1 − 0.7 × overlap with the most similar creator already picked); overlap comes from shared top cities and languages; minimum Trust Score (60 by default, adjustable), audience fit at least 55, 10 to 50 creators, within the budget. Each pick says why (reach and overlap, fit, trust, price); reach is never shown for a creator who doesn't share stats with the brand.
+- **Before sending**, the brand sees each member's deliverables, fee and share of the budget, can change any fee or reel/story count, and can leave members out.
+- **Confirmations**: every member confirms their own terms (accepting their own contract version). The collective is active, and can be funded, only when all members have confirmed. If someone declines, the brand replaces them with another creator who fits (suggested with reasons) before funding. Nothing is charged before then.
+- **Tracking**: each member's deliverables, confirmation, post and payment status are on their own deal; the brand sees all of them, a member sees only their own terms and everyone's progress. Payment statuses follow the honest-payments rules (simulated escrow is labelled; a real payment with no payout partner stays "payout not connected").
 
 ## Public creator page
 
@@ -454,14 +462,15 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 304 API tests (below), the copy rules on about 5,300 UI strings, and the TypeScript type check |
-| `make e2e` | 26 journeys in a real browser (below) |
+| `make test` | 309 API tests (below), the copy rules on about 5,400 UI strings, and the TypeScript type check |
+| `make e2e` | 27 journeys in a real browser (below) |
 | `make shots` | 84 screenshots (42 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
 - Honest payments: a failed provider call, a mismatched order or amount, a replayed payment, a webhook with a bad signature and a duplicate webhook; a funded deal that stops at "payout not connected"; revision requests.
 - Instagram (against a fake Graph API): the OAuth state (forged, expired, reused, another account's), encrypted tokens that never reach the browser, the sync and the price label, no demographics under 100 followers, personal accounts, expired tokens, rate limits, token refresh, disconnect deleting everything, and deal post checks.
+- Collectives: the builder's method and reasons, adjusted fees and deliverables, activation only when every member confirms, replacing a member who declined, members seeing only their own terms, and nothing charged before activation.
 - Contracts: version 1 from the brand, proposals as new versions with hashes, agreement only on the same version, refused proposals (same terms, not your turn, bad terms, collectives), audited status transitions, multi-link submissions with revision rounds, and idempotent repeats and request keys.
 - The public creator page: sharing settings, no private fields, badges only with data (connected, on time, completed, brand rating once per approved deal), case studies with predicted views and labelled actual views, positioning that shows only when chosen, and escaped link-preview tags.
 - Fan Proof and pitches: handle and hashtag matching with the paid-post exclusions, only API posts, recompute and delete on disconnect; pitch drafts from the creator's facts, a price range that never comes from the model, model answers with invented numbers, promises or over 150 words falling back, checked edits, the inbox for on-platform brands, revocable share links with no private data, the weekly limit, and accept (an offer) and decline (a polite note).
@@ -490,6 +499,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- A brand adjusting a collective's fee and sending it; funding only after every member confirms.
 - A creator proposing new terms and the brand accepting that version.
 - Writing a positioning and showing it on the public page with badges, an estimate and a QR code.
 - Writing a pitch from the creator's own numbers, sending it, and the brand accepting it from the Fan Inbox.
