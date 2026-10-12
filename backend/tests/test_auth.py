@@ -29,6 +29,10 @@ PUBLIC = {
     ("POST", "/api/youtube/preview"),  # public, rate-limited per IP
     ("GET", "/api/connect/instagram/consent"),
     ("GET", "/api/connect/instagram/callback"),  # proves itself with the signed, single-use state
+    ("GET", "/api/directory/brands"),  # the public brand directory
+    ("GET", "/api/directory/facets"),
+    ("GET", "/api/directory/brands/{slug}"),
+    ("POST", "/api/directory/brands/{slug}/removal-request"),  # anyone may ask; rate-limited per IP
 }
 
 

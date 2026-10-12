@@ -75,6 +75,13 @@ export default function BrandOnboarding() {
         </p>
         <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">Tell us who you want to reach</h1>
         <p className="mt-1 text-sm text-fg-2">We use this to rank creators by audience fit and price each match. About a minute.</p>
+        <p className="mt-2 text-xs text-muted">
+          Already listed as unclaimed?{" "}
+          <Link to="/brands" className="text-accent underline underline-offset-2">
+            Find your brand's page and claim it
+          </Link>{" "}
+          instead.
+        </p>
 
         <form
           className="mt-6 space-y-5"

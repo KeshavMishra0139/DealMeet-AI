@@ -46,6 +46,14 @@ def _env(name: str, default: str | None = None) -> str | None:
     return value if value not in (None, "") else default
 
 
+def _search_index() -> str:
+    """ATLAS_SEARCH_INDEX unset: "brands_search". Set to empty or "off": disabled."""
+    v = os.getenv("ATLAS_SEARCH_INDEX")
+    if v is None:
+        return "brands_search"
+    return "" if v.strip().lower() in ("", "off", "none") else v.strip()
+
+
 def _flag(name: str) -> bool:
     return (_env(name, "0") or "0").strip().lower() in ("1", "true", "yes", "on")
 
@@ -80,6 +88,8 @@ class Settings:
     # demographics. Check both against Meta's changelog; they're settings for that reason.
     ig_graph_version: str = "v25.0"
     ig_demographics_timeframe: str = "this_month"
+    # Atlas Search index on brands, used by the brand directory on Atlas. Empty: plain regex search.
+    atlas_search_index: str = "brands_search"
 
     @property
     def has_ai(self) -> bool:
@@ -126,6 +136,7 @@ def get_settings() -> Settings:
         frontend_url=(_env("FRONTEND_URL") or "").rstrip("/") or None,
         ig_graph_version=_env("IG_GRAPH_VERSION", "v25.0") or "v25.0",
         ig_demographics_timeframe=_env("IG_DEMOGRAPHICS_TIMEFRAME", "this_month") or "this_month",
+        atlas_search_index=_search_index(),
     )
 
 

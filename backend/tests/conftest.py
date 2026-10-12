@@ -1,4 +1,5 @@
 import os
+import uuid
 
 # The suite runs the sandbox: seeded personas, demo sign-in and the in-memory database.
 os.environ.setdefault("DEMO_MODE", "1")
@@ -66,3 +67,12 @@ def sign_in(client: TestClient, persona: str) -> Actor:
 def login(client, db):
     """login("cr_a") -> an Actor signed in as that demo profile's account."""
     return lambda persona: sign_in(client, persona)
+
+
+@pytest.fixture()
+def admin(client, db):
+    """An admin account (the role is only ever granted on the server)."""
+    from app.services import auth as au
+
+    user = au.new_user("admin", "Ops Admin", email=f"ops-{uuid.uuid4().hex[:6]}@example.test")
+    return Actor(client, au.create_session(user["_id"], "test"), au.public_user(user))

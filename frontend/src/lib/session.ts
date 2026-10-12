@@ -114,13 +114,20 @@ async function loadSession(role: Role): Promise<Me | null> {
 }
 
 /** The signed-in account for one side of the app, or null when nobody is signed in. */
-export function useSession(role: Role) {
+export function useSession(role: Role, enabled = true) {
   return useQuery({
     queryKey: ["session", role, pinned[role] ?? ""],
     queryFn: () => loadSession(role),
     staleTime: Infinity,
     retry: false,
+    enabled,
   });
+}
+
+/** True when this browser holds (or this frame pins) a demo session for a side. Real
+ * accounts use an HttpOnly cookie the page can't see; the server reports those. */
+export function hasDemoSession(role: Role): boolean {
+  return !!pinned[role] || !!tokenFor(role);
 }
 
 export function useCreatorId(): string {

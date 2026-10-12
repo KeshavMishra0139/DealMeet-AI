@@ -31,6 +31,9 @@ const CreatorKit = lazy(() => import("@/features/creator/Kit"));
 const DealView = lazy(() => import("@/features/deals/DealView"));
 const LinkInBio = lazy(() => import("@/features/public/LinkInBio"));
 const Worth = lazy(() => import("@/features/public/Worth"));
+const Brands = lazy(() => import("@/features/public/Brands"));
+const BrandPage = lazy(() => import("@/features/public/BrandPage"));
+const CreatorDreamBrands = lazy(() => import("@/features/creator/DreamBrands"));
 const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
 const CreatorProfile = lazy(() => import("@/features/creator/Profile"));
 const DemoCompare = lazy(() => import("@/features/demo/Compare"));
@@ -64,6 +67,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
         <Route path="/worth" element={<Worth />} />
+        <Route path="/brands" element={<Brands />} />
+        <Route path="/brands/:slug" element={<BrandPage />} />
 
         <Route
           path="/creator/onboarding"
@@ -83,6 +88,7 @@ export default function App() {
           <Route path="deals" element={<CreatorDeals />} />
           <Route path="deals/:id" element={<DealView role="creator" />} />
           <Route path="kit" element={<CreatorKit />} />
+          <Route path="brands" element={<CreatorDreamBrands />} />
           <Route path="privacy" element={<CreatorPrivacy />} />
           <Route path="connections" element={<CreatorConnections />} />
           <Route path="profile" element={<CreatorProfile />} />

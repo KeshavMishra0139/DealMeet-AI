@@ -33,6 +33,9 @@ export default function Landing() {
           <Button asChild variant="ghost" size="sm">
             <Link to="/worth">What am I worth?</Link>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Link to="/brands">Brands</Link>
+          </Button>
           {demo && (
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
               <Link to="/demo/compare">Demo</Link>

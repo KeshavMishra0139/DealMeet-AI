@@ -191,6 +191,22 @@ await step("Shortlist: save two matches with a note, compare them, then send a d
   await page.getByText(/Offer sent to Kabir Malhotra/).waitFor();
 });
 
+await step("Brands: search the directory, save a Dream Brand, see it in the Studio; unclaimed pages say they aren't on JodiDar", async () => {
+  await reset();
+  await page.goto(`${BASE}/brands?as=cr_a`);
+  await page.getByLabel("Search").fill("senpai");
+  await page.getByRole("link", { name: /Senpai Supply Co\./ }).click();
+  await page.getByRole("heading", { name: "Senpai Supply Co." }).waitFor();
+  await page.getByText(/creators? with connected accounts want to work with this brand/).waitFor();
+  await page.getByRole("button", { name: "Save as Dream Brand" }).click();
+  await page.getByText(/saved to your Dream Brands/).waitFor();
+  await page.goto(`${BASE}/creator/brands?as=cr_a`);
+  await page.getByText("Senpai Supply Co.").first().waitFor();
+  await page.goto(`${BASE}/brands/notebook-nagar`);
+  await page.getByText("Not on JodiDar AI and not affiliated with us.").first().waitFor();
+  await page.getByRole("button", { name: "Request removal" }).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();
