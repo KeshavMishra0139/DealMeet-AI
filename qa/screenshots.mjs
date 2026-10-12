@@ -52,6 +52,7 @@ const ROUTES = [
   ["brand-collective", "/brand/campaigns/lst_thalam_collective?as=br_thalam"],
   ["brand-creator", "/brand/creators/cr_a?as=br_senpai&listing=lst_senpai_hoodie"],
   ["brand-creator-locked", "/brand/creators/cr_b?as=br_senpai"],
+  ["brand-creator-audience", "/brand/creators/cr_b?as=br_thalam"],
   ["brand-deals", "/brand/deals?as=br_senpai"],
   ["brand-deal", "/brand/deals/dl_senpai_g11?as=br_senpai"],
   ["demo-compare", "/demo/compare?phone=0"],

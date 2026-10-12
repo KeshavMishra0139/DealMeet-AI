@@ -93,6 +93,13 @@ class Settings:
     ig_demographics_timeframe: str = "this_month"
     # Atlas Search index on brands, used by the brand directory on Atlas. Empty: plain regex search.
     atlas_search_index: str = "brands_search"
+    # Protected computation (services/tee.py). No endpoint: "not_configured", and the
+    # documented fallback runs. With one, attestation must verify against the trust root
+    # and the measurement policy below, or nothing is sent to it.
+    tee_endpoint: str | None = None
+    tee_trust_root: str | None = None  # PEM text, or a path to the PEM file
+    tee_measurements: str | None = None  # JSON: {"0": "<PCR0 hex>", "1": "...", "2": "..."}
+    tee_max_age_s: int = 300
 
     @property
     def has_ai(self) -> bool:
@@ -141,6 +148,10 @@ def get_settings() -> Settings:
         ig_graph_version=_env("IG_GRAPH_VERSION", "v25.0") or "v25.0",
         ig_demographics_timeframe=_env("IG_DEMOGRAPHICS_TIMEFRAME", "this_month") or "this_month",
         atlas_search_index=_search_index(),
+        tee_endpoint=(_env("TEE_ENDPOINT") or "").rstrip("/") or None,
+        tee_trust_root=_env("TEE_TRUST_ROOT"),
+        tee_measurements=_env("TEE_MEASUREMENTS"),
+        tee_max_age_s=int(_env("TEE_ATTESTATION_MAX_AGE_S", "300") or 300),
     )
 
 

@@ -33,7 +33,7 @@ Other commands. Each `make` command has an `npm run` twin for Windows. Run `make
 make setup      # or: npm run setup   install dependencies only
 make demo       # or: npm run demo    build the web app and serve everything from one port: http://localhost:8000
 make test       # or: npm test        API tests, copy rules on UI strings, type check
-make e2e        # or: npm run e2e     click through 29 key journeys in a real browser
+make e2e        # or: npm run e2e     click through 30 key journeys in a real browser
 make shots      # or: npm run shots   every screen at 390 px and 1440 px, plus an accessibility audit
                 # (e2e and shots need a browser once: npx playwright install chromium)
 make reset      # or: npm run reset   restore the seeded demo data (the app also has a "Reset demo" button)
@@ -424,6 +424,22 @@ Creators connect Instagram from **Connections** with the Instagram API with Inst
 7. Generate `TOKEN_ENC_KEY` once (command in `.env.example`) and set it on the server.
 8. Check the current Graph API version and the valid demographics `timeframe` values in Meta's changelog and the Instagram User Insights reference, and set `IG_GRAPH_VERSION` and `IG_DEMOGRAPHICS_TIMEFRAME` if they differ. The defaults (`v25.0`, `this_month`) were checked against secondary sources; Meta's own docs couldn't be opened from the environment this was built in.
 
+## Protected computation (TEE status and fallback)
+
+The app never calls an ordinary container, TLS or a mock attestation a TEE. `backend/app/services/tee.py` reports one of three statuses, shown in `/api/health` (`modes.tee`), the admin console's health panel, the creator's Privacy page and the brand's view of a creator:
+
+| Status | When | What happens |
+| --- | --- | --- |
+| `not_configured` | No `TEE_ENDPOINT` (the default, and the demo) | The fallback below |
+| `available` | An AWS Nitro Enclaves attestation verified against `TEE_TRUST_ROOT` and `TEE_MEASUREMENTS`, with a fresh nonce | The job runs in the enclave |
+| `failed` | Configured, but unreachable, missing its policy or trust root, or the attestation didn't verify | Nothing is sent to it; the fallback below |
+
+- **What it protects**: audience demographics. When a creator shares demographics with a brand, the brand sees how much of the audience overlaps its target (ages, gender, cities, languages). That overlap is the protected job (`engines/audience_overlap.py`). Today demographics are stored on our server as aggregated percentages; the TEE path is for the next step, where they're stored encrypted to a key only an attested enclave gets. That storage step isn't built, because it needs a TEE first.
+- **Fallback (one rule)**: process normally with minimised data. The job runs on our server with the same input the enclave would get: only the bucket percentages for the dimensions the brand targets, never ids, names or handles. The result says where it ran ("No TEE configured" or "TEE check failed"); it's never labelled protected.
+- **Attestation checks** (AWS Nitro): COSE_Sign1 with ES384; the certificate bundle starts at the configured root and each certificate is issued by the one before it and is in date; the signature; every PCR in the measurement policy; our nonce; and freshness (`TEE_ATTESTATION_MAX_AGE_S`). A job's answer must also be bound to its attestation (`user_data` is the SHA-256 of the result). Anything that fails is rejected, and the status is checked again before the next job.
+- **Security events** go to the audit log with a reason code only: `tee_attestation_checked`, `tee_attestation_failed` and `tee_fallback_used` (at most one per job and reason every 10 minutes). No documents, inputs, results or keys.
+- **Status: blocked by infrastructure.** The verifier is tested against attestation documents signed by a certificate chain made in the tests, and the service with a test double, but it hasn't run against a real Nitro enclave; the enclave app itself isn't in this repository. To try it you need an EC2 instance with Nitro Enclaves enabled, an enclave image that answers `POST /attest` and `POST /jobs/audience_overlap` (see the module docstring), its PCR values from `nitro-cli build-enclave`, and the AWS Nitro root certificate.
+
 ## Admin console and reports
 
 `/admin` is for accounts given the admin role on the server; there is no sign-up path to it and no admin password in the code. Every `/api/admin` route checks the role on the server, every action needs a written reason (5 to 300 characters), and every action is saved in the audit log with its reason.
@@ -492,9 +508,9 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 
 | Command | What it checks |
 | --- | --- |
-| `make test` | 340 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
-| `make e2e` | 29 journeys in a real browser (below). `QA_ONLY="Admin" make e2e` runs only the journeys whose names contain that text |
-| `make shots` | 96 screenshots (48 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make test` | 362 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
+| `make e2e` | 30 journeys in a real browser (below). `QA_ONLY="Admin" make e2e` runs only the journeys whose names contain that text |
+| `make shots` | 98 screenshots (49 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 The API tests cover:
 
@@ -514,6 +530,7 @@ The API tests cover:
 - YouTube Analytics: 28-day numbers, a token that's never stored, another account's channel refused, no channel, a declined permission, disconnect, and owner-only access.
 - YouTube data (against a fake Data API): median-views pricing per format, no `search.list`, the 12-hour cache, the per-IP limit, unknown handle, used-up quota, network failure, hidden subscribers, too few videos, linking with posts and a daily snapshot, unlinking, and owner-only access.
 - Firebase sign-in: a forged token, an expired or revoked token, a token from another Firebase project (checked by the real Admin SDK, offline), a first sign-in, a role that can't change, and linking a verified email.
+- Protected computation: the not-configured path (health, the brand's view and the fallback event), a failed attestation that sends nothing, a verified enclave given only minimised input, an answer not bound to its attestation, an unreachable enclave, missing or bad config, throttled events, and the Nitro verifier against a generated certificate chain (valid, wrong root, broken chain, bad signature, measurement mismatch, wrong nonce, stale, malformed, no policy).
 - The admin console: admin-only routes (401 and 403), a reason required for every action and saved in the audit log, suspending signing the account out, admins not suspendable, closing campaigns, reports (visible targets only, deals only by their sides, pitches only by their brand, not your own, duplicates, 5 a day), resolving once, audit filters and redaction, and the demo admin off unless the server turns it on (never on a shared demo).
 - Accounts and permissions: every private route answers 401 without a session, another account's records answer 403, expired, revoked and suspended sessions are refused, cookie writes need the app header, and admin can only be granted from the server.
 - Creator A's and Creator B's expected outputs.
@@ -531,6 +548,7 @@ The API tests cover:
 
 The e2e journeys:
 
+- The audience overlap a brand sees saying where it was computed (no TEE configured on the QA server), matching `/api/health`, and the same status on the creator's Privacy page.
 - A deal's brand reporting a problem; the demo admin resolving it, suspending (the account can't sign in) and restoring an account, each with a reason, and finding both in the audit log.
 - Pausing a campaign through the Assistant: nothing changes until Confirm.
 - A brand adjusting a collective's fee and sending it; funding only after every member confirms.

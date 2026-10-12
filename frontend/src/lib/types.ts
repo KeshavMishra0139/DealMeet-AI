@@ -36,7 +36,7 @@ export interface Persona {
 export interface Health {
   status: string;
   today: string;
-  modes: { db: string; ai: string; payments: string; auth: string };
+  modes: { db: string; ai: string; payments: string; auth: string; tee?: "not_configured" | "available" | "failed" };
   /** Persona sign-in, seeded data and the Reset button exist only in demo mode. */
   demo_mode?: boolean;
   /** True on a shared URL where the demo resets itself on a timer. */

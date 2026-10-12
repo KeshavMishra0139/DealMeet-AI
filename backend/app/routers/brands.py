@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from ..config import now_iso, today
 from ..db import get_db, out
+from ..engines import audience_overlap as overlap_engine
 from ..engines import brand_matching, brand_safety, collective, metrics
 from ..engines.common import inr
 from ..engines.fair_price import fair_price
@@ -21,7 +22,7 @@ from ..services import cache
 from ..services import campaigns as camp
 from ..services import collectives
 from ..services import consent as cs
-from ..services import fan_proof, offers, payments
+from ..services import fan_proof, offers, payments, tee
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
 
@@ -362,6 +363,20 @@ def build_collective(listing_id: str, body: CollectiveIn, user: dict = Depends(a
     return collective.build(x, brand, body.budget, body.size_min, body.size_max, body.trust_min, body.target_reach)
 
 
+OVERLAP_NOTE = {
+    "tee": "Computed inside an attested enclave (AWS Nitro Enclaves); its measurements matched our policy.",
+    "not_configured": "Computed on JodiDar's server, from only the percentages this needs.",
+    "failed": "Nothing was sent to it. Computed on JodiDar's server, from only the percentages this needs.",
+}
+
+
+def _audience_overlap(audience: dict, brand: dict) -> dict:
+    """The protected job (services/tee.py), or its documented fallback on minimised data."""
+    out = tee.protected(overlap_engine.JOB, overlap_engine.minimise(audience, brand.get("target") or {}), overlap_engine.compute)
+    note = OVERLAP_NOTE["tee" if out["processed_in"] == "tee" else out["tee_status"]]
+    return {**out["result"], "processed_in": out["processed_in"], "tee_status": out["tee_status"], "note": note}
+
+
 @router.get("/brands/{brand_id}/creators/{creator_id}")
 def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = None, _: dict = Depends(au.own_brand)):
     db = get_db()
@@ -392,8 +407,11 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
             "provenance": {"views": metrics.prov(c, "reels.0.views"), "saves": metrics.prov(c, "reels.0.saves"), "topic": metrics.prov(c, "reels.0.topic")},
         }
     demographics = None
+    overlap = None
     if scopes["demographics"]:
         demographics = {**(c.get("audience") or {}), "provenance": metrics.prov(c, "audience")}
+        if c.get("audience"):
+            overlap = _audience_overlap(c["audience"], brand)
     rate_card = None
     if scopes["rate_card"]:
         rate_card = {"typical": c.get("current_rate"), "provenance": metrics.prov(c, "current_rate")}
@@ -426,6 +444,7 @@ def creator_for_brand(brand_id: str, creator_id: str, listing_id: str | None = N
         },
         "stats": stats,
         "demographics": demographics,
+        "audience_overlap": overlap,
         "rate_card": rate_card,
         "listing": {"id": listing["_id"], "title": listing["title"]} if listing else None,
         "fan_proof": fan_proof.summary(creator_id, brand_id),
