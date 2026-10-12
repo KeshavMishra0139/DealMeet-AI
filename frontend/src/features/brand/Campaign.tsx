@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Check, Info, Lock, RefreshCw, Send, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Info, Lock, RefreshCw, Send, Star, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -12,16 +12,17 @@ import { SafetyNote } from "@/components/shared/SafetyNote";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Input, Label, Skeleton, Slider, Textarea } from "@/components/ui/form";
+import { Input, Label, Skeleton, Slider, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent, Popover, PopoverContent, PopoverTrigger } from "@/components/ui/overlays";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, post } from "@/lib/api";
 import { count, deliverable, inr, inrRange, pct, shortDate } from "@/lib/format";
-import type { BrandMatch, Collective, Listing, Matches } from "@/lib/market-types";
+import type { BrandMatch, Collective, Listing, Matches, RankCriterion } from "@/lib/market-types";
 import { useMediaQuery } from "@/lib/hooks";
 import { useBrandId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { ApplicationsPanel, CampaignControls, HistoryPanel } from "./CampaignManage";
+import { ComparePanel, RankWhy, ShortlistPanel, ShortlistToggle } from "./Shortlist";
 
 export default function Campaign() {
   const { id = "" } = useParams();
@@ -40,8 +41,6 @@ export default function Campaign() {
   if (!listing.data) return <Skeleton className="h-96 rounded-xl" />;
   const l = listing.data;
   const b = l.budget;
-  const toggle = (cid: string) =>
-    setCompare((cur) => (cur.includes(cid) ? cur.filter((x) => x !== cid) : cur.length >= 3 ? [...cur.slice(1), cid] : [...cur, cid]));
 
   return (
     <div>
@@ -89,6 +88,9 @@ export default function Campaign() {
           <TabsTrigger value="collective">
             <Users aria-hidden /> Ready-made collectives
           </TabsTrigger>
+          <TabsTrigger value="shortlist">
+            <Star aria-hidden /> Shortlist
+          </TabsTrigger>
           <TabsTrigger value="compare" disabled={compare.length < 2}>
             Compare{compare.length ? ` (${compare.length})` : ""}
           </TabsTrigger>
@@ -110,7 +112,7 @@ export default function Campaign() {
                 <p className="text-xs text-muted">Only creators who chose to be discoverable. Fields they haven't shared stay locked.</p>
               </div>
               <MatchSpace items={matches.data.items} listingId={l.id} />
-              <MatchList items={matches.data.items} compare={compare} onToggle={toggle} onOffer={setOfferTo} listingId={l.id} />
+              <MatchList items={matches.data.items} criteria={matches.data.criteria} onOffer={setOfferTo} listingId={l.id} />
             </>
           )}
         </TabsContent>
@@ -127,8 +129,12 @@ export default function Campaign() {
           <HistoryPanel listing={l} />
         </TabsContent>
 
+        <TabsContent value="shortlist" className="pt-4">
+          <ShortlistPanel listing={l} criteria={matches.data?.criteria} selected={compare} onSelect={setCompare} onCompare={() => setTab("compare")} />
+        </TabsContent>
+
         <TabsContent value="compare" className="pt-4">
-          {matches.data && <ComparePanel items={matches.data.items.filter((m) => compare.includes(m.id))} onOffer={setOfferTo} />}
+          <ComparePanel listing={l} ids={compare} />
         </TabsContent>
       </Tabs>
 
@@ -219,14 +225,12 @@ function StatusBadge({ m }: { m: BrandMatch }) {
 
 function MatchList({
   items,
-  compare,
-  onToggle,
+  criteria,
   onOffer,
   listingId,
 }: {
   items: BrandMatch[];
-  compare: string[];
-  onToggle: (id: string) => void;
+  criteria?: RankCriterion[];
   onOffer: (m: BrandMatch) => void;
   listingId: string;
 }) {
@@ -239,7 +243,6 @@ function MatchList({
           className={cn("grid gap-3 px-4 py-3.5 md:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,1.6fr)_auto] md:items-center", m.trust && m.trust.score < 50 && "bg-danger-soft/40")}
         >
           <div className="flex items-center gap-3 md:contents">
-            <Checkbox checked={compare.includes(m.id)} onCheckedChange={() => onToggle(m.id)} aria-label={`Compare ${m.name}`} />
             <div className="flex min-w-0 items-center gap-3">
               <span className="num w-5 text-xs text-muted">{i + 1}</span>
               <Avatar name={m.name} hue={m.avatar_hue} size={36} generic={m.is_reference} />
@@ -258,6 +261,7 @@ function MatchList({
                   @{m.handle} · {m.niche_label} · {m.languages.join(", ")} · {m.location}
                 </p>
                 <p className="mt-1 hidden text-xs text-fg-2 md:block">{m.reasons.slice(0, 2).join(" · ")}</p>
+                <RankWhy m={m} criteria={criteria} />
               </div>
             </div>
           </div>
@@ -281,6 +285,7 @@ function MatchList({
             </div>
           </dl>
           <div className="flex items-center gap-2 md:justify-end">
+            <ShortlistToggle listingId={listingId} creatorId={m.id} name={m.name} on={!!m.shortlisted} />
             <Button asChild size="sm" variant="ghost">
               <Link to={`/brand/creators/${m.id}?listing=${listingId}`}>View</Link>
             </Button>
@@ -291,66 +296,6 @@ function MatchList({
         </StaggerItem>
       ))}
     </Stagger>
-  );
-}
-
-function ComparePanel({ items, onOffer }: { items: BrandMatch[]; onOffer: (m: BrandMatch) => void }) {
-  if (items.length < 2) return <p className="text-sm text-muted">Tick two or three creators in Matches to compare them here.</p>;
-  const rows: { label: string; get: (m: BrandMatch) => React.ReactNode }[] = [
-    { label: "Fit", get: (m) => <FitBar fit={m.fit} /> },
-    { label: "Fair price", get: (m) => <span className="num font-semibold">{inr(m.fair.total)}</span> },
-    { label: "Median views", get: (m) => (m.median_views !== null ? <span className="num">{count(m.median_views)}</span> : <Locked label="Stats" />) },
-    { label: "Saves + shares per view", get: (m) => (m.engagement !== null ? <span className="num">{pct(m.engagement, 1)}</span> : <Locked label="Stats" />) },
-    { label: "Trust", get: (m) => <TrustBadge trust={m.trust} /> },
-    { label: "Audience", get: (m) => m.audience_stage },
-    { label: "Languages", get: (m) => m.languages.join(", ") },
-    { label: "Location", get: (m) => m.location },
-    { label: "Why they fit", get: (m) => <ul className="space-y-1 text-xs text-fg-2">{m.reasons.map((r) => <li key={r}>{r}</li>)}</ul> },
-  ];
-  return (
-    <div className="card-surface overflow-x-auto rounded-xl">
-      <table className="w-full min-w-[560px] text-left text-[13px]">
-        <thead>
-          <tr className="border-b border-line">
-            <th scope="col" className="w-40 px-4 py-3 text-xs font-medium text-muted">
-              <span className="sr-only">Attribute</span>
-            </th>
-            {items.map((m) => (
-              <th key={m.id} scope="col" className="px-4 py-3">
-                <span className="flex items-center gap-2">
-                  <Avatar name={m.name} hue={m.avatar_hue} size={28} generic={m.is_reference} />
-                  <span className="font-semibold">{m.name}</span>
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((r) => (
-            <tr key={r.label}>
-              <th scope="row" className="px-4 py-2.5 text-xs font-medium text-muted">
-                {r.label}
-              </th>
-              {items.map((m) => (
-                <td key={m.id} className="px-4 py-2.5 align-top">
-                  {r.get(m)}
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr>
-            <td />
-            {items.map((m) => (
-              <td key={m.id} className="px-4 py-3">
-                <Button size="sm" variant="primary" disabled={!!m.deal_stage} onClick={() => onOffer(m)}>
-                  <Send aria-hidden /> Offer {inr(m.fair.total)}
-                </Button>
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
   );
 }
 

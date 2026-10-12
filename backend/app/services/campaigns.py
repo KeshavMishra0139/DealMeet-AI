@@ -255,6 +255,17 @@ def set_application(x: dict, creator_id: str, status: str, user: dict) -> dict:
     if a["status"] != status:
         db.applications.update_one({"_id": a["_id"]}, {"$set": {"status": status, "updated_at": now_iso()}})
         _history(x["_id"], user, "application", creator_id=creator_id, **{"from": a["status"], "to": status})
+        # A shortlisted applicant is on the campaign's shortlist, and leaves it when moved on.
+        key = {"listing_id": x["_id"], "creator_id": creator_id}
+        if status == "shortlisted":
+            at = now_iso()
+            db.shortlists.update_one(
+                {"_id": f"sl_{x['_id']}_{creator_id}"},
+                {"$set": {**key, "brand_id": x["owner_id"], "updated_at": at}, "$setOnInsert": {"note": None, "added_at": at, "added_by": user["_id"]}},
+                upsert=True,
+            )
+        elif a["status"] == "shortlisted":
+            db.shortlists.delete_one(key)
     return applications(x)
 
 

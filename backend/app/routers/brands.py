@@ -20,7 +20,7 @@ from ..services import brand_profile as bp
 from ..services import cache
 from ..services import campaigns as camp
 from ..services import consent as cs
-from ..services import payments
+from ..services import offers, payments
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
 
@@ -462,40 +462,12 @@ def send_offer(body: OfferIn, user: dict = Depends(au.current_user)):
     db = get_db()
     brand = _brand(body.brand_id or "")
     c = db.creators.find_one({"_id": body.creator_id})
-    if not c or cs.scopes_for(c, body.brand_id) is None:
+    if not c:
         raise HTTPException(404, "Creator not available")
-    if db.deals.count_documents({"brand_id": body.brand_id}) >= 50:
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     listing = db.listings.find_one({"_id": body.listing_id}) if body.listing_id else None
     if body.listing_id and (not listing or listing["owner_id"] != body.brand_id):
         raise HTTPException(403, "That campaign belongs to another account.")
-    if listing:
-        camp.require_live(listing, "taking offers")
-    terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else {"deliverables": [{"kind": "reel", "count": 1}]}
-    fp = fair_price(c, brand, terms, with_model=False)
-    did = f"dl_{uuid.uuid4().hex[:10]}"
-    at = now_iso()
-    db.deals.insert_one(
-        {
-            "_id": did,
-            "kind": "single",
-            "listing_id": body.listing_id,
-            "brand_id": body.brand_id,
-            "creator_id": body.creator_id,
-            "amount": body.amount,
-            "fair_at_offer": fp["total"],
-            "deliverables": terms.get("deliverables"),
-            "usage_rights_days": terms.get("usage_rights_days") or 0,
-            "exclusivity_days": terms.get("exclusivity_days") or 0,
-            "stage": "offer",
-            "message": body.message,
-            "timeline": [{"stage": "offer", "at": at, "note": f"Offer sent by {brand['name']}"}],
-            "created_at": at,
-        }
-    )
-    camp.mark_offered(body.listing_id, body.creator_id, did)
-    below = 1 - body.amount / fp["total"] if fp["total"] else 0
-    return {"id": did, "fair": fp["total"], "below_pct": round(below * 100)}
+    return offers.create_offer(brand, c, listing, body.amount, body.message)
 
 
 class BookIn(BaseModel):

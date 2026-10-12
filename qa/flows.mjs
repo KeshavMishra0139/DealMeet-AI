@@ -165,6 +165,32 @@ await step("Campaigns: a draft lists what's missing, then publish, pause and res
   await page.getByText(/No applications yet/).waitFor();
 });
 
+await step("Shortlist: save two matches with a note, compare them, then send a drafted offer only after confirming", async () => {
+  await reset();
+  await page.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
+  await page.getByRole("button", { name: "Shortlist Kabir Malhotra" }).click();
+  await page.getByRole("button", { name: "Remove Kabir Malhotra from the shortlist" }).waitFor();
+  await page.getByRole("button", { name: "Shortlist Ishaan Mehta" }).click();
+  await page.getByRole("button", { name: "Remove Ishaan Mehta from the shortlist" }).waitFor();
+  await page.getByRole("button", { name: "Why ranked here" }).first().click();
+  await page.getByText("Limits of this data").waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Shortlist" }).click();
+  await page.getByLabel("Note about Kabir Malhotra").fill("Ask about the Diwali drop");
+  await page.getByLabel("Note about Kabir Malhotra").press("Enter");
+  await page.getByRole("checkbox", { name: "Compare Kabir Malhotra" }).click();
+  await page.getByRole("checkbox", { name: "Compare Ishaan Mehta" }).click();
+  await page.getByRole("button", { name: "Compare 2" }).click();
+  await page.getByRole("rowheader", { name: "Estimated price" }).waitFor();
+  await page.getByText("Ask about the Diwali drop").waitFor();
+  await page.getByRole("tab", { name: "Shortlist" }).click();
+  await page.locator("li", { hasText: "Kabir Malhotra" }).getByRole("button", { name: "Draft offer" }).click();
+  await page.getByText("Draft · not sent").waitFor();
+  await page.getByRole("button", { name: "Review and send" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm and send" }).click();
+  await page.getByText(/Offer sent to Kabir Malhotra/).waitFor();
+});
+
 await step("Privacy: revoking a brand logs it and hides the creator", async () => {
   await page.goto(`${BASE}/creator/privacy?as=cr_a`);
   await page.getByRole("button", { name: "Revoke" }).first().click();
