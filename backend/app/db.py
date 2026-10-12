@@ -37,6 +37,12 @@ COLLECTIONS = [
     "notifications",
     "payments",
     "webhook_events",
+    "manual_metrics",
+    "connections",
+    "posts",
+    "metric_snapshots",
+    "oauth_states",
+    "fan_proof",
     "ai_cache",
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
@@ -144,6 +150,7 @@ def ensure_indexes(db) -> None:
     db.payments.create_index([("kind", 1), ("ref_id", 1)])
     db.payments.create_index("payment_id", unique=True, partialFilterExpression={"payment_id": text})
     db.notifications.create_index("to")
+    db.manual_metrics.create_index([("creator_id", 1), ("ts", -1)])
     db.rate_limits.create_index("expires")
     db.oauth_states.create_index("expires")
     db.fan_proof.create_index([("creator_id", 1), ("platform", 1)])

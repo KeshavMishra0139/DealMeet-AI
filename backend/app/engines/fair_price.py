@@ -88,6 +88,8 @@ def data_label(c: dict) -> tuple[str, str]:
     if c.get("insights_source") == "instagram_api" and metrics.prov(c, "reels.0.views") == "real":
         return "Estimate from Instagram data", "instagram_api"
     if not metrics.has_reels(c):
+        if (c.get("manual") or {}).get("avg_views"):
+            return "Estimate from self-reported numbers", "manual"
         return "Estimate from your follower count", "manual"
     if metrics.recent_simulated(c, "views") or metrics.prov(c, "reels.0.views") in ("simulated", "seed") or c.get("insights_source") == "synthetic":
         return "Estimate from sample data", "synthetic"
@@ -214,7 +216,11 @@ def fair_price(
                 f"Median of your last 6 reels is {short(mv)} views. At {inr(f['cpm'])} per 1,000 views for "
                 f"{niche['label'].lower()}, that's {inr_full(base)}."
                 if real_views
-                else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+                else (
+                    f"No connected reels yet, so we use the {short(mv)} average views you reported. At {inr(f['cpm'])} per 1,000 views, that's {inr_full(base)}."
+                    if (c.get("manual") or {}).get("avg_views")
+                    else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+                )
             ),
             "simulated": bool(sim_views),
             "simulated_fields": sim_views,

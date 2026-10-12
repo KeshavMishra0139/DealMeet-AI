@@ -11,6 +11,7 @@ import {
   Menu,
   RotateCcw,
   ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -40,6 +41,7 @@ const PRIMARY: NavItem[] = [
   { to: "/creator/deals", key: "nav.deals", icon: Handshake },
 ];
 const SECONDARY: NavItem[] = [
+  { to: "/creator/profile", key: "nav.profile", icon: UserRound },
   { to: "/creator/connections", key: "nav.connections", icon: Link2 },
   { to: "/creator/kit", key: "nav.kit", icon: FileText },
   { to: "/creator/privacy", key: "nav.privacy", icon: ShieldCheck },

@@ -10,6 +10,7 @@ export const hi: Dict = {
   "nav.kit": "मीडिया किट",
   "nav.privacy": "प्राइवेसी",
   "nav.connections": "कनेक्शन",
+  "nav.profile": "प्रोफ़ाइल",
   "connections.title": "कनेक्शन",
   "nav.more": "और",
   "home.greeting": "इस हफ़्ते क्या करना है",

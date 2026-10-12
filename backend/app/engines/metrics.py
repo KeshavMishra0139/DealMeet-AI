@@ -53,7 +53,10 @@ def median_views(c: dict) -> float:
     r = recent(c)
     if r:
         return safe_median(x["views"] for x in r)
-    # No connected insights: a conservative typed estimate.
+    # No reels: the creator's self-reported average views, else a conservative estimate from followers.
+    manual = (c.get("manual") or {}).get("avg_views")
+    if manual:
+        return float(manual)
     f = c.get("followers", 0)
     return f * (1.0 if f < 1_000 else 0.6 if f < 10_000 else 0.4)
 

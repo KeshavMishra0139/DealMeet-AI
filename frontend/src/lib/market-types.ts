@@ -37,6 +37,7 @@ export interface Opportunity {
 export interface Opportunities {
   items: Opportunity[];
   hidden: { id: string; title: string; reasons: string[] }[];
+  hidden_by_prefs?: { id: string; title: string; reason: string }[];
   counts: Record<string, number>;
 }
 
