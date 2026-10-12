@@ -75,7 +75,7 @@ export default function Login() {
             />
           )}
           <FirebaseSignIn role={role} next={next} serverReady={authModes.includes("firebase")} loaded={!!health.data} />
-          <AccountForm role={role} next={next} demo={demo} />
+          <AccountForm role={role} next={next} demo={demo} startWithSignup={params.get("mode") === "signup"} />
           {demo && <DemoProfiles role={role} next={next} />}
 
           {demo && (
@@ -255,8 +255,8 @@ function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next:
   );
 }
 
-function AccountForm({ role, next, demo }: { role: Role; next: string | null; demo: boolean }) {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: string | null; demo: boolean; startWithSignup: boolean }) {
+  const [mode, setMode] = useState<"signin" | "signup">(startWithSignup ? "signup" : "signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

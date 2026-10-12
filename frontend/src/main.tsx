@@ -1,8 +1,7 @@
-import "@fontsource/sora/400.css";
-import "@fontsource/sora/500.css";
-import "@fontsource/sora/600.css";
-import "@fontsource/sora/700.css";
+// Inter (body) and Outfit (display), self-hosted: no third-party font request, and the
+// app keeps working offline.
 import "@fontsource-variable/inter";
+import "@fontsource-variable/outfit";
 import "@fontsource/noto-sans-devanagari/400.css";
 import "@fontsource/noto-sans-devanagari/600.css";
 import "@fontsource/noto-sans-tamil/400.css";

@@ -1,20 +1,39 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BadgeIndianRupee, Lock, Play, Scale, ShieldCheck, Youtube } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, ChevronRight, Lock, Play, Scale, ShieldCheck, Sparkles, Youtube } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ParallaxAurora, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
-import { Stage3D } from "@/components/three/Stage3D";
-import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
-import { HeroOrbit } from "@/components/three/lazy";
+import { siClaude, siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
+import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
+import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
+
+const HERO_VIDEO =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260505_101331_74f9b798-3f00-4e86-8a01-377aa16ffeaa.mp4";
+
+/**
+ * The services DealMeet AI actually connects to (see README, "Setup"). Shown as "Works with",
+ * never as customers or partners. Logos are Simple Icons (CC0), bundled with the app.
+ */
+const INTEGRATIONS: { icon: SimpleIcon; label: string }[] = [
+  { icon: siInstagram, label: "Instagram" },
+  { icon: siYoutube, label: "YouTube" },
+  { icon: siGoogle, label: "Google sign-in" },
+  { icon: siMeta, label: "Meta" },
+  { icon: siFirebase, label: "Firebase" },
+  { icon: siMongodb, label: "MongoDB" },
+  { icon: siRazorpay, label: "Razorpay" },
+  { icon: siClaude, label: "Claude" },
+];
 
 export default function Landing() {
   const shared = useSharedDemo();
   const demo = useDemoMode();
-  useTheme("creator");
+  useTheme("site");
   const reduce = useReducedMotion();
   const rise = (delay: number) =>
     reduce
@@ -22,56 +41,12 @@ export default function Landing() {
       : { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7, ease, delay } };
 
   return (
-    <div className="theme-creator grain relative min-h-dvh overflow-x-clip">
-      <ParallaxAurora />
+    <div className="theme-site relative min-h-dvh overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-6">
+      <Hero demo={demo} />
+      <WorksWith />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 sm:py-5">
-        <Link to="/" aria-label="DealMeet AI home" className="rounded-lg">
-          <Wordmark />
-        </Link>
-        <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/worth">What am I worth?</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <Link to="/brands">Brands</Link>
-          </Button>
-          {demo && (
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link to="/demo/compare">Demo</Link>
-            </Button>
-          )}
-          <Button asChild variant="outline" size="sm">
-            <Link to="/login">Sign in</Link>
-          </Button>
-        </nav>
-      </header>
-
-      <main id="main" className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
-        {/* 3D hero: creator core with brand cards and coins in orbit. Desktop only; follows the pointer and the scroll. */}
-        <Stage3D media="(min-width: 1280px)" className="pointer-events-none absolute -right-36 -top-12 hidden h-[560px] w-[680px] xl:block">
-          {(active, onScreen) => <HeroOrbit active={active} onScreen={onScreen} still={!!reduce} />}
-        </Stage3D>
-        <section aria-labelledby="pitch" className="relative pt-4 sm:pt-12 lg:pt-16">
-          <motion.p
-            {...rise(0)}
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2"
-          >
-            <span className="size-1.5 rounded-full bg-signature" aria-hidden />
-            Creator monetisation and brand opportunity engine
-          </motion.p>
-          <motion.h1
-            {...rise(0.05)}
-            id="pitch"
-            className="max-w-[18ch] font-display text-[29px] font-semibold leading-[1.12] tracking-[-0.03em] sm:max-w-[22ch] sm:text-5xl sm:leading-[1.06] lg:max-w-[24ch] lg:text-[60px] xl:max-w-[17ch]"
-          >
-            <span className="text-muted">Other dashboards tell creators how they're doing. </span>
-            DealMeet AI tells them <span className="text-gradient">what to do next</span>, prices it fairly, and makes
-            sure they get paid.
-          </motion.h1>
-        </section>
-
-        <section aria-label="Choose your side" className="mt-7 grid gap-3 sm:mt-10 sm:gap-4 md:grid-cols-2">
+      <main id="main" className="relative z-10 mx-auto mt-16 max-w-6xl sm:mt-24">
+        <section aria-label="Choose your side" className="grid gap-3 sm:gap-4 md:grid-cols-2">
           <motion.div {...rise(0.15)}>
             <TiltCard className="h-full rounded-[28px]" max={5}>
               <CreatorEntry />
@@ -95,7 +70,7 @@ export default function Landing() {
               <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
             </>
           )}
-          <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-11 sm:h-12">
+          <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
             <Link to="/worth">
               <Youtube aria-hidden /> What am I worth? Check your YouTube channel
             </Link>
@@ -135,12 +110,164 @@ export default function Landing() {
           <Reveal as="div" className="mt-10">
           <footer className="flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <p>Built by Team TheVortex for CodeX 3.0, Problem Statement 3.</p>
-            <p>All brands and profiles are fictional, except one anonymised reference profile.</p>
+            {demo && <p>All brands and profiles in the demo are fictional, except one anonymised reference profile.</p>}
           </footer>
           </Reveal>
         </section>
       </main>
     </div>
+  );
+}
+
+/** Video hero card with the headline and the floating navigation. */
+function Hero({ demo }: { demo: boolean }) {
+  const reduce = useReducedMotion();
+  return (
+    <section
+      aria-labelledby="hero-title"
+      className="relative isolate mx-auto flex h-[600px] w-full max-w-[1400px] flex-col overflow-hidden rounded-[48px] border border-slate-200/50 bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.03)]"
+    >
+      {/* Decorative. With reduced motion it stays on its first frame. */}
+      <video
+        aria-hidden
+        tabIndex={-1}
+        src={HERO_VIDEO}
+        autoPlay={!reduce}
+        loop
+        muted
+        playsInline
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-105 object-cover transition-transform duration-1000"
+      />
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.9, ease }}
+        className="relative z-20 flex flex-1 flex-col items-start px-8 pt-12 md:px-16 md:pt-16"
+      >
+        <Link to="/" aria-label="DealMeet AI home" className="mb-8 rounded-lg">
+          <Wordmark />
+        </Link>
+        <h1 id="hero-title" className="font-display text-[42px] leading-[1.08] text-[#0a1b33] md:text-[56px]">
+          Foundation of the
+          {/* The break only from md: at 42px on a phone it would leave "the" alone on a line. */}
+          <br className="hidden md:block" /> new digital epoch
+        </h1>
+        <p className="mt-5 max-w-md font-sans text-[14px] leading-relaxed text-[#64748b] md:text-[15px]">
+          Other dashboards tell creators how they're doing. DealMeet AI tells them what to do next, prices it fairly,
+          and makes sure they get paid.
+        </p>
+      </motion.div>
+      <FloatingNav demo={demo} />
+    </section>
+  );
+}
+
+function NavItem({ to, className, children }: { to: string; className?: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        "inline-flex items-center whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]",
+        className,
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** Pill navigation floating at the bottom of the hero. Every item goes to a real page. */
+function FloatingNav({ demo }: { demo: boolean }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.nav
+      aria-label="Primary"
+      initial={reduce ? false : { opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease, delay: 0.25 }}
+      className="absolute bottom-10 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full border border-slate-200/40 bg-white/90 px-1.5 py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-2xl"
+    >
+      <Link
+        to="/"
+        aria-label="DealMeet AI home"
+        className="mr-1 grid size-9 shrink-0 place-items-center rounded-full bg-[#0a1b33] text-[15px] leading-none text-white"
+      >
+        <span aria-hidden>✦</span>
+      </Link>
+      {/* The tool creators come for: a fair price from their own channel. Emphasised on purpose. */}
+      <NavItem
+        to="/worth"
+        className="gap-1.5 bg-linear-to-r from-violet-500/10 via-pink-500/10 to-orange-400/10 font-semibold text-[#0a1b33] ring-1 ring-violet-500/25 ring-inset hover:bg-transparent hover:ring-violet-500/50"
+      >
+        <Sparkles className="size-3.5 text-violet-600" aria-hidden />
+        Check your worth
+      </NavItem>
+      <NavItem to="/brands" className="hidden sm:inline-flex">
+        Brands
+      </NavItem>
+      {demo && (
+        <NavItem to="/demo/compare" className="hidden md:inline-flex">
+          Demo
+        </NavItem>
+      )}
+      <NavItem to="/login" className="hidden sm:inline-flex">
+        Sign in
+      </NavItem>
+      <Link
+        to="/login?mode=signup"
+        className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-[#0a1b33] py-2 pl-4 pr-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#16305a]"
+      >
+        Get started
+        <ChevronRight className="size-4" aria-hidden />
+      </Link>
+    </motion.nav>
+  );
+}
+
+/**
+ * Seamless logo scroller, pure CSS: the track holds the list twice and slides by half its
+ * width (--animate-marquee). Pauses on hover; with reduced motion it's a still, wrapped list.
+ */
+function WorksWith() {
+  return (
+    <section aria-labelledby="works-with" className="mx-auto mt-10 w-full max-w-[1400px]">
+      <h2 id="works-with" className="text-center font-sans text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        Works with
+      </h2>
+      <div className="group/marquee mt-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)] motion-reduce:[mask-image:none]">
+        <div className="flex w-max animate-marquee py-2 group-hover/marquee:[animation-play-state:paused] motion-reduce:w-full motion-reduce:animate-none">
+          {[0, 1].map((copy) => (
+            <ul
+              key={copy}
+              aria-hidden={copy === 1 || undefined}
+              // pr-3 matches gap-3, so each copy is exactly half the track and the loop has no seam.
+              className={cn(
+                "flex shrink-0 gap-3 pr-3 motion-reduce:w-full motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:pr-0",
+                copy === 1 && "motion-reduce:hidden",
+              )}
+            >
+              {INTEGRATIONS.map(({ icon, label }) => (
+                <li
+                  key={label}
+                  className="group/logo relative flex shrink-0 items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-full border border-slate-200/40 bg-white py-2.5 pl-4 pr-5 shadow-[0_12px_40px_rgba(0,0,0,0.04)]"
+                >
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 scale-125 rounded-full bg-linear-to-r from-violet-100 via-pink-100 to-orange-100 opacity-0 transition-[opacity,scale] duration-500 ease-[var(--ease-soft)] group-hover/logo:scale-100 group-hover/logo:opacity-100"
+                  />
+                  <svg viewBox="0 0 24 24" aria-hidden className="relative size-5 transition-[filter] duration-300 group-hover/logo:brightness-0">
+                    <path d={icon.path} fill={`#${icon.hex}`} />
+                  </svg>
+                  <span className="relative font-sans text-[13px] font-medium text-slate-600 transition-colors group-hover/logo:text-[#0a1b33]">
+                    {label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
