@@ -3,19 +3,23 @@
 Accounts are creators or brands; admin is granted only from the server
 (`python -m app.admin_cli grant <email>`). In demo mode (DEMO_MODE=1) the persona
 picker signs you in to a seeded demo account instead.
+
+Ways in: email and password, Firebase (Google, phone), and for creators "Continue
+with Instagram" and "Continue with YouTube" (services/social_signin.py).
 """
 from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
 from ..seed.load import DEMO_ADMIN_ID
-from ..services import firebase_auth
+from ..services import firebase_auth, ratelimit, social_signin
+from ..services import instagram as ig
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -123,17 +127,16 @@ class FirebaseIn(BaseModel):
     name: str | None = Field(default=None, max_length=60)
 
 
-@router.post("/firebase")
-def firebase_signin(body: FirebaseIn, request: Request, response: Response):
-    """Exchange a verified Firebase ID token for the app's own session."""
-    claims = firebase_auth.verify(body.id_token)
+def _firebase_account(claims: dict, role: str | None, name: str | None, via: str | None = None) -> tuple[dict, str | None]:
+    """The account a verified Firebase token signs in to, created on the first sign-in.
+    Returns it with a note when the requested side differs from the account's."""
     uid = claims.get("uid") or claims.get("sub")
     if not uid:
         raise HTTPException(401, "That sign-in couldn't be verified. Sign in again.")
     db = get_db()
     email = (claims.get("email") or "").strip().lower() or None
     verified_email = email if claims.get("email_verified") else None
-    provider = (claims.get("firebase") or {}).get("sign_in_provider", "firebase")
+    provider = via or (claims.get("firebase") or {}).get("sign_in_provider", "firebase")
     user = db.users.find_one({"firebase_uid": uid})
     if not user and verified_email:
         # An email-and-password account with the same verified email: link it, keep its role.
@@ -146,20 +149,113 @@ def firebase_signin(body: FirebaseIn, request: Request, response: Response):
     if user:
         if user.get("suspended"):
             raise HTTPException(403, "This account is suspended. Contact support if you think this is a mistake.")
-        if body.role and body.role != user["role"]:
+        if role and role != user["role"]:
             note = f"This account is a {user['role']} account. The side chosen at first sign-in can't change."
     else:
-        if not body.role:
+        if not role:
             raise HTTPException(409, "First sign-in: choose creator or brand.")
-        name = (body.name or claims.get("name") or (email or "").split("@")[0] or claims.get("phone_number") or "New member").strip()[:60]
+        name = (name or claims.get("name") or (email or "").split("@")[0] or claims.get("phone_number") or "New member").strip()[:60]
         fields = {"firebase_uid": uid, "phone": claims.get("phone_number")}
         if verified_email and not db.users.find_one({"email": verified_email}):
             fields["email"] = verified_email
-        user = au.new_user(body.role, name, **fields)
+        user = au.new_user(role, name, **fields)
         au.audit("signup", user["_id"], user["role"], via=provider)
+    return user, note
+
+
+@router.post("/firebase")
+def firebase_signin(body: FirebaseIn, request: Request, response: Response):
+    """Exchange a verified Firebase ID token for the app's own session."""
+    claims = firebase_auth.verify(body.id_token)
+    user, note = _firebase_account(claims, body.role, body.name)
+    provider = (claims.get("firebase") or {}).get("sign_in_provider", "firebase")
     out = _signed_in(request, response, user, f"firebase:{provider}")
     if note:
         out["note"] = note
+    return out
+
+
+# ------------------------------------------------------------------ creators: Instagram and YouTube
+SOCIAL_PER_HOUR = 30  # sign-in attempts per visitor IP
+
+
+def _creator_next(path: str | None) -> str | None:
+    """Where to land after an Instagram sign-in: only a page on the creator side."""
+    return path if path and (path == "/creator" or path.startswith("/creator/")) and "//" not in path else None
+
+
+@router.get("/instagram/start")
+def instagram_start(request: Request, response: Response, next_path: str | None = Query(default=None, alias="next", max_length=300)):
+    """"Continue with Instagram" (creators): the address of Instagram's official login.
+    Instagram sends the browser back to /api/connect/instagram/callback. A short-lived
+    cookie ties the sign-in to this browser; /oauth/complete checks it."""
+    if not social_signin.instagram_configured():
+        raise HTTPException(503, "Instagram sign-in isn't set up on this server (IG_APP_ID, IG_APP_SECRET, IG_REDIRECT_URI, TOKEN_ENC_KEY).")
+    ratelimit.enforce(f"igsignin:{ratelimit.client_ip(request)}", SOCIAL_PER_HOUR, 3600, "Too many sign-in attempts from here. Try again in an hour.")
+    cookie, binding = social_signin.new_binding()
+    state = ig.new_state(None, None, purpose="signin", next_path=_creator_next(next_path), binding=binding)
+    response.set_cookie(
+        social_signin.BINDING_COOKIE,
+        cookie,
+        max_age=ig.STATE_TTL + social_signin.LOGIN_CODE_TTL,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/api/auth",
+    )
+    return {"url": ig.authorize_url(state)}
+
+
+class CompleteIn(BaseModel):
+    code: str = Field(min_length=20, max_length=200)
+
+
+@router.post("/oauth/complete")
+def oauth_complete(body: CompleteIn, request: Request, response: Response):
+    """The second half of a redirect sign-in (Instagram): the one-time code the callback
+    handed the browser becomes this browser's session, on the web app's own origin."""
+    doc = social_signin.redeem_login_code(body.code, request.cookies.get(social_signin.BINDING_COOKIE))
+    response.delete_cookie(social_signin.BINDING_COOKIE, path="/api/auth")
+    user = get_db().users.find_one({"_id": doc["user_id"]})
+    if not user:
+        raise HTTPException(400, "That account no longer exists.")
+    if user.get("suspended"):
+        raise HTTPException(403, "This account is suspended. Contact support if you think this is a mistake.")
+    out = _signed_in(request, response, user, doc["via"])
+    out["next"] = doc.get("next")
+    if doc.get("note"):
+        out["note"] = doc["note"]
+    return out
+
+
+class YouTubeIn(BaseModel):
+    id_token: str = Field(min_length=20, max_length=4096)
+    # Google OAuth access token with youtube.readonly. Used once, never stored.
+    access_token: str = Field(min_length=20, max_length=4096)
+    name: str | None = Field(default=None, max_length=60)
+
+
+@router.post("/youtube")
+def youtube_signin(body: YouTubeIn, request: Request, response: Response):
+    """"Continue with YouTube" (creators): a verified Google sign-in, plus the channel that
+    Google account owns. A first sign-in creates a creator account."""
+    if not social_signin.youtube_configured():
+        raise HTTPException(503, "YouTube sign-in isn't set up on this server (Firebase and YOUTUBE_API_KEY).")
+    ratelimit.enforce(f"ytsignin:{ratelimit.client_ip(request)}", SOCIAL_PER_HOUR, 3600, "Too many sign-in attempts from here. Try again in an hour.")
+    claims = firebase_auth.verify(body.id_token)
+    # Both checks run before any account is created or changed.
+    channel = social_signin.owned_channel(body.access_token, social_signin.google_ids(claims))
+    user, note = _firebase_account(claims, "creator", body.name or (channel or {}).get("title"), via="youtube")
+    notes = [note] if note else []
+    if channel:
+        linked = social_signin.claim_channel(user, channel)
+        if linked:
+            notes.append(linked)
+    else:
+        notes.append("This Google account doesn't have a YouTube channel, so no channel was linked.")
+    out = _signed_in(request, response, user, "youtube")
+    if notes:
+        out["note"] = " ".join(notes)
     return out
 
 

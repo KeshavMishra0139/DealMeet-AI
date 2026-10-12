@@ -2,7 +2,7 @@ from fastapi import APIRouter, Response
 
 from ..config import get_settings, now_iso, today
 from ..db import db_mode, ping
-from ..services import payments, tee
+from ..services import payments, social_signin, tee
 from ..services.social import PROVIDERS
 from ..seed.catalog import CITIES, FORMATS, INCOME_TYPES, LANGS, NICHES, STAGES
 
@@ -32,7 +32,13 @@ def health(response: Response):
             "payouts": payments.payout_mode(),
             "social": social_mode(),
             "post_checks": "automatic when connected" if social_mode() != "not_connected" else "brand review (automatic checks not connected)",
-            "auth": ", ".join(["password"] + (["firebase"] if s.has_firebase else []) + (["demo"] if s.demo_mode else [])),
+            "auth": ", ".join(
+                ["password"]
+                + (["firebase"] if s.has_firebase else [])
+                + (["instagram"] if social_signin.instagram_configured() else [])
+                + (["youtube"] if social_signin.youtube_configured() else [])
+                + (["demo"] if s.demo_mode else [])
+            ),
             "tee": tee.status()["status"],  # not_configured, available or failed: never a container passed off as a TEE
         },
         "demo_mode": s.demo_mode,

@@ -17,7 +17,7 @@ from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
 from ..services import auth as au
-from ..services import cache
+from ..services import cache, social_signin
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
 
@@ -244,9 +244,11 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         raise HTTPException(422, "Unknown niche")
     db.creators.insert_one(doc)
     au.link_profile(user, cid)
+    # Signed in with Instagram or YouTube: their real numbers replace what was typed.
+    notes = social_signin.attach_pending(user, cid)
     cache.invalidate("trust:")  # per-creator scores; the trained model stays
     cache.invalidate("spam")
-    return {"id": cid, "handle": doc["handle"]}
+    return {"id": cid, "handle": doc["handle"], "notes": notes}
 
 
 class TagIn(BaseModel):

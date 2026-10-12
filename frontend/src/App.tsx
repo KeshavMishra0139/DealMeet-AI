@@ -8,6 +8,7 @@ import { isEmbedFrame } from "@/lib/session";
 
 const Landing = lazy(() => import("@/features/public/Landing"));
 const Login = lazy(() => import("@/features/public/Login"));
+const LoginComplete = lazy(() => import("@/features/public/LoginComplete"));
 const NotFound = lazy(() => import("@/features/public/NotFound"));
 const CreatorShell = lazy(() => import("@/features/creator/CreatorShell"));
 const BrandShell = lazy(() => import("@/features/brand/BrandShell"));
@@ -69,6 +70,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/login/complete" element={<LoginComplete />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
         <Route path="/worth" element={<Worth />} />
         <Route path="/brands" element={<Brands />} />

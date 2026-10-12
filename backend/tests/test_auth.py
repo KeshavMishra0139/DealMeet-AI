@@ -18,6 +18,9 @@ PUBLIC = {
     ("POST", "/api/auth/signup"),
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/firebase"),
+    ("GET", "/api/auth/instagram/start"),  # the address of Instagram's login; rate-limited per IP
+    ("POST", "/api/auth/oauth/complete"),  # proves itself with the one-time code from the callback
+    ("POST", "/api/auth/youtube"),  # proves itself with a verified Google sign-in
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/personas"),
     ("POST", "/api/auth/demo"),

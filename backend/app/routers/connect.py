@@ -10,7 +10,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
 from ..services import instagram as ig
-from ..services import ratelimit
+from ..services import ratelimit, social_signin
 from ..services.creator_ctx import load_creator
 
 router = APIRouter(prefix="/api", tags=["connect"])
@@ -45,9 +45,35 @@ def start(request: Request, json: bool = False, user: dict = Depends(au.current_
     return {"url": url} if json else RedirectResponse(url, status_code=302)
 
 
+def _signin_callback(request: Request, code: str | None, state: str | None, error: str | None, error_reason: str | None) -> RedirectResponse:
+    """"Continue with Instagram": find or create the creator account, then send the browser
+    to the web app with a one-time code that becomes its session (POST /api/auth/oauth/complete)."""
+    front = _frontend(request)
+
+    def fail(msg: str) -> RedirectResponse:
+        return RedirectResponse(f"{front}/login?role=creator&error={quote(msg)}", status_code=302)
+
+    try:
+        st = ig.consume_state(state or "", None, purpose="signin")
+    except HTTPException as e:
+        return fail(e.detail)
+    if error or not code:
+        cancelled = error_reason == "user_denied" or error == "access_denied"
+        return fail("You cancelled the Instagram login. You're not signed in." if cancelled else "Instagram didn't complete the login.")
+    try:
+        user, note = social_signin.instagram_signin(code)
+    except ig.IGError as e:
+        return fail(e.message)
+    login_code = social_signin.issue_login_code(user, "instagram", st.get("binding"), st.get("next"), note)
+    return RedirectResponse(f"{front}/login/complete?code={quote(login_code)}", status_code=302)
+
+
 @router.get("/connect/instagram/callback")
 def callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None, error_reason: str | None = None):
-    """Instagram sends the browser back here. The state proves which account started it."""
+    """Instagram sends the browser back here, for Connections and for "Continue with
+    Instagram" on the sign-in page. The state proves which flow, and which account, started it."""
+    if ig.state_purpose(state) == "signin":
+        return _signin_callback(request, code, state, error, error_reason)
     back = f"{_frontend(request)}/creator/connections"
     session_user = au.optional_user(request)
     try:
@@ -62,6 +88,8 @@ def callback(request: Request, code: str | None = None, state: str | None = None
         return RedirectResponse(f"{back}?ig=error&msg={quote('That account no longer exists.')}", status_code=302)
     try:
         grant = ig.exchange_code(code)
+        grant["ig_user_id"] = ig.identity(grant["token"])["ig_user_id"]
+        ig.claim_identity(user, grant["ig_user_id"])  # one Instagram account, one DealMeet account
         ig.save_connection(user, st["creator_id"], grant)
         au.audit("connect_instagram", user["_id"], user["role"])
     except ig.IGError as e:
