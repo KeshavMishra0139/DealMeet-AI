@@ -27,6 +27,7 @@ import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { StagePill } from "./Home";
 import { RateCards } from "./RateCards";
+import { useTerms } from "./terms";
 
 const ICONS: Record<string, typeof IndianRupee> = {
   brand: Megaphone,
@@ -101,6 +102,7 @@ function FairPriceCard({
   options: MoneyData["brand_options"];
 }) {
   const [lister, setLister] = useState(initial.lister_id ?? options[0]?.id ?? "");
+  const words = useTerms();
   const fp = useQuery({
     queryKey: ["fair", creatorId, lister],
     queryFn: () => api<FairPrice>(`/creators/${creatorId}/fair-price?lister_id=${lister}`),
@@ -116,13 +118,13 @@ function FairPriceCard({
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="fair" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              Your fair rate · per reel
+              Your fair rate · per {words.post}
             </h2>
             <p className="num mt-1 font-display text-[40px] font-semibold leading-none tracking-tight sm:text-5xl">
               <span className="text-gradient">{inrRange(data.range.low, data.range.high)}</span>
             </p>
             <p className="mt-2 text-sm text-fg-2">
-              For <span className="font-medium text-fg">{data.lister_name ?? "a typical brand in your niche"}</span>. Priced on followers alone:{" "}
+              For <span className="font-medium text-fg">{data.lister_name ?? "a typical brand in your niche"}</span>. Priced on {words.audience} alone:{" "}
               <span className="num font-medium text-fg">{inr(data.follower_price)}</span>
               {data.uplift_vs_followers && data.uplift_vs_followers > 1.2 && (
                 <span className="num"> ({data.uplift_vs_followers.toFixed(1)}x less)</span>

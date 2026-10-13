@@ -106,7 +106,9 @@ PRICE_BASIS = {
     "Estimate from Instagram data": "Price estimated from their connected Instagram data.",
     "Estimate from sample data": "Price estimated from sample data.",
     "Estimate from self-reported numbers": "Price estimated from numbers they reported.",
+    "Estimate from YouTube data": "Price estimated from their YouTube channel's public data.",
     "Estimate from your follower count": "Price estimated from their follower count.",
+    "Estimate from your subscriber count": "Price estimated from their subscriber count.",
 }
 
 

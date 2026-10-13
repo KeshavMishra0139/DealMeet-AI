@@ -90,7 +90,8 @@ def audience_fit(c: dict, lister: dict) -> dict:
     aud = c.get("audience") or {}
     ages = aud.get("age") or {}
     t_ages = target.get("ages") or []
-    age = sum(ages.get(a, 0) for a in t_ages) if t_ages else 0.7
+    # No audience data yet (a new account on a live site): ages and cities count as typical, not zero.
+    age = sum(ages.get(a, 0) for a in t_ages) if t_ages and ages else 0.7
 
     gender = 1.0
     if target.get("gender") in ("female", "male"):
@@ -107,7 +108,7 @@ def audience_fit(c: dict, lister: dict) -> dict:
     t_regions = set(target.get("regions") or [])
     region_ok = 1.0 if not t_regions or _region(c) in t_regions else 0.0
     t_cities = set(target.get("cities") or [])
-    city_share = sum(x["share"] for x in aud.get("cities") or [] if x["name"] in t_cities) if t_cities else 0.5
+    city_share = sum(x["share"] for x in aud.get("cities") or [] if x["name"] in t_cities) if t_cities and aud.get("cities") else 0.5
     geo = 0.5 * region_ok + 0.5 * clamp(city_share / 0.5, 0, 1)
 
     niche = niche_affinity(c["niche"], lister.get("niches") or [])
@@ -122,9 +123,11 @@ def audience_fit(c: dict, lister: dict) -> dict:
         reasons.append(f"Adjacent niche ({label}) to what {lister['name']} targets")
     else:
         cautions.append(f"{NICHES[c['niche']]['label']} is outside {possessive(lister['name'])} categories")
-    if t_ages:
+    if t_ages and ages:
         pct = round(parts["age"] * 100)
         (reasons if pct >= 60 else cautions).append(f"{pct_text(pct)} of the audience is in the target ages ({', '.join(t_ages)})")
+    elif t_ages:
+        cautions.append("Audience ages aren't known yet, so they count as typical")
     if t_langs:
         pct = round(language * 100)
         shared = [k for k, v in sorted(a_langs.items(), key=lambda kv: -kv[1]) if k in t_langs and k in LANGS]
@@ -172,8 +175,8 @@ def listing_fit(c: dict, listing: dict, lister: dict) -> dict:
     eligible = c.get("followers", 0) >= min_f
     if not eligible:
         score *= 0.6
-        base["cautions"].append(f"Listing asks for {min_f:,}+ followers")
+        base["cautions"].append(f"Listing asks for {min_f:,}+ followers or subscribers")
     if metrics.has_reels(c) and metrics.reach_ratio(c) > 2:
-        base["reasons"].append(f"Reels reach about {metrics.reach_ratio(c):.0f}x the follower count")
+        base["reasons"].append(f"{metrics.post_noun(c).capitalize()}s reach about {metrics.reach_ratio(c):.0f}x the {metrics.audience_noun(c)[:-1]} count")
     base.update({"fit": round(score, 3), "score": int(round(score * 100)), "eligible": eligible, "speaks": speaks})
     return base

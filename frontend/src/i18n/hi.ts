@@ -57,6 +57,7 @@ export const hi: Dict = {
   "durable.firstStream": "आपका पहला ज़रिया",
   "durable.nextStream": "अगला ज़रिया जो जोड़ें",
   "rate.fairPerReel": "प्रति रील सही रेट",
+  "rate.fairPerReelYt": "हर वीडियो का सही रेट",
   "rate.forBrand": "{brand} के लिए",
   "rate.typical": "आपकी आम डील",
   "rate.fairOnReach": "पहुँच के हिसाब से सही",

@@ -59,6 +59,8 @@ export interface Reel {
 }
 
 export interface Creator {
+  /** The words for this creator's posts and audience: videos and subscribers on YouTube. */
+  terms?: { platform: "youtube" | "instagram"; post: string; posts: string; audience: string };
   id: string;
   handle: string;
   name: string;

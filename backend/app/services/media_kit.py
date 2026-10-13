@@ -53,6 +53,9 @@ TEXT = {
         "reel": "1 reel",
         "reel_stories": "1 reel + 2 stories",
         "bundle": "2-reel bundle",
+        "video": "1 video",
+        "video_shorts": "1 video + 2 Shorts",
+        "bundle_video": "2-video bundle",
         "audience": "Mostly {age} ({age_pct}%), {women}% women, top cities {cities}.",
         "safe": "Brand safety: no concerns found.",
         "unsafe": "Brand safety: {label}; {fix}",
@@ -67,6 +70,9 @@ TEXT = {
         "reel": "1 रील",
         "reel_stories": "1 रील + 2 स्टोरी",
         "bundle": "2 रील्स का बंडल",
+        "video": "1 वीडियो",
+        "video_shorts": "1 वीडियो + 2 Shorts",
+        "bundle_video": "2 वीडियो का बंडल",
         "audience": "ज़्यादातर {age} ({age_pct}%), {women}% महिलाएँ, टॉप शहर {cities}।",
         "safe": "ब्रैंड सेफ़्टी: कोई चिंता नहीं मिली।",
         "unsafe": "ब्रैंड सेफ़्टी: ध्यान दें, {label}।",
@@ -109,10 +115,12 @@ def _copy(c: dict, pub: dict, lang: Lang) -> tuple[KitCopy, str]:
     ratio = metrics.reach_ratio(c) if has else 0
     # Only cite the best format when its label is real data, not simulated.
     best = metrics.by_topic(c)[0]["topic"] if has and metrics.by_topic(c) and metrics.prov(c, "reels.0.topic") != "simulated" else None
+    yt = metrics.platform(c) == "youtube"
+    posts, audience = f"{metrics.post_noun(c)}s", metrics.audience_noun(c)
     facts = (
-        f"Niche: {niche_en}. Languages: {langs_en}. "
-        + (f"Followers: {short(c.get('followers', 0))}. " if pub["stats"] else "")
-        + (f"Median views of last 6 reels: {short(metrics.median_views(c))}. Reach ratio: about {ratio:.0f}x followers. Best format: {best}. " if has else "")
+        f"Niche: {niche_en}. Languages: {langs_en}. Platform: {'YouTube' if yt else 'Instagram'}. "
+        + (f"{audience.capitalize()}: {short(c.get('followers', 0))}. " if pub["stats"] else "")
+        + (f"Median views of last 6 {posts}: {short(metrics.median_views(c))}. Reach ratio: about {ratio:.0f}x {audience}. Best format: {best}. " if has else "")
         + (f"City: {c.get('city')}." if c.get("city") else f"Region: {c.get('region')}.")
     )
 
@@ -121,14 +129,15 @@ def _copy(c: dict, pub: dict, lang: Lang) -> tuple[KitCopy, str]:
 
         def fallback() -> KitCopy:
             head = f"{langs} में {niche}"
+            hp, ha = ("वीडियो", "सब्सक्राइबर्स") if yt else ("रील्स", "फ़ॉलोअर्स")
             if has and ratio >= 2:
-                head += f", फ़ॉलोअर्स से करीब {ratio:.0f} गुना पहुँच"
-            bio = f"{langs} में {niche} रील्स।"
+                head += f", {ha} से करीब {ratio:.0f} गुना पहुँच"
+            bio = f"{langs} में {niche} {hp}।"
             if has:
-                bio += f" हाल की रील्स के मीडियन व्यूज़ {short(metrics.median_views(c))} हैं।"
+                bio += f" हाल के {hp} के मीडियन व्यूज़ {short(metrics.median_views(c))} हैं।"
             if best:
                 bio += f" दर्शकों को सबसे ज़्यादा {best} पसंद आता है।"
-            bio += " ब्रैंड रील्स, कलेक्टिव्स और लंबी पार्टनरशिप के लिए DealMeet एस्क्रो के ज़रिए उपलब्ध।"
+            bio += f" ब्रैंड {hp}, कलेक्टिव्स और लंबी पार्टनरशिप के लिए DealMeet एस्क्रो के ज़रिए उपलब्ध।"
             return KitCopy(headline=head, bio=bio)
 
         prompt = (
@@ -138,18 +147,18 @@ def _copy(c: dict, pub: dict, lang: Lang) -> tuple[KitCopy, str]:
         )
         return generate("media_kit_copy_hi", prompt, KitCopy, fallback, facts=facts, max_tokens=500)
 
-    noun = niche_en if niche_en.lower().endswith("edits") else f"{niche_en} reels"
+    noun = niche_en if niche_en.lower().endswith("edits") else f"{niche_en} {posts}"
 
     def fallback_en() -> KitCopy:
         head = f"{niche_en} in {langs_en}"
         if has and ratio >= 2:
-            head += f", reaching about {ratio:.0f}x the follower count"
+            head += f", reaching about {ratio:.0f}x the {audience[:-1]} count"
         bio = f"{noun} in {langs_en}."
         if has:
-            bio += f" Recent reels have a median of {short(metrics.median_views(c))} views."
+            bio += f" Recent {posts} have a median of {short(metrics.median_views(c))} views."
         if best:
             bio += f" {best} is the format audiences respond to most."
-        bio += " Available for brand reels, collectives and long-term partnerships through DealMeet escrow."
+        bio += f" Available for brand {posts}, collectives and long-term partnerships through DealMeet escrow."
         return KitCopy(headline=head, bio=bio)
 
     prompt = (
@@ -215,11 +224,19 @@ def build_kit(c: dict, lang: Lang = "en") -> dict:
             from_rate = min(r["amount"] for r in saved)
         else:
             brand = best_fit_brand(c)
-            packages = [
-                ("reel", None),
-                ("reel_stories", {"deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}]}),
-                ("bundle", {"deliverables": [{"kind": "reel", "count": 2}]}),
-            ]
+            packages = (
+                [  # a YouTube creator's own formats
+                    ("video", {"deliverables": [{"kind": "video", "count": 1}]}),
+                    ("video_shorts", {"deliverables": [{"kind": "video", "count": 1}, {"kind": "short", "count": 2}]}),
+                    ("bundle_video", {"deliverables": [{"kind": "video", "count": 2}]}),
+                ]
+                if metrics.platform(c) == "youtube"
+                else [
+                    ("reel", None),
+                    ("reel_stories", {"deliverables": [{"kind": "reel", "count": 1}, {"kind": "story", "count": 2}]}),
+                    ("bundle", {"deliverables": [{"kind": "reel", "count": 2}]}),
+                ]
+            )
             rate_rows = []
             for key, terms in packages:
                 fp = fair_price(c, brand, terms, with_model=False)

@@ -92,6 +92,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `SESSION_HOURS` | How long a sign-in lasts | 72 |
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
 | `DEMO_RESET_MINUTES` | On a shared URL, put the demo data back to its seeded state every N minutes (skipped while someone changed something in the last 5 minutes). The Docker image sets 30 | Never resets on its own |
+| `REMOVE_SAMPLE_DATA` | With `DEMO_MODE=0`, `1` removes sample creators, brands, campaigns, deals and demo accounts left in the database from demo mode, at start. Real accounts stay; safe to leave on | Sample records left from demo mode stay in the database |
 | `AI_MAX_CALLS_PER_HOUR` | Cap on live AI calls across all visitors; beyond it, templates are used | 100 |
 | `TEE_ENDPOINT`, `TEE_TRUST_ROOT`, `TEE_MEASUREMENTS`, `TEE_ATTESTATION_MAX_AGE_S` | Protected computation in an AWS Nitro enclave, accepted only when its attestation verifies against the trust root and PCR policy ([details](#protected-computation-tee-status-and-fallback)) | TEE status `not_configured`; the audience overlap runs on the server from minimised data, and says so |
 

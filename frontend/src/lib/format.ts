@@ -71,6 +71,7 @@ export function timeOfDay(iso: string) {
 
 const DELIVERABLES: Record<string, [string, string]> = {
   reel: ["reel", "reels"],
+  video: ["video", "videos"],
   short: ["short", "shorts"],
   story: ["story", "stories"],
   carousel: ["carousel", "carousels"],

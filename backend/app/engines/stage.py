@@ -38,27 +38,27 @@ def detect(c: dict, fair: dict | None) -> dict:
         key = "growing"
     label, line = STAGES[key]
 
-    reasons, inputs = [], [inp("Followers", short(followers), metrics.prov(c, "followers"))]
+    reasons, inputs = [], [inp(metrics.audience_noun(c).capitalize(), short(followers), metrics.prov(c, "followers"))]
     if key == "underpriced" and fair:
         ratio = metrics.reach_ratio(c)
         reasons = [
-            f"Your last 6 reels averaged about {ratio:.0f}x your followers in views.",
-            f"Your typical deal is {inr(rate)}, but your reach supports {inr_range(fair['range']['low'], fair['range']['high'])} a reel.",
+            f"Your last 6 {metrics.post_noun(c)}s averaged about {ratio:.0f}x your {metrics.audience_noun(c)} in views.",
+            f"Your typical deal is {inr(rate)}, but your reach supports {inr_range(fair['range']['low'], fair['range']['high'])} a {metrics.post_noun(c)}.",
         ]
         if c.get("best_deal"):
             reasons.append(f"Your best deal ({inr(c['best_deal'])}) shows brands will pay more when they see the value.")
         inputs += [
-            inp("Average views, last 6 reels", short(metrics.mean_views(c)), metrics.prov(c, "reels.0.views")),
+            inp(f"Average views, last 6 {metrics.post_noun(c)}s", short(metrics.mean_views(c)), metrics.prov(c, "reels.0.views")),
             inp("Typical deal", inr(rate), metrics.prov(c, "current_rate")),
         ]
     elif key == "starting":
         reasons = [
-            "No income recorded yet and under 10K followers.",
-            "At this stage, consistency and one first income stream matter more than follower count.",
+            f"No income recorded yet and under 10K {metrics.audience_noun(c)}.",
+            f"At this stage, consistency and one first income stream matter more than {metrics.audience_noun(c)[:-1]} count.",
         ]
     elif key == "expert_first":
         reasons = [
-            f"You have expertise ({c.get('expertise')}) but under 1K followers.",
+            f"You have expertise ({c.get('expertise')}) but under 1K {metrics.audience_noun(c)}.",
             "Services and digital products can earn before an audience exists.",
         ]
     elif key == "fair" and fair:

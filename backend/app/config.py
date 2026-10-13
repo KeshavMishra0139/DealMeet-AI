@@ -167,8 +167,10 @@ def get_settings() -> Settings:
 
 
 def today() -> date:
-    """The demo's 'today'. Fixed so seeded deadlines and reel dates stay consistent."""
-    return get_settings().demo_today
+    """In demo mode, the demo's fixed 'today', so seeded deadlines and reel dates stay
+    consistent. On a live site (DEMO_MODE=0), the real date in India."""
+    s = get_settings()
+    return s.demo_today if s.demo_mode else datetime.now(IST).date()
 
 
 _BOOT_DATE = datetime.now(IST).date()
@@ -178,6 +180,8 @@ def now() -> datetime:
     """Demo date combined with the real time of day (IST). Days that pass while the
     server runs still count, so timestamps keep increasing after midnight."""
     real = datetime.now(IST)
+    if not get_settings().demo_mode:
+        return real  # a live site runs on the real clock
     d = today() + (real.date() - _BOOT_DATE)
     return real.replace(year=d.year, month=d.month, day=d.day)
 

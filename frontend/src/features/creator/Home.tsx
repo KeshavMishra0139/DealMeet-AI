@@ -118,7 +118,7 @@ export default function Home() {
             <DurableCard durable={durable} label={t("home.durable")} />
           </StaggerItem>
           <StaggerItem>
-            <RateGapCard gap={rate_gap} label={t("home.rateGap")} />
+            <RateGapCard gap={rate_gap} label={t("home.rateGap")} youtube={yt} />
           </StaggerItem>
           <StaggerItem>
             <PipelineCard pipeline={pipeline} label={t("home.pipeline")} />
@@ -248,14 +248,14 @@ function DurableCard({ durable, label }: { durable: Durable; label: string }) {
   );
 }
 
-function RateGapCard({ gap, label }: { gap: RateGap; label: string }) {
+function RateGapCard({ gap, label, youtube }: { gap: RateGap; label: string; youtube: boolean }) {
   const { t, pick } = useI18n();
   const max = Math.max(gap.fair.high, gap.current ?? 0, gap.follower_price);
   const bar = (v: number) => `${Math.max(4, (v / max) * 100)}%`;
   return (
     <CardShell title={label} why={<WhyPopover why={gap.why} subject={label} />}>
       <p className="mt-3 text-xs text-muted">
-        {t("rate.fairPerReel")}
+        {t(youtube ? "rate.fairPerReelYt" : "rate.fairPerReel")}
         {gap.brand ? ` · ${t("rate.forBrand", { brand: gap.brand })}` : ""}
       </p>
       <p className="num font-display text-[28px] font-semibold leading-tight tracking-tight">{inrRange(gap.fair.low, gap.fair.high)}</p>

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -73,6 +74,12 @@ async def lifespan(_: FastAPI):
     db = get_db()
     if settings.demo_mode:
         seed_all(db)
+    elif os.getenv("REMOVE_SAMPLE_DATA", "").strip().lower() in ("1", "true", "yes", "on"):
+        # A live site: sample creators, brands, campaigns and demo accounts left from demo
+        # mode are removed at start. Real accounts stay. Safe to leave on.
+        from .seed.load import remove_sample
+
+        remove_sample(db)
     _warm_models()
     # Creators saved before brand search existed get their measured reach.
     from .services import reach

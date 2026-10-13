@@ -76,14 +76,14 @@ def g_raise_rate(c, ctx):
         "S",
         why(
             [
-                f"Your last 6 reels averaged {short(metrics.mean_views(c))} views on {short(c['followers'])} followers: about {ratio:.0f}x.",
-                f"Your typical deal is {inr(rate)}, which is roughly {inr(c['followers'] * 0.33)} at follower rates.",
+                f"Your last 6 {metrics.post_noun(c)}s averaged {short(metrics.mean_views(c))} views on {short(c['followers'])} {metrics.audience_noun(c)}: about {ratio:.0f}x.",
+                f"Your typical deal is {inr(rate)}, which is roughly {inr(c['followers'] * 0.33)} at {metrics.audience_noun(c)[:-1]} rates.",
                 f"Priced on reach, a well-fitting brand like {fair['lister_name'] or 'yours'} should pay {inr_range(fair['range']['low'], fair['range']['high'])}.",
             ]
             + ([f"Your best deal ({inr(c['best_deal'])}) shows brands will pay more when they see the value."] if c.get("best_deal") else []),
             [
-                inp("Average views, last 6 reels", short(metrics.mean_views(c)), metrics.prov(c, "reels.0.views")),
-                inp("Followers", short(c["followers"]), metrics.prov(c, "followers")),
+                inp(f"Average views, last 6 {metrics.post_noun(c)}s", short(metrics.mean_views(c)), metrics.prov(c, "reels.0.views")),
+                inp(metrics.audience_noun(c).capitalize(), short(c["followers"]), metrics.prov(c, "followers")),
                 inp("Typical deal", inr(rate), metrics.prov(c, "current_rate")),
                 inp("Fair price", inr_range(fair["range"]["low"], fair["range"]["high"])),
             ],
@@ -326,12 +326,12 @@ def fb_real_numbers(c, ctx):
         "real_numbers",
         "growth",
         "Link your YouTube channel" if link else "Add your average views",
-        "Your price and moves use an estimate from your follower count. Your real views make them fit you.",
+        f"Your price and moves use an estimate from your {metrics.audience_noun(c)[:-1]} count. Your real views make them fit you.",
         estimate(fair["range"]["low"], fair["range"]["high"], "inr", "deal", ["Your fair price per post today, from that estimate: real views can move it either way"], "low"),
         "S",
         why(
-            [f"Priced on about {short(metrics.median_views(c))} views a post, estimated from {short(c.get('followers', 0))} followers.", "Moves like posting more of what works need your real views."],
-            [inp("Followers", short(c.get("followers", 0)), metrics.prov(c, "followers"))],
+            [f"Priced on about {short(metrics.median_views(c))} views a post, estimated from {short(c.get('followers', 0))} {metrics.audience_noun(c)}.", "Moves like posting more of what works need your real views."],
+            [inp(metrics.audience_noun(c).capitalize(), short(c.get("followers", 0)), metrics.prov(c, "followers"))],
             title="Why your real numbers",
         ),
         {"label": "Link your channel", "to": "/creator/connections"} if link else {"label": "Add your views", "to": "/creator/profile"},
@@ -361,7 +361,11 @@ def fb_share_kit(c, ctx):
 
 
 def fb_dream_brands(c, ctx):
-    if get_db().wishlists.count_documents({"creator_id": c["_id"]}) >= 3:
+    from ..services.directory import VISIBLE
+
+    db = get_db()
+    # Only when there are brands to save (a new live site may have none yet).
+    if db.wishlists.count_documents({"creator_id": c["_id"]}) >= 3 or db.brands.count_documents(VISIBLE) < 3:
         return None
     fair, noun = ctx["fair"], metrics.post_noun(c)
     return _move(
@@ -378,7 +382,29 @@ def fb_dream_brands(c, ctx):
     )
 
 
-FALLBACKS = [fb_steady_pace, fb_real_numbers, fb_share_kit, fb_dream_brands]
+def fb_profile(c, ctx):
+    """The first unfinished item of the profile brands search and read."""
+    from ..services.profile import completeness
+
+    todo = next((i for i in completeness(c)["items"] if not i["done"]), None)
+    if not todo:
+        return None
+    fair, noun = ctx["fair"], metrics.post_noun(c)
+    return _move(
+        "finish_profile",
+        "opportunity",
+        f"Finish your profile: {todo['label'].lower()}",
+        todo["fix"],
+        estimate(fair["range"]["low"], fair["range"]["high"], "inr", "deal", [f"If a brand finds you in search and books one {noun} at your fair price"], "low"),
+        "S",
+        why(["Brands search creators by niche, city, language and reach.", "A complete profile shows them what they need to say yes."], title="Why finish your profile"),
+        {"label": "Open your profile", "to": "/creator/profile"},
+        0.24,
+        hi=hindi.move("finish_profile"),
+    )
+
+
+FALLBACKS = [fb_steady_pace, fb_real_numbers, fb_share_kit, fb_dream_brands, fb_profile]
 
 
 # Follow-ups, chosen by last week's outcomes.
@@ -406,11 +432,11 @@ def f_bundle(c, ctx, prev):
     return _move(
         "bundle_offer",
         "money",
-        f"Offer a 2-reel bundle at {inr_range(lo, hi)} instead of cutting your rate",
+        f"Offer a 2-{metrics.post_noun(c)} bundle at {inr_range(lo, hi)} instead of cutting your rate",
         "Brands that balk at one higher price often say yes to more value per rupee.",
         estimate(lo * 0.4, hi * 0.8, "inr", "month", ["One brand in three takes the bundle"], "low"),
         "S",
-        why(["Last week's rate raise was turned down.", "A bundle keeps your per-reel rate intact."], title="Why a bundle"),
+        why(["Last week's rate raise was turned down.", f"A bundle keeps your per-{metrics.post_noun(c)} rate intact."], title="Why a bundle"),
         {"label": "See your price breakdown", "to": "/creator/money"},
         0.9,
         follow_up_of="raise_rate",

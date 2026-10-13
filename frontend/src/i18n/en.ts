@@ -55,6 +55,7 @@ export const en = {
   "durable.firstStream": "Your first stream",
   "durable.nextStream": "Next stream to add",
   "rate.fairPerReel": "Fair rate per reel",
+  "rate.fairPerReelYt": "Fair rate per video",
   "rate.forBrand": "for {brand}",
   "rate.typical": "Your typical deal",
   "rate.fairOnReach": "Fair, on reach",

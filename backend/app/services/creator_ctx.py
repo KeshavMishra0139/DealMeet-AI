@@ -53,7 +53,7 @@ def rate_gap(c: dict, fair: dict) -> dict:
     if rate:
         gap = mid - rate
         line = (
-            f"You're leaving about {inr(gap)} on each brand reel." if gap > 0 else "Your rate is in line with your reach."
+            f"You're leaving about {inr(gap)} on each brand {metrics.post_noun(c)}." if gap > 0 else "Your rate is in line with your reach."
         )
     else:
         gap = None
@@ -69,13 +69,13 @@ def rate_gap(c: dict, fair: dict) -> dict:
         "brand": fair["lister_name"],
         "why": why(
             [
-                f"Fair price for {fair['lister_name'] or 'a well-fitting brand'}: {inr_range(lo, hi)} a reel, priced on {short(metrics.median_views(c))} median views.",
-                f"Priced on followers alone it would be about {inr(fp)}.",
+                f"Fair price for {fair['lister_name'] or 'a well-fitting brand'}: {inr_range(lo, hi)} a {metrics.post_noun(c)}, priced on {short(metrics.median_views(c))} median views.",
+                f"Priced on {metrics.audience_noun(c)} alone it would be about {inr(fp)}.",
             ]
             + ([f"Your typical deal is {inr(rate)}."] if rate else []),
             [
                 inp("Typical deal", inr(rate) if rate else "Not set", metrics.prov(c, "current_rate") if rate else None),
-                inp("Follower-based price", inr(fp)),
+                inp(f"{metrics.audience_noun(c)[:-1].capitalize()}-based price", inr(fp)),
             ],
             metrics.fields_simulated(c, "current_rate") if rate else [],
             title="How we worked out your rate gap",

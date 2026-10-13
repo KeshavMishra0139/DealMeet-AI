@@ -182,3 +182,25 @@ def test_fallback_moves_have_hindi_copy_and_no_promises(client, db):
         if m:
             text = " ".join([m["title"], m["reason"], m["hi"]["title"], m["hi"]["reason"], *m["impact"]["assumptions"]])
             assert m["hi"]["title"] and not any(rx.search(text) for rx in rules), m["kind"]
+
+
+def test_removing_sample_data_keeps_real_accounts(client, youtube, db):
+    from app.seed.load import remove_sample
+
+    a, cid = _new_creator(client, db, channel=CHANNEL)
+    a.get(f"/api/creators/{cid}/home")
+    # A real creator's application to a sample campaign goes with the sample brand.
+    db.applications.insert_one({"_id": "ap_real", "creator_id": cid, "lister_id": "br_senpai", "listing_id": "ls_x"})
+    removed = remove_sample(db)
+    assert removed["creators"] >= 50 and removed["brands"] >= 20 and removed["users"] >= 50
+    assert db.creators.count_documents({}) == 1 and db.creators.find_one({"_id": cid})["followers"] == 21_300
+    assert db.brands.count_documents({}) == 0 and db.listings.count_documents({}) == 0 and db.deals.count_documents({}) == 0
+    assert db.posts.count_documents({"creator_id": cid}) == 10 and db.plans.count_documents({"creator_id": cid}) == 1
+    assert db.applications.count_documents({}) == 0
+    assert db.users.count_documents({"seeded": True}) == 0 and a.get(f"/api/creators/{cid}/home").status_code == 200
+    # A live site with no brands yet still gets a full week of moves, none about brands that aren't there.
+    moves = a.get(f"/api/creators/{cid}/home").json()["plan"]["moves"]
+    db.plans.delete_many({"creator_id": cid})
+    moves = a.get(f"/api/creators/{cid}/home").json()["plan"]["moves"]
+    assert len(moves) == 3 and "dream_brands" not in {m["kind"] for m in moves}
+    assert remove_sample(db) == {}  # safe to repeat

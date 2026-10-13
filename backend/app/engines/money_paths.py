@@ -86,7 +86,7 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
     paths.append(
         {
             "type": "brand",
-            "title": "Brand reels at your fair rate" if underpriced else "Brand collaborations",
+            "title": f"Brand {metrics.post_noun(c)}s at your fair rate" if underpriced else "Brand collaborations",
             "fit": brand_fit,
             "effort": "S" if dpm else "M",
             "estimate": estimate(
@@ -97,7 +97,7 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                 [
                     f"{lo_d:.1f} to {hi_d:.1f} brand deals a month"
                     + (f" (you averaged {dpm:.1f} over the last 6 months)" if dpm else ""),
-                    f"Each at your fair rate of {inr_range(per['low'], per['high'])} a reel",
+                    f"Each at your fair rate of {inr_range(per['low'], per['high'])} a {metrics.post_noun(c)}",
                 ],
                 "medium" if dpm else "low",
             ),
@@ -107,9 +107,9 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                     f"You're quoting about {inr(rate)}; your reach supports {inr_range(per['low'], per['high'])}.",
                 ]
                 if underpriced
-                else [f"Your reels reach about {short(metrics.median_views(c))} people, which brands pay for."]
+                else [f"Your {metrics.post_noun(c)}s reach about {short(metrics.median_views(c))} people, which brands pay for."]
                 if not expert_first
-                else ["With under 1K followers, brand budgets will be small for now. Your expertise earns sooner."]
+                else [f"With under 1K {metrics.audience_noun(c)}, brand budgets will be small for now. Your expertise earns sooner."]
             ),
             "first_step": "Quote your fair rate with the price breakdown" if underpriced else "Share your media kit with 3 matched brands",
             "simulated": metrics.fields_simulated(c, "income_history", "current_rate") if dpm else [],
@@ -134,7 +134,7 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                     f"Your audience already watches {label}; {product} fits what you post.",
                     "Recurring income that doesn't depend on landing the next brand deal.",
                 ],
-                "first_step": f"Add the {owner.get('name')} link to your bio and pin it on your next reel",
+                "first_step": f"Add the {owner.get('name')} link to your bio and pin it on your next {metrics.post_noun(c)}",
                 "listing_id": aff["_id"],
                 "simulated": [],
             }
@@ -282,8 +282,8 @@ def build(c: dict, fair_any: dict, opps: list[dict]) -> list[dict]:
                 "fit": 0.5,
                 "effort": "S",
                 "estimate": estimate(est["low"] * 0.5, est["high"] * 2, "inr", "month", ["Half a feature to 2 features a month", f"{inr_range(est['low'], est['high'])} per feature"], "low"),
-                "reasons": [f"{best['lister']['name']} pays for features and credits you, which also brings followers."],
-                "first_step": f"Send a reel to {best['lister']['name']}",
+                "reasons": [f"{best['lister']['name']} pays for features and credits you, which also brings {metrics.audience_noun(c)}."],
+                "first_step": f"Send a {metrics.post_noun(c)} to {best['lister']['name']}",
                 "listing_id": best["id"],
                 "simulated": [],
             }

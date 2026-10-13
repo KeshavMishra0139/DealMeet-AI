@@ -76,7 +76,7 @@ def facts_for(c: dict, intent: str) -> tuple[list[dict], dict]:
     """The facts an answer may use, with their sources, plus raw values for templates."""
     reels_src = source_of(c, "reels")
     raw: dict = {"trend": views_trend(c)}
-    facts = [_fact("followers", "Followers", short(c.get("followers") or 0), source_of(c, "followers"))]
+    facts = [_fact("followers", metrics.audience_noun(c).capitalize(), short(c.get("followers") or 0), source_of(c, "followers"))]
     if metrics.has_reels(c):
         facts.append(_fact("median_views", "Median views, last 6 posts", short(metrics.median_views(c)), reels_src))
     t = raw["trend"]
@@ -86,7 +86,7 @@ def facts_for(c: dict, intent: str) -> tuple[list[dict], dict]:
         ctx = cc.build(c, with_plan=False)
         fair = ctx["fair"]
         raw["fair"] = fair
-        facts.append(_fact("fair", "Fair rate per reel (estimate)", inr_range(fair["range"]["low"], fair["range"]["high"]), fair.get("data_source", reels_src)))
+        facts.append(_fact("fair", f"Fair rate per {metrics.post_noun(c)} (estimate)", inr_range(fair["range"]["low"], fair["range"]["high"]), fair.get("data_source", reels_src)))
         if c.get("current_rate"):
             facts.append(_fact("rate", "Your typical rate", inr(c["current_rate"]), source_of(c, "current_rate")))
     if intent in ("earnings", "general"):
@@ -122,13 +122,13 @@ def _template(intent: str, c: dict, raw: dict) -> CoachAnswer:
     )
     uncertain = "Views swing a lot from post to post, and 6 posts is a small sample." if t["enough"] else "With fewer than 6 posts, any trend would be a guess."
     if intent == "trend":
-        nxt = ["Post at least 2 reels this week so there's more to compare."] if not t["enough"] else ["Repeat the format of your best recent post and compare next week."]
+        nxt = [f"Post at least 2 {metrics.post_noun(c)}s this week so there's more to compare."] if not t["enough"] else ["Repeat the format of your best recent post and compare next week."]
         return CoachAnswer(answer=trend_line, uncertain=uncertain, next_steps=nxt)
     if intent == "price":
         f = raw["fair"]
         rate = f" Your typical rate is {inr(c['current_rate'])}." if c.get("current_rate") else ""
         return CoachAnswer(
-            answer=f"Your fair rate is about {inr_range(f['range']['low'], f['range']['high'])} a reel ({f.get('data_label', 'estimate').lower()}), priced on your median views, not your followers.{rate}",
+            answer=f"Your fair rate is about {inr_range(f['range']['low'], f['range']['high'])} a {metrics.post_noun(c)} ({f.get('data_label', 'estimate').lower()}), priced on your median views, not your {metrics.audience_noun(c)}.{rate}",
             uncertain="It's an estimate: the brand's budget, deliverables and usage rights change the final number.",
             next_steps=["Open Money to see each step of the price.", "Counter low offers at the fair rate, with its reasons."],
         )
@@ -154,7 +154,7 @@ def _template(intent: str, c: dict, raw: dict) -> CoachAnswer:
         )
     parts = [trend_line]
     if raw.get("fair"):
-        parts.append(f"Your fair rate is about {inr_range(raw['fair']['range']['low'], raw['fair']['range']['high'])} a reel.")
+        parts.append(f"Your fair rate is about {inr_range(raw['fair']['range']['low'], raw['fair']['range']['high'])} a {metrics.post_noun(c)}.")
     if raw.get("opportunities") is not None:
         parts.append(f"{len(raw['opportunities'])} top opportunities fit you now.")
     return CoachAnswer(answer=" ".join(parts), uncertain=uncertain, next_steps=["Ask about views, pricing, earnings, brands or deals."])

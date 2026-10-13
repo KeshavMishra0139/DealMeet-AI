@@ -66,7 +66,9 @@ const DAYS = [0, 15, 30, 60, 90];
 export function RateCards({ creatorId }: { creatorId: string }) {
   const qc = useQueryClient();
   const rates = useQuery({ queryKey: ["rates", creatorId], queryFn: () => api<RatesOut>(`/creators/${creatorId}/rates`) });
-  const [format, setFormat] = useState<Format>("reel");
+  const [picked, setFormat] = useState<Format | null>(null);
+  // The creator's own platform's first format until they pick one (a Short on YouTube).
+  const format: Format = picked ?? rates.data?.formats[0]?.key ?? "reel";
   const [count, setCount] = useState(1);
   const [usage, setUsage] = useState(0);
   const [excl, setExcl] = useState(0);

@@ -88,6 +88,36 @@ def _with_profiles(listers: list[dict], listings: list[dict]) -> tuple[list[dict
     return brands, out
 
 
+# Fields that tie a record to a creator or a brand, across collections.
+OWNER_FIELDS = ("creator_id", "brand_id", "owner_id", "lister_id", "to")
+
+
+def remove_sample(db) -> dict:
+    """Removes every sample record for a live site: records marked synthetic, the seeded
+    demo accounts and their sessions, and anything tied to a sample creator or brand
+    (plans, notifications, applications, deals...). Real accounts and their own data
+    stay. Safe to repeat. Returns what was removed, per collection."""
+    creator_ids = [c["_id"] for c in all_creators()]
+    brand_ids = [b["_id"] for b in LISTERS]
+    sample_ids = creator_ids + brand_ids
+    removed: dict[str, int] = {}
+    for name in COLLECTIONS:
+        if name == "ai_cache":
+            continue
+        q: dict = {"$or": [{"source": SYNTHETIC}] + [{f: {"$in": sample_ids}} for f in OWNER_FIELDS]}
+        if name in ("creators", "brands"):
+            q["$or"].append({"_id": {"$in": sample_ids}})
+        n = db[name].delete_many(q).deleted_count
+        if n:
+            removed[name] = n
+    users = [u["_id"] for u in db.users.find({"seeded": True}, {"_id": 1})]
+    if users:
+        removed["sessions"] = db.sessions.delete_many({"user_id": {"$in": users}}).deleted_count
+        removed["users"] = db.users.delete_many({"_id": {"$in": users}}).deleted_count
+    log.info("Removed sample data: %s", removed)
+    return removed
+
+
 def seed_users(db, creators: list[dict], drop_sandbox_accounts: bool = True) -> None:
     """One demo account per seeded creator and lister, with stable ids so sessions
     survive a reset. In demo mode, accounts made during the demo (new personas, guest

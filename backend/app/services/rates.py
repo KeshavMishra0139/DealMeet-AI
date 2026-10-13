@@ -260,7 +260,9 @@ def kit_rates(c: dict, lang: str = "en") -> list[dict]:
 def formats_view(c: dict) -> list[dict]:
     """Every format, and whether it can be estimated now."""
     out = []
-    for key, spec in FORMATS.items():
+    # The creator's own platform first: YouTube formats lead for a YouTube creator.
+    youtube_first = metrics.platform(c) == "youtube"
+    for key, spec in sorted(FORMATS.items(), key=lambda kv: youtube_first and not kv[1]["family"].startswith("youtube")):
         available, reason = True, None
         if spec["family"] == "youtube_long" and not (c.get("channels") or {}).get("youtube"):
             available, reason = False, "Link your YouTube channel to estimate this."

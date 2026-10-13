@@ -180,7 +180,7 @@ def skills(c: dict, stage_id: str, paths: list[dict]) -> list[dict]:
     if stage_id == "underpriced":
         out.append(("Pricing and negotiation", "Quote from your price breakdown and hold your rate once.", "You're quoting well below what your reach supports."))
     if "Basic editing" in (c.get("skill_gaps") or []):
-        out.append(("Basic editing: cuts, captions, a first-second hook", "Learn jump cuts and auto-captions in a free phone editor (2 hours).", "Tighter reels keep people watching past the first second."))
+        out.append(("Basic editing: cuts, captions, a first-second hook", "Learn jump cuts and auto-captions in a free phone editor (2 hours).", f"Tighter {metrics.post_noun(c)}s keep people watching past the first second."))
     top3 = [p["type"] for p in paths[:3]]
     if "digital" in top3 and c["niche"] == "food":
         out.append(("Writing and pricing a recipe e-book", "Pick 10 recipes, photograph each, price at ₹199.",
@@ -190,7 +190,7 @@ def skills(c: dict, stage_id: str, paths: list[dict]) -> list[dict]:
     if c.get("platforms") == ["instagram"] and metrics.has_reels(c) and metrics.reach_ratio(c) > 1:
         out.append(("Repurposing to YouTube Shorts", "Re-upload your top 5 reels as Shorts, one a day.", "Your content travels well; a second platform widens reach."))
     if c.get("followers", 0) < 1_000 and c.get("expertise"):
-        out.append(("Short explainers from your expertise", "Turn the 5 questions clients ask most into 30-second reels.", "Expertise is your fastest route to trust."))
+        out.append(("Short explainers from your expertise", f"Turn the 5 questions clients ask most into 30-second {'Shorts' if metrics.platform(c) == 'youtube' else 'reels'}.", "Expertise is your fastest route to trust."))
     out.append(("Hooks in the first second", "Open with the result, then show how.", "Most viewers decide in the first second."))
     seen, result = set(), []
     for title, action, reason in out:
@@ -267,7 +267,7 @@ def thirty_day_plan(c: dict, moves: list[dict], gaps: list[dict], skill_list: li
     if len(skill_list) > 1:
         weeks[2]["items"].append({"kind": "skill", "title": f"Practise: {skill_list[1]['title'].lower()}"})
     weeks[3]["items"] += [
-        {"kind": "review", "title": "Compare saves on new reels against your usual ones"},
+        {"kind": "review", "title": "Compare saves on new reels against your usual ones" if metrics.ss_known(c) else f"Compare views on new {metrics.post_noun(c)}s against your usual ones"},
         {"kind": "money", "title": "Update your rate card from your latest price breakdown"},
     ]
     return weeks

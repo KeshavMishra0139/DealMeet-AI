@@ -26,7 +26,7 @@ CAPS = {
 FOLLOWER_RATE = 0.33
 # Minimum fee per reel-equivalent: making a reel takes hours, whatever the reach.
 PRODUCTION_FLOOR = 1_000
-DELIVERABLE_UNITS = {"reel": 1.0, "short": 1.0, "story": 0.25, "carousel": 0.6, "link_in_bio": 0.15, "live": 1.2}
+DELIVERABLE_UNITS = {"reel": 1.0, "video": 1.0, "short": 1.0, "story": 0.25, "carousel": 0.6, "link_in_bio": 0.15, "live": 1.2}
 
 
 def _pct(v: float) -> str:
@@ -87,10 +87,12 @@ def data_label(c: dict) -> tuple[str, str]:
     changes the data source, not the certainty: the price stays an estimate."""
     if c.get("insights_source") == "instagram_api" and metrics.prov(c, "reels.0.views") == "real":
         return "Estimate from Instagram data", "instagram_api"
+    if c.get("insights_source") == "youtube_api" and metrics.has_reels(c) and metrics.prov(c, "reels.0.views") == "real":
+        return "Estimate from YouTube data", "youtube_api"
     if not metrics.has_reels(c):
         if (c.get("manual") or {}).get("avg_views"):
             return "Estimate from self-reported numbers", "manual"
-        return "Estimate from your follower count", "manual"
+        return f"Estimate from your {metrics.audience_noun(c)[:-1]} count", "manual"
     if metrics.recent_simulated(c, "views") or metrics.prov(c, "reels.0.views") in ("simulated", "seed") or c.get("insights_source") == "synthetic":
         return "Estimate from sample data", "synthetic"
     return "Estimate from self-reported numbers", "manual"
@@ -159,6 +161,7 @@ def terms_adjustment(terms: dict | None) -> tuple[float, float, list[str]]:
 
 DELIVERABLE_NAMES = {
     "reel": ("reel", "reels"),
+    "video": ("video", "videos"),
     "short": ("short", "shorts"),
     "story": ("story", "stories"),
     "carousel": ("carousel", "carousels"),
@@ -198,6 +201,9 @@ def fair_price(
     """Fair price for one creator and lister. Pass `scopes` when the result goes
     to that brand, so its step reasons respect what the creator shared."""
     niche = NICHES[c["niche"]]
+    if not (terms or {}).get("deliverables"):
+        # One post in the creator's own format: a video on YouTube, a reel on Instagram (same units).
+        terms = {**(terms or {}), "deliverables": [{"kind": metrics.post_noun(c), "count": 1}]}
     f = factors(c, lister)
     adj = adjustments(f)
     mv = f["median_views"]
@@ -216,13 +222,13 @@ def fair_price(
             "pct": None,
             "amount": round(base),
             "reason": (
-                f"Median of your last 6 reels is {short(mv)} views. At {inr(f['cpm'])} per 1,000 views for "
+                f"Median of your last 6 {metrics.post_noun(c)}s is {short(mv)} views. At {inr(f['cpm'])} per 1,000 views for "
                 f"{niche['label'].lower()}, that's {inr_full(base)}."
                 if real_views
                 else (
-                    f"No connected reels yet, so we use the {short(mv)} average views you reported. At {inr(f['cpm'])} per 1,000 views, that's {inr_full(base)}."
+                    f"No connected {metrics.post_noun(c)}s yet, so we use the {short(mv)} average views you reported. At {inr(f['cpm'])} per 1,000 views, that's {inr_full(base)}."
                     if (c.get("manual") or {}).get("avg_views")
-                    else f"No connected reels yet, so we estimate {short(mv)} views per reel from your follower count."
+                    else f"No connected {metrics.post_noun(c)}s yet, so we estimate {short(mv)} views per {metrics.post_noun(c)} from your {metrics.audience_noun(c)[:-1]} count."
                 )
             ),
             "simulated": bool(sim_views),
@@ -269,7 +275,7 @@ def fair_price(
     add(
         "consistency",
         "Consistency",
-        f"{metrics.posts_per_week(c):.1f} reels a week over the last 4 weeks; views vary by {metrics.views_cv(c) * 100:.0f}% reel to reel.",
+        f"{metrics.posts_per_week(c):.1f} {metrics.post_noun(c)}s a week over the last 4 weeks; views vary by {metrics.views_cv(c) * 100:.0f}% {metrics.post_noun(c)} to {metrics.post_noun(c)}.",
         sim_views + sim_dates,
     )
     safety = f["safety"]
@@ -293,7 +299,7 @@ def fair_price(
                 "label": "Production floor",
                 "pct": None,
                 "amount": round(PRODUCTION_FLOOR - running),
-                "reason": f"Below this reach we price at least {inr_full(PRODUCTION_FLOOR)} per reel to cover the time it takes to make one.",
+                "reason": f"Below this reach we price at least {inr_full(PRODUCTION_FLOOR)} per {metrics.post_noun(c)} to cover the time it takes to make one.",
                 "simulated": False,
             }
         )
@@ -309,7 +315,7 @@ def fair_price(
                 "label": "Deliverables",
                 "pct": round(units - 1, 4),
                 "amount": round(amount),
-                "reason": f"{deliverables_label(terms)}: {units:g}x a single reel.",
+                "reason": f"{deliverables_label(terms)}: {units:g}x a single {metrics.post_noun(c)}.",
                 "simulated": False,
             }
         )
@@ -359,7 +365,7 @@ def fair_price(
             "inr",
             "deal",
             [
-                f"Priced on the median of your last 6 reels ({short(mv)} views), not on followers",
+                f"Priced on the median of your last 6 {metrics.post_noun(c)}s ({short(mv)} views), not on {metrics.audience_noun(c)}",
                 f"{inr(f['cpm'])} per 1,000 views is the seeded rate for {niche['label'].lower()}",
                 "Each adjustment is capped so no single factor dominates",
             ],
@@ -368,11 +374,11 @@ def fair_price(
         "why": why(
             [
                 f"Your price follows how many people actually watch: {short(mv)} median views.",
-                f"Priced on followers alone it would be about {inr(fp)}.",
+                f"Priced on {metrics.audience_noun(c)} alone it would be about {inr(fp)}.",
             ]
             + [s["reason"] for s in steps[1:3]],
             [
-                inp("Median views (last 6 reels)", short(mv), metrics.prov(c, "reels.0.views") if real_views else None),
+                inp(f"Median views (last 6 {metrics.post_noun(c)}s)", short(mv), metrics.prov(c, "reels.0.views") if real_views else None),
                 inp("Rate per 1,000 views", inr(f["cpm"])),
                 inp("Followers", short(c.get("followers", 0)), metrics.prov(c, "followers")),
             ],

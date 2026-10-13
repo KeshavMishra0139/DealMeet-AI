@@ -188,6 +188,9 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     rng = random.Random(cid)
     city = body.city if body.city in CITIES else "Mumbai"
     connected = body.sample_insights  # sample data stands in for a connected account, labelled so
+    # Demo mode fills in an audience mix and counts for exploring, marked simulated. A live
+    # site (DEMO_MODE=0) invents nothing: audience stays unknown until a platform reports it.
+    sandbox = get_settings().demo_mode
     langs = body.languages
     captions = [x.strip() for x in body.captions if x.strip()]
     caption_tags = tag_captions(captions) if captions else None
@@ -197,7 +200,11 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         "name": body.name.strip(),
         "avatar_hue": rng.randint(0, 359),
         "is_reference": False,
-        "reference_note": "Your profile. Insights are sample data for the demo, marked simulated." if connected else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated.",
+        "reference_note": (
+            "Your profile. Insights are sample data for the demo, marked simulated." if connected
+            else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated." if sandbox
+            else "Your profile, from what you typed in onboarding."
+        ),
         "bio": f"{NICHES[body.niche]['label']} from {city}.",
         "niche": body.niche,
         "sub_niches": [],
@@ -208,12 +215,12 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         "state": CITIES[city][0],
         "region": CITIES[city][1],
         "followers": followers,
-        "following": max(50, int(followers * 0.05)) if followers else 0,
+        "following": (max(50, int(followers * 0.05)) if followers else 0) if sandbox else None,
         "posts": 0,
         "reels": _reels(cid, body.niche, langs, followers, {}, rng) if connected and followers > 0 else [],
         "follower_history": _follower_history(followers, {}, rng) if connected and followers > 0 else [],
         "comment_insights": {"generic_share": 0.14, "sample_size": 60} if connected else {},
-        "audience": _audience(body.niche, langs, city, rng),
+        "audience": _audience(body.niche, langs, city, rng) if sandbox else {},
         "income_goal": {"monthly": body.income_goal, "types": body.income_types},
         "income_history": [],
         "past_deals": [],
@@ -238,7 +245,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     # What the creator typed is theirs. Everything the demo generates (the sandbox
     # login's sample insights, the audience mix, counts derived from the follower
     # band) is marked simulated, so the app labels it like Creator A's simulated fields.
-    sample = ["audience", "following", "posts"]
+    sample = ["audience", "following", "posts"] if sandbox else []
     if body.followers is None and followers:
         sample.append("followers")  # estimated from the audience stage
     if connected:
