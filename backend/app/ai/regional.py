@@ -12,6 +12,28 @@ from pydantic import BaseModel, Field
 from ..seed.catalog import LANGS, NICHES
 from .llm import generate
 
+# How the language model is asked to write in each language. Numbers stay in Western digits
+# so every number can be checked against the facts it was given.
+WRITE_IN = {
+    "en": "English",
+    "hi": "Hindi in Devanagari script",
+    "hinglish": "Hinglish: Hindi written in Latin letters, mixed with English the way creators talk",
+    "ta": "Tamil in Tamil script",
+    "te": "Telugu in Telugu script",
+    "kn": "Kannada in Kannada script",
+    "ml": "Malayalam in Malayalam script",
+    "bn": "Bengali in Bengali script",
+    "mr": "Marathi in Devanagari script",
+    "gu": "Gujarati in Gujarati script",
+}
+WRITE_RULE = "Keep brand, app and format names in English, and write every number in Western digits (0-9)."
+
+
+def write_in(lang: str) -> str:
+    """'Tamil in Tamil script (keep brand names in English ...)' for a prompt."""
+    return f"{WRITE_IN.get(lang, 'English')}. {WRITE_RULE}"
+
+
 SCRIPTS = [
     ("ta", "Tamil", 0x0B80, 0x0BFF),
     ("te", "Telugu", 0x0C00, 0x0C7F),

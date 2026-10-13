@@ -29,7 +29,7 @@ def preview(body: PreviewIn, request: Request):
     ratelimit.enforce(
         f"ytprev:{ratelimit.client_ip(request)}", PREVIEW_PER_HOUR, 3600, "That's a lot of lookups from here. Try again in an hour."
     )
-    return yt.public_view(yt.channel_report(body.handle, body.niche if body.niche in NICHES else None))
+    return yt.public_view(yt.channel_report(body.handle, body.niche if body.niche in NICHES else None, ai=True))
 
 
 class LinkIn(BaseModel):

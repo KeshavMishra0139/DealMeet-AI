@@ -28,7 +28,7 @@ def _creator(user: dict) -> dict:
 
 class AskIn(BaseModel):
     question: str = Field(min_length=2, max_length=300)
-    lang: Literal["en", "hi"] = "en"
+    lang: Literal["en", "hi", "hinglish", "ta", "te", "kn", "ml", "bn", "mr", "gu"] = "en"
 
 
 @router.post("/assistant/ask")

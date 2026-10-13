@@ -124,6 +124,17 @@ export function useSession(role: Role, enabled = true) {
   });
 }
 
+/** The signed-in home for whoever is signed in here (creator, brand or admin), null when
+ * nobody is, and `loading` until the sessions are known. Public pages that are only for
+ * visitors (What am I worth?) send signed-in people to their own dashboard instead. */
+export function useSignedInHome(): { loading: boolean; to: string | null } {
+  const creator = useSession("creator");
+  const brand = useSession("brand");
+  const role = (creator.data ?? brand.data)?.user.role;
+  const to = role === "creator" ? "/creator" : role === "brand" ? "/brand" : role === "admin" ? "/admin" : null;
+  return { loading: !to && (creator.isLoading || brand.isLoading), to };
+}
+
 /** True when this browser holds (or this frame pins) a demo session for a side. Real
  * accounts use an HttpOnly cookie the page can't see; the server reports those. */
 export function hasDemoSession(role: Role): boolean {

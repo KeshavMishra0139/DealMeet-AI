@@ -28,6 +28,7 @@ const SHORT: Record<string, string> = {
   consistency: "Consistency",
   safety: "Brand safety",
   trust: "Trust",
+  ai: "AI review",
   floor: "Production floor",
   deliverables: "Deliverables",
   terms: "Usage rights",

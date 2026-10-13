@@ -7,11 +7,13 @@ import { ErrorState } from "@/components/shared/Bits";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FieldHint, Input, Label, Segmented, Skeleton, Textarea } from "@/components/ui/form";
+import { FieldHint, Input, Label, Select, Skeleton, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, del, post } from "@/lib/api";
 import { inrRange, shortDate } from "@/lib/format";
+import { htmlLang, isWriteLang, langLabel, WRITE_LANGS, type WriteLang } from "@/lib/languages";
 import { useCreatorId } from "@/lib/session";
+import { useCreator } from "./CreatorShell";
 import type { BrandCard } from "@/features/public/Brands";
 
 export interface FanProof {
@@ -30,7 +32,9 @@ interface Pitch {
   subject: string;
   pitch: string;
   content_ideas: string[];
-  lang: "en" | "hi";
+  lang: WriteLang;
+  /** The language asked for, when the pitch came back in another (no AI: English). */
+  lang_requested?: WriteLang | null;
   status: "draft" | "sent" | "shared" | "accepted" | "declined";
   written_by: "ai" | "template";
   suggested_price_range: { range: { low: number; high: number }; deliverables: string; data_label: string; data_source: string } | null;
@@ -129,7 +133,9 @@ function NewPitch({
 }) {
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState<BrandCard | null>(null);
-  const [lang, setLang] = useState<"en" | "hi">("en");
+  const creator = useCreator().data;
+  const [picked, setLang] = useState<WriteLang | null>(null);
+  const lang: WriteLang = picked ?? (creator?.languages.find(isWriteLang) || "en");
   const query = useDeferredValue(q);
   const dream = useQuery({ queryKey: ["dream", creatorId], queryFn: () => api<{ items: BrandCard[] }>(`/creators/${creatorId}/dream-brands`), enabled: !!creatorId });
   const found = useQuery({
@@ -146,7 +152,12 @@ function NewPitch({
   }, [initialBrand, brand, dream.data]);
   const write = useMutation({
     mutationFn: () => post<Pitch>(`/creators/${creatorId}/pitches`, { brand_id: brand?.id ?? initialBrand, lang }),
-    onSuccess: (p) => onCreated(p.id),
+    onSuccess: (p) => {
+      if (p.lang_requested && p.lang !== p.lang_requested) {
+        toast.info(`Written in ${langLabel(p.lang)}`, { description: `AI writing isn't available right now, so this pitch is in ${langLabel(p.lang)} instead of ${langLabel(p.lang_requested)}.` });
+      }
+      onCreated(p.id);
+    },
     onError: (e) => toast.error((e as Error).message),
   });
   const options = query.trim().length >= 2 ? (found.data?.items ?? []) : (dream.data?.items ?? []);
@@ -181,23 +192,21 @@ function NewPitch({
           </ul>
         </div>
         <div>
-          <p className="mb-1.5 text-[13px] font-medium text-fg-2">Language</p>
-          <Segmented
-            label="Pitch language"
-            value={lang}
-            onChange={setLang}
-            options={[
-              { value: "en", label: "English" },
-              { value: "hi", label: "हिंदी" },
-            ]}
-          />
+          <Label htmlFor="np-lang">Language</Label>
+          <Select id="np-lang" value={lang} onChange={(e) => setLang(e.target.value as WriteLang)} className="min-w-40">
+            {WRITE_LANGS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </Select>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button variant="primary" disabled={!chosen} loading={write.isPending} onClick={() => write.mutate()}>
           {!write.isPending && <PenLine aria-hidden />} Write my pitch{chosen ? ` to ${chosen.name}` : ""}
         </Button>
-        <p className="text-xs text-muted">Written from your own numbers only. Price comes from your fair-rate estimate, never from AI.</p>
+        <p className="text-xs text-muted">Written from your own numbers only, in the language you pick. The price range comes from your fair-rate estimate, never from the pitch writer.</p>
       </div>
     </section>
   );
@@ -243,7 +252,7 @@ function Editor({ creatorId, pitch, onDone }: { creatorId: string; pitch: Pitch;
         </div>
         <div>
           <Label htmlFor="pe-body">Pitch</Label>
-          <Textarea id="pe-body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={1200} className="min-h-40" lang={pitch.lang} />
+          <Textarea id="pe-body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={1200} className="min-h-40" lang={htmlLang(pitch.lang)} />
           <FieldHint className={words > 150 ? "text-danger" : undefined}>{words} of 150 words. Numbers must come from your data; promises can't be sent.</FieldHint>
         </div>
         <fieldset className="space-y-2">

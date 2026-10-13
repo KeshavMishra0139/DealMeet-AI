@@ -9,6 +9,9 @@ export interface FormatPrice {
   per_video?: number;
   estimate?: Estimate;
   why?: string[];
+  /** The price before the AI market review, when one was applied. */
+  formula_per_video?: number;
+  ai?: { adjust_pct: number; reasons: string[]; confidence: "low" | "medium" | "high" };
 }
 
 export interface YouTubeVideo {
@@ -40,8 +43,15 @@ export interface WorthReport {
   niche: string;
   niche_label: string;
   niche_guessed: boolean;
+  /** Who picked the niche: the visitor, YouTube's topics, the AI reading the titles, or a default. */
+  niche_source: "you" | "topics" | "ai" | "default";
+  /** Main language of the titles: read by rules, refined by the AI when it's on. */
+  language: string | null;
+  language_label: string | null;
+  language_source: "titles" | "ai";
   prices: { shorts: FormatPrice; long: FormatPrice };
   notes: string[];
+  ai_review: { adjust_pct: number; reasons: string[]; confidence: "low" | "medium" | "high" } | null;
   source: "youtube_api";
   fetched_at: string;
 }

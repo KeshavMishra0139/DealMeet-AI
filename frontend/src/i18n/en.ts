@@ -118,7 +118,6 @@ export const en = {
   "reach.date": "Date",
   "reach.pctCol": "% of followers",
   "reach.pctColYt": "% of subscribers",
-  "nav.worth": "Check your worth",
   "weekly.title": "Weekly report",
   "weekly.range": "{start} to {end}, compared with the week before",
   "weekly.views": "Brand views",

@@ -23,6 +23,7 @@ from statistics import median
 
 from pydantic import BaseModel, Field
 
+from ..ai.regional import write_in
 from ..ai.llm import generate
 from ..config import now_iso, today
 from ..db import get_db
@@ -176,7 +177,7 @@ def ask(c: dict, question: str, lang: str = "en") -> dict:
     facts_text = "\n".join(f"- {f['label']}: {f['value']} (source: {f['source']})" for f in facts)
     prompt = (
         f"A creator asks: {question.strip()}\n\nTheir numbers (the only facts you may use):\n{facts_text}\n\n"
-        f"Answer in {'Hindi (Devanagari)' if lang == 'hi' else 'English'} in 2 to 4 short sentences. Say what is uncertain. "
+        f"Answer in {write_in(lang)} Use 2 to 4 short sentences. Say what is uncertain. "
         "If there are fewer than 6 posts, say you can't tell a trend. Suggest up to 3 next steps inside the app."
     )
     result, how = generate("coach", prompt, CoachAnswer, lambda: _template(intent, c, raw), facts=facts_text, max_tokens=500)
@@ -189,6 +190,8 @@ def ask(c: dict, question: str, lang: str = "en") -> dict:
         "used": facts,
         "trend_known": raw["trend"]["enough"],
         "written_by": "ai" if how in ("ai", "cache") else "template",
+        # Templates are in English: an answer asked for in another language says which it got.
+        "lang": lang if how in ("ai", "cache") else "en",
         "at": now_iso(),
     }
     db.coach_answers.replace_one({"_id": key}, {"_id": key, "creator_id": c["_id"], "answer": out}, upsert=True)

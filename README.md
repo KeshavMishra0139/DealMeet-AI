@@ -62,7 +62,7 @@ The demo needs nothing. To run with real accounts and live data, set these up in
 6. **Google OAuth test users (YouTube Analytics and "Continue with YouTube")**: in the Firebase project's Google Cloud console, enable the YouTube Analytics API, add the `youtube.readonly` and `yt-analytics.readonly` scopes to the OAuth consent screen, keep the app in **Testing** and add each creator's Google account as a **test user** ([details](#youtube-analytics-optional)). With Firebase and `YOUTUBE_API_KEY` both set, creators also get **Continue with YouTube** on the sign-in page.
 7. **Meta app with Instagram Testers**: follow the [Meta dashboard steps](#connecting-instagram); set `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` (HTTPS), `FRONTEND_URL` and `TOKEN_ENC_KEY`. Each creator who connects must be an Instagram Tester with a Creator or Business account while the app is in development mode. The same settings turn on **Continue with Instagram** on the sign-in page.
 8. **Payments (optional)**: Razorpay test keys `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and the webhook secret `RAZORPAY_WEBHOOK_SECRET` (webhook URL: `/api/payments/razorpay/webhook`).
-9. **Live AI (optional)**: `ANTHROPIC_API_KEY` and `AI_MODEL`, with `AI_MAX_CALLS_PER_HOUR` as a cap.
+9. **Live AI (optional)**: `ANTHROPIC_API_KEY` and `AI_MODEL`, or `OPENROUTER_API_KEY` and `AI_MODEL`. No hourly cap unless `AI_MAX_CALLS_PER_HOUR` is set. See [AI across the app](#ai-across-the-app).
 10. **An admin**: sign up, then on the server `python -m app.admin_cli grant <email>` (in `backend/`).
 
 **Switching between sample and real data**: `make dev` with no `MONGODB_URI` runs the in-memory demo (`USE_MOCK_DB=1`, `DEMO_MODE=1`). With `MONGODB_URI` set, `make dev` uses that database instead; add `DEMO_MODE=0` for real accounts only. The API never falls back to the in-memory database on its own: if `MONGODB_URI` is set and unreachable, it stops with a clear message. Every number in the app carries its source: "Live data" (from YouTube or Instagram), "Self-reported" (typed by the creator) or "Sample data" (seeded).
@@ -78,7 +78,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `MONGODB_URI`, `MONGODB_DB` | MongoDB Atlas (or any MongoDB), with TLS certificates from certifi | Without `USE_MOCK_DB=1`, startup stops with a clear message. The API never falls back to memory on its own |
 | `USE_MOCK_DB` | `1`: in-memory database (mongomock); data is lost on restart. `make dev` sets it when `MONGODB_URI` is empty; the Docker image sets it for the shared demo | `0` |
 | `ATLAS_SEARCH_INDEX` | Atlas Search index for the brand directory (`backend/atlas/brands_search.json`) | `brands_search`; empty or `off` uses a plain text match |
-| `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI for caption tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
+| `ANTHROPIC_API_KEY`, `AI_MODEL` | Live AI ([everything it does](#ai-across-the-app)): the AI price review, regional-language pitches and coach answers, the week's moves, caption and language tagging, topic ideas and media-kit copy, via the official SDK with structured output validated by Pydantic. Both must be set | Deterministic templates from the same numbers |
 | `OPENROUTER_API_KEY` (with `AI_MODEL`) | The same live AI through OpenRouter when `ANTHROPIC_API_KEY` is empty. `AI_MODEL` is OpenRouter's model id, for example an Anthropic model under `anthropic/` (copy it from openrouter.ai/models). Replies are JSON checked by the same Pydantic models, copy rules and number check | Templates, as above; `/api/health` shows `ai_provider` |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay **test mode** for the brand's payment into escrow (`rzp_test_` keys only). Each order is stored with its deal and amount; checkout must match both, and a payment is used once. A failed Razorpay call is an error (502), never a simulated success | Demo mode: a simulated payment, labelled so. Otherwise funding answers 503 and no money moves |
 | `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
@@ -93,7 +93,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `DEMO_TODAY` | The date the demo treats as today, so seeded deadlines line up (default `2026-10-08`) | `2026-10-08` |
 | `DEMO_RESET_MINUTES` | On a shared URL, put the demo data back to its seeded state every N minutes (skipped while someone changed something in the last 5 minutes). The Docker image sets 30 | Never resets on its own |
 | `REMOVE_SAMPLE_DATA` | With `DEMO_MODE=0`, `1` removes sample creators, brands, campaigns, deals and demo accounts left in the database from demo mode, at start. Real accounts stay; safe to leave on | Sample records left from demo mode stay in the database |
-| `AI_MAX_CALLS_PER_HOUR` | Cap on live AI calls across all visitors; beyond it, templates are used | 100 |
+| `AI_MAX_CALLS_PER_HOUR` | Cap on live AI calls across all visitors; beyond it, templates are used | `0`: no cap |
 | `TEE_ENDPOINT`, `TEE_TRUST_ROOT`, `TEE_MEASUREMENTS`, `TEE_ATTESTATION_MAX_AGE_S` | Protected computation in an AWS Nitro enclave, accepted only when its attestation verifies against the trust root and PCR policy ([details](#protected-computation-tee-status-and-fallback)) | TEE status `not_configured`; the audience overlap runs on the server from minimised data, and says so |
 
 Every AI call goes through one function with a fallback: if the key is missing, the call fails, the reply breaks the copy rules, or it quotes a number that isn't in our data, the template is used instead. Answers are cached.
@@ -135,7 +135,7 @@ docker run -p 8000:8000 jodidar-ai      # http://localhost:8000
 - **Any other Docker host** (Railway, Fly.io, Google Cloud Run, Hugging Face Spaces): point it at the `Dockerfile`. Health check path: `/api/health`.
 - **Run one instance with one worker** while `USE_MOCK_DB=1`: the demo data lives in the server's memory, so a second instance would see different data. With Atlas (`MONGODB_URI`, `USE_MOCK_DB=0`) data survives restarts.
 - **Everyone shares one demo.** The image runs with `DEMO_MODE=1`. Data resets on every restart, and every 30 minutes when idle (`DEMO_RESET_MINUTES`). The Studio and Console say so next to **Reset demo**, which resets it for everyone. Set `DEMO_MODE=0` on the host for real accounts only: then there is no seeded data, no persona sign-in and no reset.
-- **Leave `ANTHROPIC_API_KEY` unset on a public URL**, or set a spend limit on the key: every visitor could otherwise trigger paid calls (capped by `AI_MAX_CALLS_PER_HOUR`).
+- **Live AI on a public URL costs per call**: there's no hourly cap by default. Set a spend limit on the key or OpenRouter account, or set `AI_MAX_CALLS_PER_HOUR`. Public lookups are still rate-limited per visitor.
 - Razorpay accepts `rzp_test_` keys only. `VITE_FIREBASE_*` values are baked in at build time (Docker build args), and the deployed domain must be added to Firebase's authorised domains.
 - Visitor-created records are capped (100 sign-ups, 50 new brands, 20 campaigns or collabs each, 30 bookings per creator, 50 offers per brand), and requests over 256 KB are refused.
 
@@ -276,9 +276,10 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 ## Real YouTube data and "What am I worth?"
 
-`/worth` is public: type a YouTube @handle (or channel link) and see the channel's real numbers, labelled **Live data**, and an estimate for one brand Short and one brand integration in a long video.
+`/worth` is for visitors who haven't signed in: type a YouTube @handle (or channel link) and see the channel's real numbers, labelled **Live data**, and an estimate for one brand Short and one brand integration in a long video. It's linked from the landing page only while nobody is signed in; a signed-in creator who opens it goes to Money (their own price), anyone else to their dashboard.
 
-- **Priced on views, never subscribers**: the median views of the channel's recent videos (from the last 30) × the niche's rate per 1,000 views, through the same Fair-Price engine. Shorts and long videos are priced separately because their views aren't comparable. Videos from the last 3 days aren't counted yet.
+- **Priced on views, never subscribers**: the median views of the channel's recent settled videos × the niche's rate per 1,000 views, through the same Fair-Price engine. Shorts and long videos are priced separately because their views aren't comparable. Videos from the last 3 days aren't counted yet: the newest 50 uploads are read first, and up to 200 (4 pages) when a channel posts so often that too few are older, as TV networks do. Each format is priced on its newest 30 settled videos; live streams and premieres are left out.
+- **AI market review** (when AI is on): the model reads the channel's titles and numbers and moves each price by -30% to +40%, with reasons; when nobody picked a niche and YouTube's topics don't match one, it names the niche from the titles. The page says so. See [AI across the app](#ai-across-the-app).
 - With fewer than 3 settled videos of a format, it says there isn't enough data instead of pricing. Public data has no engagement, audience or trust signals, so there are no adjustments and the range is wider; it stays labelled **Estimate**.
 - The API has no "is a Short" flag: up to 60 seconds counts as a Short, or up to 3 minutes when tagged #shorts.
 - **Quota**: only 1-unit calls (`channels.list` by handle or id, `playlistItems.list`, `videos.list`); never `search.list` (100 units). Every response is cached in the database for 12 hours, and the public lookup is rate-limited per IP (20 an hour).
@@ -286,6 +287,19 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 - In the Studio, **Connections** links the creator's own channel: the summary goes to `creators.channels.youtube` (`creators.platforms` was already the list of platforms a creator says they use), each video to `posts` and one `metric_snapshots` row per day, all with `source: "youtube_api"` and `fetched_at`. Unlinking deletes them. A channel linked by handle is public data, so it's marked "Ownership not verified" until YouTube Analytics is connected, and one channel can't be linked to two profiles.
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
+
+## AI across the app
+
+With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for OpenRouter), the language model works in these places. Every answer is checked against a Pydantic schema, the copy rules (no promises) and the facts it was given (no invented numbers); anything that fails, and everything when AI is off, uses the template or formula instead, so no screen depends on it. `/api/health` shows `"ai": "live"` and the provider.
+
+| Where | What the AI does | What it can't do |
+|---|---|---|
+| **Fair price** (`ai/price_review.py`) | Reviews each creator's formula price from their real numbers and post titles (what the content is, the language market, likes and comments per 1,000 views, steadiness) and adds an **AI market review** step with its reasons. Stored per creator and applied everywhere their price shows (Money, rates, media kit, offers, brand search) until their numbers change; refreshed in the background, or on demand from Money (**Review now**) | Move the price more than -30% to +40%; quote numbers that aren't in the facts. The gradient-boosted cross-check stays on the formula alone |
+| **What am I worth?** | The same review for any channel, on the spot, plus the niche and main language from the titles | Override a niche the visitor picked |
+| **The week's 3 moves** (`ai/moves.py`) | Rewords each move's title and reason for this creator, in English and Hindi, once per weekly plan, in the background | Choose the moves, change what they ask or their numbers (the engine decides those); reword a move already acted on |
+| **Pitches and the coach** (`ai/regional.py` `WRITE_IN`) | Writes in 10 languages: English, Hindi, Hinglish, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, numbers in 0-9 | Without AI: English or Hindi templates, and the answer says which language it's in |
+| **Language and captions** | Reads a channel's main language from its titles (script and word rules first, refined by the model) for the YouTube dashboard and price review; tags captions with language, niche, tone and brand safety | |
+| **Media kit, branding, topic ideas, assistant actions** | Copy and routing as described in their sections | |
 
 ## Weekly report and "Check your worth"
 
@@ -299,7 +313,7 @@ The top of the Creator Studio home is a **Weekly report**: the 7 days ending tod
   - **Followers**: the change between Instagram or YouTube snapshots (`metric_snapshots`), only when there's one in both weeks.
 - Each tile shows last week's figure with an up, down or same marker, and its data label (Sample data, Self-reported, Live data). In English and हिंदी. The loading state is the same size as the loaded card, so the page doesn't jump.
 
-**Check your worth** (`/worth`) is emphasised wherever navigation shows it: the landing page's floating nav, the Studio sidebar (after the main tabs) and the Studio's mobile menu. One component (`frontend/src/components/shared/WorthLink.tsx`): a signature-gradient pill with a soft glow that breathes (opacity only; still with reduced motion) and a sparkle that turns on hover.
+**Check your worth** (`/worth`) is for visitors before they sign in: it's emphasised in the landing page's floating nav (`frontend/src/components/shared/WorthLink.tsx`, a signature-gradient pill with a soft glow that breathes, opacity only and still with reduced motion) and the landing's YouTube button, and both disappear once someone is signed in. Inside the Studio a creator's price is on Money, reviewed by the AI when it's on; opening `/worth` while signed in goes there.
 
 ## Creator profile, completeness and brand-readiness
 
@@ -354,8 +368,8 @@ The **Assistant** (Creator Studio and Brand Console) does things for the signed-
 
 **AI Pitch Builder** (Studio → Pitches, or "Pitch this brand" on a brand page):
 
-- Written through `ai/llm.py` `generate` with a strict schema (subject, a pitch of at most 150 words, exactly 3 content ideas), the copy rules and a check that every number is in the creator's facts; otherwise the template writes it. English or Hindi.
-- Input: the creator's stats with their sources, niche, audience, Fan Proof and the brand's public info. The **suggested price range comes from the fair-price engine**, never from the model.
+- Written through `ai/llm.py` `generate` with a strict schema (subject, a pitch of at most 150 words, exactly 3 content ideas), the copy rules and a check that every number is in the creator's facts; otherwise the template writes it. In English, Hindi, Hinglish, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi or Gujarati (the creator's first language is picked by default); without AI, English or Hindi from the templates, and the pitch says which language it came back in.
+- Input: the creator's stats with their sources, niche, audience, Fan Proof and the brand's public info. The **suggested price range comes from the fair-price engine** (the formula plus the capped AI market review), never from the pitch writer.
 - The creator edits before sending. Edits are checked too: no promises, and no numbers that aren't in their data (small counts like "2 reels" are fine).
 - A brand on the platform gets the pitch in its **Fan Inbox**. For a brand that isn't, the creator gets a share link `/p/:slug` (unguessable, revocable, no private data) to send themselves.
 - **5 sent pitches per creator per rolling 7 days**, enforced on the server; one unanswered pitch per brand at a time.

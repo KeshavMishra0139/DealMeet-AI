@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
+from ..ai import price_review
 from ..db import get_db
 from ..engines import durable_income, hindi, money_paths, next_step, roadmap, stage
 from ..engines.common import day_month, inp, inr, inr_range, short, why
@@ -31,6 +32,7 @@ def best_fit_brand(c: dict) -> dict | None:
 
 
 def build(c: dict, with_plan: bool = True) -> dict:
+    price_review.ensure(c)  # a background AI review when one is due; shows on the next load
     brand = best_fit_brand(c)
     fair = fair_price(c, brand)
     fair_any = fair_price(c, None, with_model=False)

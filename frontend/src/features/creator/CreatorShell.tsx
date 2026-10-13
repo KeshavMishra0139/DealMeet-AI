@@ -25,7 +25,6 @@ import { Avatar } from "@/components/shared/Bits";
 import { ActionAssistant } from "@/components/shared/ActionAssistant";
 import { AskButton } from "./AskPanel";
 import { Wordmark } from "@/components/shared/Wordmark";
-import { WorthLink } from "@/components/shared/WorthLink";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { LangScope, useI18n } from "@/i18n";
@@ -109,12 +108,7 @@ function Studio() {
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
           {[...PRIMARY, ...SECONDARY].map((item, i) => (
             <div key={item.to}>
-              {i === PRIMARY.length && (
-                <>
-                  <WorthLink variant="side" label={t("nav.worth")} className="mt-2" />
-                  <div className="mx-3 my-3 h-px bg-line" />
-                </>
-              )}
+              {i === PRIMARY.length && <div className="mx-3 my-3 h-px bg-line" />}
               <SideLink item={item} label={t(item.key)} />
             </div>
           ))}
@@ -192,7 +186,6 @@ function Studio() {
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent sheet title={creator.data?.name ?? t("nav.more")} description={creator.data ? `@${creator.data.handle}` : undefined}>
           <div className="space-y-1" key={location.pathname}>
-            <WorthLink variant="sheet" label={t("nav.worth")} onClick={() => setMoreOpen(false)} className="mb-2" />
             {SECONDARY.map((item) => (
               <NavLink
                 key={item.to}

@@ -214,6 +214,18 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | Live YouTube journey with demo mode off: sign-up, Link channel in the UI, every Studio screen checked for live numbers, YouTube words and no sample data, at 1280 and 390 px | Tested | Browser run against the app with the YouTube Data API faked (this machine can't reach Google) |
 | Account menu, sign out and account deletion | Tested | `test_account_delete.py`; browser run at 1280 and 390 px |
 | AI through OpenRouter (`OPENROUTER_API_KEY`, `AI_MODEL`) | Unverified | `test_ai_fallback.py` against a fake OpenRouter; not run with a real key |
+| Price on channels that post dozens of videos a day (TV networks): older uploads read until enough settled videos | Tested | `test_youtube.py` |
+
+## 23. AI across the app
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| AI market review of the fair price: capped at -30% to +40%, reasons grounded in the facts, stored per creator and applied everywhere, stale when the numbers change; on the spot for "What am I worth?" | Tested against a fake model | `test_price_review.py`; not run with a real key |
+| The week's moves reworded by the AI in English and Hindi; the engine's choice and numbers kept; moves already acted on untouched | Tested against a fake model | `test_ai_moves.py` |
+| Pitches and coach answers in 10 languages; without AI, English or Hindi and the reply says which | Tested (fallbacks) | `test_pitches.py`, `test_coach.py`; regional output not run with a real key |
+| Main language of a channel from its titles (rules, refined by the model) | Tested | `test_price_review.py` |
+| No hourly AI cap unless `AI_MAX_CALLS_PER_HOUR` is set | Tested | `test_ai_moves.py` |
+| "What am I worth?" only for signed-out visitors; signed-in people go to their dashboard | Type-checked; browser journey | `qa/flows.mjs` |
 
 ## Bugs found by the new tests and fixed
 

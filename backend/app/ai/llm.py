@@ -41,12 +41,15 @@ _RULES = [
 ]
 _client = None
 # Live calls allowed per hour across all visitors; beyond that, templates are used.
-MAX_CALLS_PER_HOUR = int(os.getenv("AI_MAX_CALLS_PER_HOUR", "100") or 100)
+# 0 (the default) means no cap; set AI_MAX_CALLS_PER_HOUR to limit spending.
+MAX_CALLS_PER_HOUR = int(os.getenv("AI_MAX_CALLS_PER_HOUR", "0") or 0)
 _calls: list[float] = []
 _calls_lock = threading.Lock()
 
 
 def _allow_call() -> bool:
+    if MAX_CALLS_PER_HOUR <= 0:
+        return True
     now = time.monotonic()
     with _calls_lock:
         _calls[:] = [t for t in _calls if now - t < 3600]

@@ -501,6 +501,21 @@ await step("What am I worth?: public page says plainly when YouTube data isn't c
   await page.getByRole("alert").getByText(/YouTube data isn't connected on this server/).waitFor();
 });
 
+await step("What am I worth?: only for visitors; signed-in creators get their own price instead", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  await p.goto(`${BASE}/`);
+  await p.getByRole("link", { name: /Check your worth/ }).first().waitFor();
+  const r = await p.evaluate(async () => (await fetch("/api/auth/demo", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: true }) })).status);
+  if (r !== 200) throw new Error(`demo sign-in ${r}`);
+  await p.goto(`${BASE}/creator`);
+  await p.getByRole("button", { name: /More/ }).first().click();
+  if (await p.getByText(/Check your worth/).count()) throw new Error("Check your worth is in the signed-in Studio");
+  await p.goto(`${BASE}/worth`);
+  await p.waitForURL(/\/creator\/money$/);
+  await ctx.close();
+});
+
 // Presenting on a laptop: compare, phone view and the live split.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 desk.on("pageerror", (e) => errors.push(String(e)));

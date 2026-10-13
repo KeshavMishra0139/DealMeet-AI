@@ -10,9 +10,16 @@ export function FormatPriceCard({ price, title }: { price: FormatPrice; title: s
     <article className="card-surface rounded-[var(--radius-card)] p-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <Badge size="sm" variant="outline">
-          Estimate
-        </Badge>
+        <span className="flex gap-1.5">
+          {price.ai && (
+            <Badge size="sm" variant="outline">
+              AI-reviewed
+            </Badge>
+          )}
+          <Badge size="sm" variant="outline">
+            Estimate
+          </Badge>
+        </span>
       </div>
       {price.enough_data && price.estimate ? (
         <>

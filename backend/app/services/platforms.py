@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ..seed.catalog import LANGS
 from ..config import IST
 from ..db import get_db
 from ..engines import metrics
@@ -98,6 +99,15 @@ def _ratio_line(t: dict, med: float, audience: int | None) -> str | None:
     return f"Your recent {t['posts']} reach about {round(r * 100)}% of your {t['audience']}."
 
 
+def _language(c: dict, recent: list[dict]) -> str | None:
+    """The main language of the creator's titles: the AI review's reading when there is one,
+    else script and word rules (ai/regional.py)."""
+    from ..ai import price_review
+
+    reviewed = (price_review.current(c) or {}).get("language")
+    return reviewed if reviewed in LANGS else price_review.detect_language([p.get("title") or "" for p in recent])
+
+
 def dashboard(c: dict, platform: str) -> dict:
     """The dashboard for one platform: headline numbers, the recent posts against the
     audience, formats, a list of recent posts and plain-language insights."""
@@ -161,6 +171,9 @@ def dashboard(c: dict, platform: str) -> dict:
         insights.append(f"Your best recent {t['post']}: “{best['title'] or 'Untitled'}” with {short(best['views'])} views.")
     if likes is not None and comments is not None:
         insights.append(f"{likes:g} likes and {comments:g} comments per 1,000 views on your recent {t['posts']}.")
+    language = _language(c, recent)
+    if language:
+        insights.append(f"Your recent {t['post']} titles are mostly in {LANGS[language]['label']}.")
     if platform == "instagram":
         ss = _saves_shares_per_1k(recent)
         if ss is not None:
@@ -189,6 +202,7 @@ def dashboard(c: dict, platform: str) -> dict:
         "change": _change(c["_id"], platform, "subscribers" if platform == "youtube" else "followers"),
         "analytics": _analytics(ch) if platform == "youtube" else _ig_audience(ch),
         "insights": insights,
+        "language": language,
         "notes": notes,
     }
 

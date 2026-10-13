@@ -5,10 +5,11 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/form";
+import { Input, Select } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { useI18n } from "@/i18n";
 import { api, post } from "@/lib/api";
+import { htmlLang, isWriteLang, langLabel, WRITE_LANGS, type WriteLang } from "@/lib/languages";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,8 @@ interface Answer {
   used: { key: string; label: string; value: string; source: string }[];
   trend_known: boolean;
   written_by: "ai" | "template";
+  /** The language the answer is in (templates are in English). */
+  lang?: string;
   cached: boolean;
 }
 
@@ -37,7 +40,8 @@ export function AskButton({ compact = false, className }: { compact?: boolean; c
 }
 
 function AskDialog({ onClose }: { onClose: () => void }) {
-  const { lang } = useI18n();
+  const { lang: uiLang } = useI18n();
+  const [lang, setLang] = useState<WriteLang>(isWriteLang(uiLang) ? uiLang : "en");
   const id = useCreatorId();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -73,6 +77,16 @@ function AskDialog({ onClose }: { onClose: () => void }) {
             {!ask.isPending && <Send aria-hidden />}
           </Button>
         </form>
+        <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+          <label htmlFor="ask-lang">Answer in</label>
+          <Select id="ask-lang" value={lang} onChange={(e) => setLang(e.target.value as WriteLang)} className="h-9 min-w-36 text-sm">
+            {WRITE_LANGS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {sugg.data?.questions.map((s) => (
             <button key={s} type="button" onClick={() => run(s)} className="rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2 hover:border-accent/60 hover:text-fg">
@@ -89,7 +103,10 @@ function AskDialog({ onClose }: { onClose: () => void }) {
 
         {a && (
           <div className="mt-5 space-y-4" aria-live="polite">
-            <p className="text-[15px] leading-relaxed">{a.answer}</p>
+            <p className="text-[15px] leading-relaxed" lang={htmlLang(a.lang)}>
+              {a.answer}
+            </p>
+            {a.lang && a.lang !== lang && <p className="text-xs text-muted">AI writing isn't available right now, so this answer is in {langLabel(a.lang)}.</p>}
             <div className="flex gap-2 rounded-2xl bg-surface-2 p-3 text-[13px] text-fg-2">
               <HelpCircle className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
               <span>

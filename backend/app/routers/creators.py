@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..ai import price_review
 from ..ai.regional import tag_captions
 from ..config import get_settings, now_iso
 from ..db import get_db
@@ -18,7 +19,7 @@ from ..engines.matching import audience_fit
 from ..seed.catalog import CITIES, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
 from ..services import auth as au
-from ..services import cache, reach, social_signin
+from ..services import cache, ratelimit, reach, social_signin
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
 
@@ -129,6 +130,18 @@ def get_fair_price(creator_id: str, lister_id: str | None = None, listing_id: st
         lister = lister or db.brands.find_one({"_id": listing["owner_id"]})
         terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")}
     return fair_price(c, lister, terms)
+
+
+@router.post("/creators/{creator_id}/price-review")
+def run_price_review(creator_id: str, _: dict = Depends(au.own_creator)):
+    """Asks the AI to review this creator's price now. It also runs on its own, in the
+    background, whenever their numbers change."""
+    if not price_review.enabled():
+        raise HTTPException(503, "AI isn't switched on for this site, so prices come from the formula alone.")
+    ratelimit.enforce(f"pricereview:{creator_id}", 6, 3600, "That's enough price reviews for this hour. Try again later.")
+    if not price_review.refresh(creator_id):
+        raise HTTPException(502, "The AI review didn't come back usable this time, so your price stays the formula's. Try again in a few minutes.")
+    return fair_price(cc.load_creator(creator_id), None, with_model=False)["ai_review"]
 
 
 # ------------------------------------------------------------------ onboarding

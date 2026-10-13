@@ -120,7 +120,6 @@ export const hi: Dict = {
   "reach.date": "तारीख़",
   "reach.pctCol": "फ़ॉलोअर्स का %",
   "reach.pctColYt": "सब्सक्राइबर्स का %",
-  "nav.worth": "अपनी कीमत जानें",
   "weekly.title": "साप्ताहिक रिपोर्ट",
   "weekly.range": "{start} से {end}, पिछले हफ़्ते से तुलना",
   "weekly.views": "ब्रांड ने प्रोफ़ाइल देखी",

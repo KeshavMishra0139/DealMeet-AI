@@ -21,6 +21,8 @@ CAPS = {
     "safety": (-0.15, 0.0),
     "trust": (-0.20, 0.05),
     "terms": (0.0, 0.40),
+    # The AI market review (ai/price_review.py): what the formula can't see, within these bounds.
+    "ai": (-0.30, 0.40),
 }
 # The common follower-count rule of thumb for micro creators (rupees per follower).
 FOLLOWER_RATE = 0.33
@@ -79,6 +81,24 @@ def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int
         "per_video": round(per),
         "estimate": estimate(per * 0.85, per * 1.15, "inr", "deal", reasons[:2] + ["No engagement, fit or trust adjustments"], "low" if len(views) < 6 else "medium"),
         "why": reasons,
+    }
+
+
+def with_review(price: dict, review: dict) -> dict:
+    """A public estimate with the AI market review applied (capped, never below the floor)."""
+    if not price.get("enough_data"):
+        return price
+    pct = clamp(review["adjust_pct"] / 100, *CAPS["ai"])
+    per = max(price["per_video"] * (1 + pct), PRODUCTION_FLOOR)
+    note = f"AI market review: {_pct(pct)}. {review['reasons'][0]}"
+    est = price["estimate"]
+    return {
+        **price,
+        "formula_per_video": price["per_video"],
+        "per_video": round(per),
+        "estimate": estimate(per * 0.85, per * 1.15, "inr", "deal", list(est.get("assumptions") or [])[:2] + [f"AI market review {_pct(pct)}, capped at -30% to +40%"], est.get("confidence", "medium")),
+        "why": list(price.get("why") or []) + [note],
+        "ai": {"adjust_pct": review["adjust_pct"], "reasons": review["reasons"], "confidence": review["confidence"]},
     }
 
 
@@ -191,15 +211,35 @@ def fit_reason(fit: dict, scopes: dict | None = None) -> str:
     return " ".join([f"Fit {fit['score']}/100."] + (["; ".join(notes[:2]) + "."] if notes else []))
 
 
+def _ai_view(c: dict, review: dict | None) -> dict:
+    from ..ai import price_review
+
+    if not review:
+        return {"status": price_review.status(c)}
+    other = review.get("niche") if review.get("niche") in NICHES and review.get("niche") != c.get("niche") else None
+    return {
+        "status": "applied",
+        "adjust_pct": review["adjust_pct"],
+        "reasons": review["reasons"],
+        "confidence": review["confidence"],
+        "suggested_niche": other,
+        "suggested_niche_label": NICHES[other]["label"] if other else None,
+        "language": review.get("language"),
+        "reviewed_at": review.get("reviewed_at"),
+    }
+
+
 def fair_price(
     c: dict,
     lister: dict | None = None,
     terms: dict | None = None,
     with_model: bool = True,
     scopes: dict | None = None,
+    with_ai: bool = True,
 ) -> dict:
     """Fair price for one creator and lister. Pass `scopes` when the result goes
-    to that brand, so its step reasons respect what the creator shared."""
+    to that brand, so its step reasons respect what the creator shared. With `with_ai`,
+    a stored AI market review for the creator's current numbers is applied as a capped step."""
     niche = NICHES[c["niche"]]
     if not (terms or {}).get("deliverables"):
         # One post in the creator's own format: a video on YouTube, a reel on Instagram (same units).
@@ -292,6 +332,14 @@ def fair_price(
         sim_trust,
     )
     reach_per_reel = running  # what the market model is checked against
+    review = None
+    if with_ai:
+        from ..ai import price_review
+
+        review = price_review.current(c)
+    if review:
+        adj["ai"] = clamp(review["adjust_pct"] / 100, *CAPS["ai"])
+        add("ai", "AI market review", " ".join(review["reasons"][:2]))
     if running < PRODUCTION_FLOOR:
         steps.append(
             {
@@ -359,6 +407,7 @@ def fair_price(
         "follower_price": fp,
         "follower_rate": FOLLOWER_RATE,
         "uplift_vs_followers": round(per_reel / fp, 2) if fp else None,
+        "ai_review": _ai_view(c, review) if with_ai else None,
         "estimate": estimate(
             lo,
             hi,
@@ -368,7 +417,8 @@ def fair_price(
                 f"Priced on the median of your last 6 {metrics.post_noun(c)}s ({short(mv)} views), not on {metrics.audience_noun(c)}",
                 f"{inr(f['cpm'])} per 1,000 views is the seeded rate for {niche['label'].lower()}",
                 "Each adjustment is capped so no single factor dominates",
-            ],
+            ]
+            + ([f"An AI market review adjusted it by {_pct(adj['ai'])}, within -30% to +40%"] if review else []),
             confidence,
         ),
         "why": why(

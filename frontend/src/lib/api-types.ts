@@ -223,7 +223,23 @@ export interface FairPrice {
   estimate: Estimate;
   why: Why;
   model_check?: { predicted: number; agrees_within_pct: number; trained_on: number; note: string; checked_before_floor?: boolean };
+  /** The AI market review (a capped step in `steps` when applied); null when not asked for. */
+  ai_review?: AiPriceReview | null;
 }
+
+export type AiPriceReview =
+  | { status: "off" }
+  | { status: "pending" }
+  | {
+      status: "applied";
+      adjust_pct: number;
+      reasons: string[];
+      confidence: "low" | "medium" | "high";
+      suggested_niche: string | null;
+      suggested_niche_label: string | null;
+      language: string | null;
+      reviewed_at: string | null;
+    };
 
 export interface MoneyPath {
   type: string;

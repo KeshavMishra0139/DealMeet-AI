@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Segmented, Skeleton } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
+import { AiReviewNote } from "@/components/shared/AiReview";
 import type { FairPrice, Money as MoneyData, MoneyPath } from "@/lib/api-types";
 import { inr, inrRange, signedPct } from "@/lib/format";
 import { SourceBadge } from "@/components/shared/SourceBadge";
@@ -158,6 +159,7 @@ function FairPriceCard({
         <div className={cn("relative mt-6 transition-opacity", fp.isFetching && "opacity-60")}>
           <Waterfall fp={data} />
         </div>
+        <AiReviewNote review={data.ai_review} creatorId={creatorId} className="relative mt-4" />
 
         {data.model_check && (
           <p className="relative mt-4 text-xs text-muted">

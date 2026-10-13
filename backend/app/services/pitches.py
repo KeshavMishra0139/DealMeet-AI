@@ -21,6 +21,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from ..ai.llm import breaks_copy_rules, generate, numbers_grounded
+from ..ai.regional import WRITE_IN, write_in
 from ..config import now_iso
 from ..db import get_db
 from ..engines import metrics
@@ -140,18 +141,23 @@ def _price(c: dict, b: dict) -> dict:
     return {"range": fp["range"], "deliverables": fp["deliverables"], "data_label": fp["data_label"], "data_source": fp["data_source"], "estimate": True}
 
 
+# Templates exist in English and Hindi; a pitch asked for in another language falls back to English.
+TEMPLATE_LANGS = ("en", "hi")
+
+
 def write(c: dict, b: dict, lang: str) -> dict:
+    """A pitch in any of the app's languages (regional ones need the AI; without it, English)."""
+    lang = lang if lang in WRITE_IN else "en"
     facts, fp = facts_for(c, b)
     text = _facts_text(c, b, facts, fp)
-    language = "Hindi (Devanagari; keep brand and format names in English)" if lang == "hi" else "English"
     prompt = (
-        f"{text}\n\nWrite a short pitch from this creator to this brand in {language}, in the first person. "
-        f"Return a subject line, a pitch of at most {MAX_WORDS} words, and exactly 3 content ideas. "
+        f"{text}\n\nWrite a short pitch from this creator to this brand in {write_in(lang)} Write in the first person. "
+        f"Return a subject line, a pitch of at most {MAX_WORDS} words and at most 1,000 characters, and exactly 3 content ideas. "
         "Use only the facts above; quote no number that isn't in them; don't mention prices or rates; "
         "no promises about results, reach or sales."
     )
     def fallback() -> PitchCopy:
-        return _template(c, b, facts, fp, lang)
+        return _template(c, b, facts, fp, lang if lang in TEMPLATE_LANGS else "en")
 
     copy, how = generate("pitch", prompt, PitchCopy, fallback, facts=text, max_tokens=700)
     try:
@@ -159,7 +165,9 @@ def write(c: dict, b: dict, lang: str) -> dict:
         copy = PitchCopy.model_validate(copy.model_dump())
     except ValidationError:
         copy, how = fallback(), "template"
-    return {"copy": copy.model_dump(), "written_by": "ai" if how in ("ai", "cache") else "template", "facts": facts, "fan_proof": fp,
+    by_ai = how in ("ai", "cache")
+    return {"copy": copy.model_dump(), "written_by": "ai" if by_ai else "template", "lang": lang if by_ai or lang in TEMPLATE_LANGS else "en",
+            "lang_requested": lang, "facts": facts, "fan_proof": fp,
             "facts_text": text, "suggested_price_range": _price(c, b)}
 
 
@@ -172,7 +180,7 @@ def _brand(brand_id: str) -> dict:
 
 
 def view(p: dict, for_brand: bool = False) -> dict:
-    d = {k: p.get(k) for k in ("subject", "pitch", "content_ideas", "lang", "status", "written_by", "suggested_price_range", "fan_proof", "facts",
+    d = {k: p.get(k) for k in ("subject", "pitch", "content_ideas", "lang", "lang_requested", "status", "written_by", "suggested_price_range", "fan_proof", "facts",
                                "created_at", "sent_at", "answered_at", "deal_id", "brand_id", "brand_name", "brand_slug", "decline_note")}
     d["id"] = p["_id"]
     if not for_brand:
@@ -199,7 +207,8 @@ def create(c: dict, brand_id: str, lang: str, user: dict) -> dict:
         "brand_name": b["name"],
         "brand_slug": b.get("slug"),
         "on_platform": b.get("claimed", True),
-        "lang": lang,
+        "lang": w["lang"],
+        "lang_requested": w["lang_requested"],
         **w["copy"],
         "written_by": w["written_by"],
         "facts": w["facts"],

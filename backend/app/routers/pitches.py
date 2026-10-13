@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api", tags=["pitches"])
 
 class NewPitch(BaseModel):
     brand_id: str = Field(min_length=3, max_length=40)
-    lang: Literal["en", "hi"] = "en"
+    lang: Literal["en", "hi", "hinglish", "ta", "te", "kn", "ml", "bn", "mr", "gu"] = "en"
 
 
 class PitchEdit(BaseModel):

@@ -228,3 +228,10 @@ def youtube(monkeypatch, db):
     monkeypatch.setattr(yt.httpx, "get", fake.get)
     yield fake
     config.get_settings.cache_clear()
+
+
+def test_a_regional_language_pitch_needs_the_ai_and_says_what_it_got(login):
+    # No AI here: a Tamil pitch comes back in English, and says Tamil was asked for.
+    ta = _draft(login("cr_b"), lang="ta")
+    assert ta["lang"] == "en" and ta["lang_requested"] == "ta" and ta["written_by"] == "template"
+    assert ta["pitch"].startswith("Hi ")

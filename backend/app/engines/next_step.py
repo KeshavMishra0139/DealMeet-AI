@@ -582,6 +582,9 @@ def _save(c: dict, week: int, moves: list[dict], changes: list[str]) -> dict:
         "generated_at": now_iso(),
     }
     get_db().plans.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+    from ..ai import moves as ai_moves
+
+    ai_moves.personalize_soon(doc["_id"])  # the AI words the moves for this creator, in the background
     return doc
 
 

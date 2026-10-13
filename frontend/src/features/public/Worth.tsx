@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink, Search, Youtube } from "lucide-react";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ChannelAvatar } from "@/components/shared/ChannelAvatar";
 import { FormatPriceCard } from "@/components/shared/FormatPriceCard";
 import { SourceBadge } from "@/components/shared/SourceBadge";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
 import { count, shortDate } from "@/lib/format";
+import { useSignedInHome } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { WorthReport } from "@/lib/youtube-types";
 
@@ -18,8 +19,23 @@ interface Meta {
   niches: { id: string; label: string }[];
 }
 
-/** Public, no sign-in: a creator types their YouTube handle and sees real numbers and a price estimate. */
+const NICHE_FROM: Record<string, string> = {
+  topics: " (guessed from your channel's YouTube topics; change it above)",
+  ai: " (read from your video titles by AI; change it above)",
+  default: " (a middle rate: we couldn't tell the niche; pick yours above)",
+};
+
+/** Public, for visitors who haven't signed in: a creator types their YouTube handle and sees
+ * real numbers and a price estimate. Signed-in people go to their own dashboard instead
+ * (a creator's price, AI-reviewed, is on Money). */
 export default function Worth() {
+  const home = useSignedInHome();
+  if (home.loading) return null;
+  if (home.to) return <Navigate to={home.to === "/creator" ? "/creator/money" : home.to} replace />;
+  return <WorthLookup />;
+}
+
+function WorthLookup() {
   useTheme("creator");
   const [params, setParams] = useSearchParams();
   const [handle, setHandle] = useState(params.get("handle") ?? "");
@@ -120,8 +136,21 @@ export default function Worth() {
 
               <p className="text-sm text-fg-2">
                 Niche: <span className="font-medium text-fg">{r.niche_label}</span>
-                {r.niche_guessed ? " (guessed from your channel's YouTube topics; change it above)" : ""}.
+                {NICHE_FROM[r.niche_source] ?? ""}.
+                {r.language_label && (
+                  <>
+                    {" "}
+                    Language: <span className="font-medium text-fg">{r.language_label}</span>
+                    {r.language_source === "ai" ? " (read from the video titles by AI)." : " (from the video titles)."}
+                  </>
+                )}
               </p>
+              {r.ai_review && (
+                <p className="text-sm text-fg-2">
+                  AI market review: <span className="num font-medium text-fg">{r.ai_review.adjust_pct > 0 ? "+" : ""}{r.ai_review.adjust_pct}%</span> on the
+                  formula's price, capped at -30% to +40%. {r.ai_review.reasons[0]}
+                </p>
+              )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <FormatPriceCard price={r.prices.shorts} title="One brand Short" />

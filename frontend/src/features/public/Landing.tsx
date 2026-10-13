@@ -7,7 +7,7 @@ import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Moti
 import { Wordmark } from "@/components/shared/Wordmark";
 import { WorthLink } from "@/components/shared/WorthLink";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/lib/session";
+import { useSignedInHome } from "@/lib/session";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ const INTEGRATIONS: { icon: SimpleIcon; label: string }[] = [
 export default function Landing() {
   const shared = useSharedDemo();
   const demo = useDemoMode();
+  const signedIn = !!useDashboard();
   useTheme("site");
   const reduce = useReducedMotion();
   const rise = (delay: number) =>
@@ -72,11 +73,13 @@ export default function Landing() {
               <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
             </>
           )}
-          <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
-            <Link to="/worth">
-              <Youtube aria-hidden /> What am I worth? Check your YouTube channel
-            </Link>
-          </Button>
+          {!signedIn && (
+            <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
+              <Link to="/worth">
+                <Youtube aria-hidden /> What am I worth? Check your YouTube channel
+              </Link>
+            </Button>
+          )}
           {shared && <p className="w-full text-xs text-muted">Shared live demo: everyone sees the same data, and it resets automatically when idle.</p>}
         </motion.div>
 
@@ -182,10 +185,7 @@ function NavItem({ to, className, children }: { to: string; className?: string; 
 
 /** Where a signed-in visitor's dashboard is, or null when nobody is signed in. */
 function useDashboard(): string | null {
-  const creator = useSession("creator").data;
-  const brand = useSession("brand").data;
-  const role = (creator ?? brand)?.user.role;
-  return role === "creator" ? "/creator" : role === "brand" ? "/brand" : role === "admin" ? "/admin" : null;
+  return useSignedInHome().to;
 }
 
 /** Pill navigation floating at the bottom of the hero. Every item goes to a real page. */
@@ -207,8 +207,9 @@ function FloatingNav({ demo }: { demo: boolean }) {
       >
         <span aria-hidden>✦</span>
       </Link>
-      {/* The tool creators come for: a fair price from their own channel. Emphasised on purpose. */}
-      <WorthLink variant="pill" />
+      {/* The tool creators come for: a fair price from their own channel. Emphasised on purpose,
+          for visitors only: once signed in, their price is in their dashboard. */}
+      {!dashboard && <WorthLink variant="pill" />}
       <NavItem to="/brands" className="hidden sm:inline-flex">
         Brands
       </NavItem>
