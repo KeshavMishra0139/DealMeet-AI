@@ -27,8 +27,15 @@ log = logging.getLogger("jodidar.youtube")
 
 API = "https://www.googleapis.com/youtube/v3"
 CACHE_SECONDS = 12 * 3600
-MAX_VIDEOS = 30
+MAX_VIDEOS = 30  # the newest videos shown and put on a linked profile
 NEW_DAYS = 3  # videos younger than this are still gathering views
+# Pricing reads further back when needed: a TV network posts dozens of clips a day, so its
+# newest 30 can all be under 3 days old. Up to PRICE_PAGES pages of 50 uploads (2 quota
+# units a page) until PRICE_SAMPLE settled videos are in; each format is priced on its newest
+# PRICE_SAMPLE settled videos.
+PAGE_SIZE = 50
+PRICE_PAGES = 4
+PRICE_SAMPLE = 30
 SOURCE = "youtube_api"
 
 HANDLE = re.compile(r"^@?([A-Za-z0-9._-]{3,30})$")
@@ -127,42 +134,34 @@ def video_format(duration_s: int, title: str, description: str) -> str:
 def prices_for(videos: list[dict], niche: str) -> dict:
     """An estimate per format, Shorts and long videos priced separately: their views
     aren't comparable. Videos from the last 3 days aren't counted yet."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=NEW_DAYS)).isoformat()
+    cutoff = _cutoff()
     prices = {}
     for fmt in ("shorts", "long"):
-        of_fmt = [v for v in videos if v["format"] == fmt]
-        settled = [v["views"] for v in of_fmt if (v.get("published_at") or "") < cutoff]
-        prices[fmt] = public_estimate(settled, niche, fmt, newest_excluded=len(of_fmt) - len(settled))
+        of_fmt = sorted((v for v in videos if v["format"] == fmt), key=lambda v: v.get("published_at") or "", reverse=True)
+        settled = [v["views"] for v in of_fmt if (v.get("published_at") or "") < cutoff][:PRICE_SAMPLE]
+        fresh = sum(1 for v in of_fmt if (v.get("published_at") or "") >= cutoff)
+        prices[fmt] = public_estimate(settled, niche, fmt, newest_excluded=fresh)
     return prices
 
 
-def guess_niche(topics: list[str]) -> str | None:
-    t = " ".join(topics).lower()
-    return next((n for key, n in TOPIC_NICHES if key in t), None)
+def _cutoff() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=NEW_DAYS)).isoformat()
 
 
-def _iso(ts: float) -> str:
-    return datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(IST).isoformat(timespec="seconds")
-
-
-def channel_report(query: str, niche: str | None = None) -> dict:
-    """Live channel numbers, the last 30 videos and a price per format (estimate)."""
-    data, fetched = _call("channels", {"part": "snippet,statistics,topicDetails,contentDetails", **parse_query(query)})
-    items = data.get("items") or []
-    if not items:
-        raise HTTPException(404, "No YouTube channel found for that handle. Check the spelling, including the @.")
-    ch = items[0]
-    sn, st = ch.get("snippet") or {}, ch.get("statistics") or {}
-    topics = (ch.get("topicDetails") or {}).get("topicCategories") or []
-    uploads = ((ch.get("contentDetails") or {}).get("relatedPlaylists") or {}).get("uploads")
+def _uploads(playlist: str) -> list[dict]:
+    """The channel's uploads, newest first: one page of 50, more only while too few are old
+    enough to price. Live streams and scheduled premieres are left out: their views aren't in."""
     videos: list[dict] = []
-    if uploads:
-        pl, _ = _call("playlistItems", {"part": "contentDetails", "playlistId": uploads, "maxResults": MAX_VIDEOS})
+    token = None
+    for _ in range(PRICE_PAGES):
+        pl, _ = _call("playlistItems", {"part": "contentDetails", "playlistId": playlist, "maxResults": PAGE_SIZE, **({"pageToken": token} if token else {})})
         ids = [i["contentDetails"]["videoId"] for i in pl.get("items") or [] if (i.get("contentDetails") or {}).get("videoId")]
         if ids:
             vd, _ = _call("videos", {"part": "snippet,statistics,contentDetails", "id": ",".join(ids)})
             for v in vd.get("items") or []:
                 vs, vstat = v.get("snippet") or {}, v.get("statistics") or {}
+                if vs.get("liveBroadcastContent") in ("live", "upcoming"):
+                    continue
                 dur = _seconds((v.get("contentDetails") or {}).get("duration"))
                 videos.append(
                     {
@@ -178,10 +177,38 @@ def channel_report(query: str, niche: str | None = None) -> dict:
                         "permalink": f"https://www.youtube.com/watch?v={v['id']}",
                     }
                 )
+        token = pl.get("nextPageToken")
+        cutoff = _cutoff()
+        if not token or sum(1 for v in videos if (v.get("published_at") or "") < cutoff) >= PRICE_SAMPLE:
+            break
     videos.sort(key=lambda v: v["published_at"] or "", reverse=True)
+    return videos
+
+
+def guess_niche(topics: list[str]) -> str | None:
+    t = " ".join(topics).lower()
+    return next((n for key, n in TOPIC_NICHES if key in t), None)
+
+
+def _iso(ts: float) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(IST).isoformat(timespec="seconds")
+
+
+def channel_report(query: str, niche: str | None = None) -> dict:
+    """Live channel numbers, the newest 30 videos and a price per format (estimate)."""
+    data, fetched = _call("channels", {"part": "snippet,statistics,topicDetails,contentDetails", **parse_query(query)})
+    items = data.get("items") or []
+    if not items:
+        raise HTTPException(404, "No YouTube channel found for that handle. Check the spelling, including the @.")
+    ch = items[0]
+    sn, st = ch.get("snippet") or {}, ch.get("statistics") or {}
+    topics = (ch.get("topicDetails") or {}).get("topicCategories") or []
+    uploads = ((ch.get("contentDetails") or {}).get("relatedPlaylists") or {}).get("uploads")
+    every = _uploads(uploads) if uploads else []
+    videos = every[:MAX_VIDEOS]
     guessed = guess_niche(topics)
     use = niche if niche in NICHES else guessed or FALLBACK_NICHE
-    prices = prices_for(videos, use)
+    prices = prices_for(every, use)
     hidden = bool(st.get("hiddenSubscriberCount"))
     notes = []
     if hidden:

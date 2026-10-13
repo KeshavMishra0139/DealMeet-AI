@@ -54,7 +54,11 @@ class FakeYouTube:
             }
             return httpx.Response(200, json={"items": [item]}, request=req)
         if endpoint == "playlistItems":
-            return httpx.Response(200, json={"items": [{"contentDetails": {"videoId": v["id"]}} for v in self.videos]}, request=req)
+            start, size = int(params.get("pageToken") or 0), int(params.get("maxResults") or 5)
+            page = {"items": [{"contentDetails": {"videoId": v["id"]}} for v in self.videos[start : start + size]]}
+            if start + size < len(self.videos):
+                page["nextPageToken"] = str(start + size)
+            return httpx.Response(200, json=page, request=req)
         if endpoint == "videos":
             ids = params["id"].split(",")
             return httpx.Response(200, json={"items": [v for v in self.videos if v["id"] in ids]}, request=req)
@@ -166,3 +170,21 @@ def test_only_the_owner_links_a_channel(client, login, youtube):
     assert client.post("/api/creators/cr_b/youtube/link", json={"handle": "@testkitchen"}).status_code == 401
     assert login("cr_a").post("/api/creators/cr_b/youtube/link", json={"handle": "@testkitchen"}).status_code == 403
     assert login("br_thalam").get("/api/creators/cr_b/youtube").status_code == 403
+
+
+def test_a_channel_posting_dozens_a_day_is_priced_on_older_videos(client, youtube):
+    # A TV network: 80 clips in the last 2 days, then its older uploads.
+    youtube.videos = (
+        [_video(4000, 0, 0, 0, title="Live now")]
+        + [_video(1000 + i, 2_000_000, 300, 1) for i in range(80)]
+        + [_video(2000 + i, 400_000, 30, 4 + i // 10) for i in range(40)]
+        + [_video(3000 + i, 800_000, 900, 4 + i // 10) for i in range(40)]
+    )
+    youtube.videos[0]["snippet"]["liveBroadcastContent"] = "live"
+    r = yt.channel_report("@testkitchen")
+    assert len(r["videos"]) == 30  # the newest 30 still shown
+    shorts, long = r["prices"]["shorts"], r["prices"]["long"]
+    assert shorts["enough_data"] and shorts["median_views"] == 400_000
+    assert long["enough_data"] and long["median_views"] == 800_000 and long["videos"] == 29  # 150 read: 1 live, 80 new, 40 Shorts, 29 long
+    assert all(v["post_id"] != "v4000" for v in r["videos"])  # the live stream isn't counted
+    assert youtube.calls.count("playlistItems") == 3  # stopped once enough settled videos were in
