@@ -106,6 +106,20 @@ def logout(request: Request, response: Response):
     return {"ok": True}
 
 
+class DeleteAccountIn(BaseModel):
+    confirm: Literal["DELETE"]  # typed by the person, so a stray click can't delete an account
+
+
+@router.post("/delete-account")
+def delete_account(body: DeleteAccountIn, response: Response, user: dict = Depends(au.current_user)):
+    """Deletes the signed-in account and everything that is only its data (services/account.py)."""
+    from ..services import account
+
+    out = account.delete_account(user)
+    au.clear_cookie(response)
+    return {"deleted": out["deleted"]}
+
+
 @router.get("/me")
 def me(user: dict = Depends(au.current_user)):
     db = get_db()

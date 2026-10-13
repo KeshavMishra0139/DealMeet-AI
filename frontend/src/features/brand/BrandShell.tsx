@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
 import { ActionAssistant } from "@/components/shared/ActionAssistant";
+import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
@@ -95,7 +96,9 @@ function Console() {
         <Link to="/brand" className="mx-1.5 rounded-lg" aria-label="DealMeet AI: your Console home">
           <Wordmark />
         </Link>
-        <BrandSwitcher className="mt-5" />
+        <AccountMenu role="brand" className="mt-5" links={[{ label: "Brand profile", to: "/brand/profile" }]}>
+          <BrandSwitcher />
+        </AccountMenu>
         <Button asChild variant="primary" size="sm" className="mx-0.5 mt-4 justify-start">
           <Link to="/brand/campaigns/new">
             <Plus aria-hidden /> New campaign
@@ -148,13 +151,13 @@ function BrandSwitcher({ className }: { className?: string }) {
   const brand = useBrand();
   if (!brand.data) return <div className={cn("skeleton h-[52px] rounded-xl", className)} />;
   return (
-    <div className={cn("flex items-center gap-2.5 rounded-xl border border-line p-2", className)}>
+    <span className={cn("flex items-center gap-2.5 rounded-xl border border-line p-2 pr-8 transition-colors hover:bg-surface-2", className)}>
       <Avatar name={brand.data.name} hue={brand.data.hue} size={32} className="rounded-lg" />
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold">{brand.data.name}</p>
-        <p className="truncate text-xs text-muted">{brand.data.category}</p>
-      </div>
-    </div>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-semibold">{brand.data.name}</span>
+        <span className="block truncate text-xs text-muted">{brand.data.category}</span>
+      </span>
+    </span>
   );
 }
 
@@ -197,6 +200,7 @@ function Controls({ onDone }: { onDone?: () => void }) {
         </Button>
       )}
       <SignOutButton role="brand" onDone={onDone} size="sm" className="w-full justify-start" />
+      <DeleteAccountButton role="brand" onDone={onDone} />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.</p>}
     </div>
   );

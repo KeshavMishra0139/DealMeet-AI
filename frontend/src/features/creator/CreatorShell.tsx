@@ -19,6 +19,7 @@ import {
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
+import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { ActionAssistant } from "@/components/shared/ActionAssistant";
@@ -92,7 +93,17 @@ function Studio() {
         <Link to="/creator" className="mx-2 rounded-lg" aria-label="DealMeet AI: your Studio home">
           <Wordmark />
         </Link>
-        <ProfileCard creator={creator.data} className="mx-1 mt-6" />
+        <AccountMenu
+          role="creator"
+          className="mx-1 mt-6 w-auto"
+          links={[
+            { label: "Profile", to: "/creator/profile" },
+            { label: "Connections", to: "/creator/connections" },
+            { label: "Privacy", to: "/creator/privacy" },
+          ]}
+        >
+          <ProfileCard creator={creator.data} />
+        </AccountMenu>
         <AskButton className="mx-1 mt-3 justify-start" />
         <ActionAssistant role="creator" className="mx-1 mt-2 justify-start" />
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
@@ -229,13 +240,13 @@ function SideLink({ item, label }: { item: NavItem; label: string }) {
 function ProfileCard({ creator, className }: { creator?: Creator; className?: string }) {
   if (!creator) return <div className={cn("skeleton h-[60px] rounded-2xl", className)} />;
   return (
-    <div className={cn("flex items-center gap-3 rounded-2xl border border-line bg-surface p-2.5", className)}>
+    <span className={cn("flex items-center gap-3 rounded-2xl border border-line bg-surface p-2.5 pr-8 transition-colors hover:bg-surface-2", className)}>
       <Avatar name={creator.name} hue={creator.avatar_hue} size={38} generic={creator.is_reference} />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{creator.name}</p>
-        <p className="truncate text-xs text-muted">{creator.niche_label}</p>
-      </div>
-    </div>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{creator.name}</span>
+        <span className="block truncate text-xs text-muted">{creator.niche_label}</span>
+      </span>
+    </span>
   );
 }
 
@@ -297,6 +308,7 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
         </Button>
       )}
       <SignOutButton role="creator" onDone={onDone} className="w-full justify-start" />
+      <DeleteAccountButton role="creator" onDone={onDone} size="md" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">{t("common.sharedDemo")}</p>}
     </div>
   );
