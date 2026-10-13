@@ -669,6 +669,7 @@ frontend/
 shared/            copy rules used by both test suites
 qa/                Playwright screenshots, accessibility audit and e2e journeys (localhost only)
 scripts/           cross-platform dev, demo and test runners
+
 ```
 
 ## Stack
