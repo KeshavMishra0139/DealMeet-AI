@@ -19,7 +19,10 @@ def get_creator(creator_id: str, _: dict = Depends(own_creator)):
     c = get_db().creators.find_one({"_id": creator_id})
     if not c:
         raise HTTPException(404, "Creator not found")
-    return creator_view(c)
+    from ..engines import metrics
+
+    # The words every screen uses for this creator's posts and audience (videos and subscribers on YouTube).
+    return {**creator_view(c), "terms": metrics.terms(c)}
 
 
 @router.get("/brands/{brand_id}")

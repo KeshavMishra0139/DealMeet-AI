@@ -2,6 +2,5 @@
 import { lazy } from "react";
 
 export const HeroOrbit = lazy(() => import("./HeroOrbit"));
-export const ReachBars3D = lazy(() => import("./ReachBars3D"));
 export const MatchMap3D = lazy(() => import("./MatchMap3D"));
 export const DealFlow3D = lazy(() => import("./DealFlow3D"));

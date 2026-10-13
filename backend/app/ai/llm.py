@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import Callable, TypeVar
 
+import httpx
 from pydantic import BaseModel, ValidationError
 
 from ..config import get_settings
@@ -65,6 +66,48 @@ def _get_client():
     return _client
 
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+class _NoOutput(Exception):
+    """The model answered without usable output (a refusal, a cut-off or an empty reply)."""
+
+
+def _json_object(text: str) -> str:
+    """The JSON object in a reply, without ```json fences or a sentence around it."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("no JSON object in the reply")
+    return text[start : end + 1]
+
+
+def _openrouter(prompt: str, schema: type[T], max_tokens: int) -> T:
+    """One call through OpenRouter's chat completions API (AI_MODEL is its model id, such as
+    a Claude model under "anthropic/"). The reply must be JSON for `schema`; it's checked with
+    Pydantic like the direct path's structured output."""
+    s = get_settings()
+    shape = json.dumps(schema.model_json_schema(), separators=(",", ":"))
+    r = httpx.post(
+        OPENROUTER_URL,
+        headers={"Authorization": f"Bearer {s.openrouter_api_key}", "X-Title": "DealMeet AI"},
+        json={
+            "model": s.ai_model,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": f"{SYSTEM}\n\nReply with one JSON object only, no other text, matching this JSON Schema: {shape}"},
+                {"role": "user", "content": prompt},
+            ],
+        },
+        timeout=30.0,
+    )
+    r.raise_for_status()
+    choice = (r.json().get("choices") or [{}])[0]
+    text = (choice.get("message") or {}).get("content") or ""
+    if choice.get("finish_reason") in ("content_filter", "length") or not text.strip():
+        raise _NoOutput(choice.get("finish_reason") or "empty")
+    return schema.model_validate_json(_json_object(text))
+
+
 def breaks_copy_rules(text: str) -> bool:
     return any(rx.search(text) for rx in _RULES)
 
@@ -106,6 +149,27 @@ def generate(
         log.info("AI %s: hourly limit reached; using template", task)
         return fallback(), "template"
 
+    if s.ai_provider == "openrouter":
+        try:
+            result = _openrouter(prompt, schema, max_tokens)
+        except _NoOutput as e:
+            log.info("AI %s: no usable output from OpenRouter (%s); using template", task, e)
+            return fallback(), "template"
+        except httpx.HTTPStatusError as e:
+            # 401: wrong key; 402: no credits on the OpenRouter account; 429: rate limited.
+            log.warning("AI %s: OpenRouter error %s; using template", task, e.response.status_code)
+            return fallback(), "template"
+        except httpx.HTTPError:
+            log.warning("AI %s: OpenRouter unreachable; using template", task)
+            return fallback(), "template"
+        except (ValidationError, ValueError) as e:
+            log.warning("AI %s: invalid output from OpenRouter (%s); using template", task, type(e).__name__)
+            return fallback(), "template"
+        except Exception as e:  # never let the demo break on an AI call
+            log.warning("AI %s: unexpected OpenRouter error (%s); using template", task, type(e).__name__)
+            return fallback(), "template"
+        return _checked(task, key, result, fallback, facts)
+
     try:
         import anthropic
 
@@ -136,6 +200,11 @@ def generate(
         log.warning("AI %s: unexpected error (%s); using template", task, type(e).__name__)
         return fallback(), "template"
 
+    return _checked(task, key, result, fallback, facts)
+
+
+def _checked(task: str, key: str, result: T, fallback: Callable[[], T], facts: str | None) -> tuple[T, str]:
+    """Live output is used only if it keeps the copy rules and cites only numbers in the facts."""
     text = result.model_dump_json()
     if breaks_copy_rules(text):
         log.info("AI %s: output broke copy rules; using template", task)
@@ -143,5 +212,5 @@ def generate(
     if facts is not None and not numbers_grounded(text, facts):
         log.info("AI %s: output used numbers not in the facts; using template", task)
         return fallback(), "template"
-    db.ai_cache.replace_one({"_id": key}, {"_id": key, "task": task, "data": result.model_dump()}, upsert=True)
+    get_db().ai_cache.replace_one({"_id": key}, {"_id": key, "task": task, "data": result.model_dump()}, upsert=True)
     return result, "ai"

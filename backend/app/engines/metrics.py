@@ -219,11 +219,38 @@ def on_youtube(c: dict) -> bool:
     return bool(r) and r[0].get("source") == "youtube_api"
 
 
+# The words each platform uses. Copy about a creator's own posts and audience follows
+# the platform their numbers come from: a YouTube creator never reads "reels".
+TERMS = {
+    "youtube": {"platform": "youtube", "label": "YouTube", "post": "video", "posts": "videos", "audience": "subscribers"},
+    "instagram": {"platform": "instagram", "label": "Instagram", "post": "reel", "posts": "reels", "audience": "followers"},
+}
+
+
+def platform(c: dict) -> str:
+    """'youtube' or 'instagram': where the profile's numbers come from, else the
+    connected channel, else the platforms the creator said they use."""
+    r = recent(c)
+    if r and r[0].get("source") in ("youtube_api", "instagram_api"):
+        return "youtube" if r[0]["source"] == "youtube_api" else "instagram"
+    channels = c.get("channels") or {}
+    if channels.get("instagram"):
+        return "instagram"
+    if channels.get("youtube"):
+        return "youtube"
+    said = c.get("platforms") or []
+    return "youtube" if "youtube" in said and "instagram" not in said else "instagram"
+
+
+def terms(c: dict) -> dict:
+    return TERMS[platform(c)]
+
+
 def post_noun(c: dict) -> str:
     """'video' or 'reel', for copy about the creator's own posts."""
-    return "video" if on_youtube(c) else "reel"
+    return terms(c)["post"]
 
 
 def audience_noun(c: dict) -> str:
     """'subscribers' or 'followers', for copy about the creator's follower count."""
-    return "subscribers" if on_youtube(c) else "followers"
+    return terms(c)["audience"]

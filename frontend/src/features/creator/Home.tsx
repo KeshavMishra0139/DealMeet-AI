@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { CountUp, Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { MoveCard } from "./MoveCard";
 import { ReachCard } from "./ReachCard";
+import { PlatformDashboards, usePlatforms } from "./PlatformDashboard";
 import { WeeklyReport } from "./WeeklyReport";
 
 export function useHome(id: string) {
@@ -31,6 +32,7 @@ export default function Home() {
   const { t } = useI18n();
   const tr = useTr();
   const home = useHome(id);
+  const platforms = usePlatforms(id);
   const qc = useQueryClient();
   const next = useMutation({
     mutationFn: () => post<Plan>(`/creators/${id}/plan/next`),
@@ -43,6 +45,7 @@ export default function Home() {
   if (home.isError) return <ErrorState error={home.error} onRetry={() => home.refetch()} />;
   if (!home.data) return <HomeSkeleton />;
   const { creator, stage, plan, durable, rate_gap, pipeline, context } = home.data;
+  const yt = context.terms.platform === "youtube";
 
   return (
     <div>
@@ -58,7 +61,9 @@ export default function Home() {
       </h1>
       {creator.reference_note && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
 
-      <WeeklyReport creatorId={id} className="mt-5" />
+      <WeeklyReport creatorId={id} youtube={context.terms.platform === "youtube"} className="mt-5" />
+
+      <PlatformDashboards creatorId={id} className="mt-5" />
 
       {plan.changes.length > 0 && plan.week > 1 && (
         <motion.div
@@ -100,7 +105,8 @@ export default function Home() {
 
       <Goals creatorId={id} />
 
-      {context.has_reels && (
+      {/* A connected platform's dashboard above already draws its own chart. */}
+      {context.has_reels && platforms.data && !platforms.data.platforms.length && (
         <Reveal className="mt-8">
           <ReachCard context={context} />
         </Reveal>
@@ -122,11 +128,11 @@ export default function Home() {
 
       <p className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <span>{t("home.context")}:</span>
-        <span className="num">{t("home.followers", { n: count(context.followers) })}</span>
+        <span className="num">{t(yt ? "home.followersYt" : "home.followers", { n: count(context.followers) })}</span>
         {context.has_reels && (
           <>
             <span aria-hidden>·</span>
-            <span className="num">{t("home.medianViews", { n: count(context.median_views) })}</span>
+            <span className="num">{t(yt ? "home.medianViewsYt" : "home.medianViews", { n: count(context.median_views) })}</span>
           </>
         )}
         {context.trust && (

@@ -29,6 +29,58 @@ export interface Stage {
   hi?: { label: string; line: string };
 }
 
+/** A platform's own words, from the server (engines/metrics.py TERMS). */
+export interface Terms {
+  platform: "youtube" | "instagram";
+  label: string;
+  post: string;
+  posts: string;
+  audience: string;
+}
+
+/** One connected platform's dashboard (GET /creators/{id}/platforms, services/platforms.py). */
+export interface PlatformDashboard {
+  platform: "youtube" | "instagram";
+  terms: Terms;
+  account: { name: string | null; handle: string | null; picture: string | null; verified: boolean };
+  source: string;
+  fetched_at: string | null;
+  kpis: { key: string; label: string; value: number | null; hidden?: boolean }[];
+  chart: { recent: { date: string; views: number; title: string | null }[]; audience: number | null };
+  formats: { key: string; label: string; count: number; median_views: number }[];
+  posts: {
+    id: string;
+    date: string;
+    title: string | null;
+    views: number;
+    likes: number | null;
+    comments: number | null;
+    saves: number | null;
+    shares: number | null;
+    format: string;
+    permalink: string | null;
+  }[];
+  change: { now: number; before: number; since: string } | null;
+  analytics: {
+    period_days?: number;
+    views?: number;
+    minutes_watched?: number;
+    average_view_duration_s?: number;
+    top_age: { age: string; percent: number } | null;
+    women_percent?: number | null;
+    top_countries?: { country: string; share: number }[];
+    top_cities?: { city: string; share: number }[];
+  } | null;
+  insights: string[];
+  notes: string[];
+}
+
+export interface Platforms {
+  primary: "youtube" | "instagram" | null;
+  terms: Terms;
+  platforms: PlatformDashboard[];
+}
+
 export type Effort = "S" | "M" | "L";
 export type MoveCategory = "money" | "growth" | "opportunity";
 
@@ -130,6 +182,8 @@ export interface Home {
     followers: number;
     median_views: number;
     has_reels: boolean;
+    /** The words for this creator's posts and audience: videos and subscribers on YouTube. */
+    terms: Terms;
     reach_ratio: number | null;
     trust: TrustInfo | null;
     recent?: { date: string; views: number }[];

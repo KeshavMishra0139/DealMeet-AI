@@ -19,7 +19,8 @@ import { cn } from "@/lib/utils";
 const PLATFORM = { instagram: "Instagram", youtube: "YouTube" } as const;
 const TILE_HEIGHT = "min-h-[168px]";
 
-export function WeeklyReport({ creatorId, className }: { creatorId: string; className?: string }) {
+/** `youtube`: the creator's posts are YouTube videos, so it says videos, not reels. */
+export function WeeklyReport({ creatorId, youtube = false, className }: { creatorId: string; youtube?: boolean; className?: string }) {
   const { t } = useI18n();
   const q = useQuery({ queryKey: ["weekly-report", creatorId], queryFn: () => api<Report>(`/creators/${creatorId}/weekly-report`) });
 
@@ -58,14 +59,17 @@ export function WeeklyReport({ creatorId, className }: { creatorId: string; clas
             ))}
           </div>
         )}
-        {q.data && <Body r={q.data} />}
+        {q.data && <Body r={q.data} youtube={youtube} />}
       </div>
     </section>
   );
 }
 
-function Body({ r }: { r: Report }) {
+function Body({ r, youtube }: { r: Report; youtube: boolean }) {
   const { t } = useI18n();
+  const yt = youtube || r.reach?.source === "youtube_api";
+  const w = (key: "weekly.reach" | "weekly.reelsOne" | "weekly.reels" | "weekly.reelsNone" | "weekly.quiet", vars?: Record<string, string | number>) =>
+    t(yt ? (`${key}Yt` as const) : key, vars);
   const { profile_views: views, offers, paid, reach } = r;
   return (
     <>
@@ -101,18 +105,18 @@ function Body({ r }: { r: Report }) {
         {reach ? (
           <Metric
             icon={<PlayCircle />}
-            label={t("weekly.reach")}
+            label={w("weekly.reach")}
             value={reach.this}
             format={count}
             last={reach.last}
             lastFormat={count}
-            sub={reach.reels === 0 ? t("weekly.reelsNone") : reach.reels === 1 ? t("weekly.reelsOne") : t("weekly.reels", { n: reach.reels })}
+            sub={reach.reels === 0 ? w("weekly.reelsNone") : reach.reels === 1 ? w("weekly.reelsOne") : w("weekly.reels", { n: reach.reels })}
             source={reach.source}
           />
         ) : (
           <div className={cn(TILE_HEIGHT, "flex flex-col justify-between rounded-2xl bg-[#f9fafb] p-3.5 ring-1 ring-slate-200/70 sm:p-4")}>
             <p className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-              <PlayCircle className="size-3.5" aria-hidden /> {t("weekly.reach")}
+              <PlayCircle className="size-3.5" aria-hidden /> {w("weekly.reach")}
             </p>
             <p className="mt-2 text-[13px] leading-snug text-slate-600">{t("weekly.noReach")}</p>
             <Link to="/creator/connections" className="mt-2 self-start rounded-full bg-[#0a1b33] px-3 py-1 text-xs font-medium text-white hover:bg-[#16305a]">
@@ -124,7 +128,7 @@ function Body({ r }: { r: Report }) {
           <Metric
             key={f.platform}
             icon={<Users />}
-            label={t("weekly.followers", { platform: PLATFORM[f.platform] })}
+            label={t(f.platform === "youtube" ? "weekly.followersYt" : "weekly.followers", { platform: PLATFORM[f.platform] })}
             value={f.now}
             format={count}
             last={f.before}
@@ -133,7 +137,7 @@ function Body({ r }: { r: Report }) {
           />
         ))}
       </div>
-      {r.quiet && <p className="mt-3 text-[13px] text-slate-600">{t("weekly.quiet")}</p>}
+      {r.quiet && <p className="mt-3 text-[13px] text-slate-600">{w("weekly.quiet")}</p>}
     </>
   );
 }

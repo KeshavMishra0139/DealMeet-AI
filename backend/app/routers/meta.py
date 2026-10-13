@@ -28,6 +28,7 @@ def health(response: Response):
             "db": db_mode(),
             "db_ok": db_ok,
             "ai": "live" if s.has_ai else "templates",
+            "ai_provider": s.ai_provider,  # anthropic, openrouter or None
             "payments": payments.mode(),
             "payouts": payments.payout_mode(),
             "social": social_mode(),

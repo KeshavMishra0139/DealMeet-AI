@@ -163,4 +163,5 @@ def context_line(c: dict) -> dict:
         "trust": trust_score(c),
         "recent": [{"date": r["date"], "views": r["views"]} for r in recent],
         "recent_provenance": {"views": metrics.prov(c, "reels.0.views"), "followers": metrics.prov(c, "followers")},
+        "terms": metrics.terms(c),
     }

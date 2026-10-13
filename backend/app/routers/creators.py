@@ -46,6 +46,14 @@ def home(creator_id: str, _: dict = Depends(au.own_creator)):
     }
 
 
+@router.get("/creators/{creator_id}/platforms")
+def platform_dashboards(creator_id: str, _: dict = Depends(au.own_creator)):
+    """One dashboard per connected platform, in that platform's words (services/platforms.py)."""
+    from ..services import platforms
+
+    return platforms.overview(cc.load_creator(creator_id))
+
+
 class MoveAction(BaseModel):
     action: Literal["done", "skip", "reopen"]
     result: Literal["worked", "partly", "no"] | None = None

@@ -82,6 +82,9 @@ class Settings:
     firebase_service_account_json: str | None = None
     google_application_credentials: str | None = None
     youtube_api_key: str | None = None
+    # OpenRouter (https://openrouter.ai): used for AI copy when ANTHROPIC_API_KEY isn't set.
+    # AI_MODEL is then OpenRouter's model id, e.g. a Claude model listed as "anthropic/...".
+    openrouter_api_key: str | None = None
     token_enc_key: str | None = None
     ig_app_id: str | None = None
     ig_app_secret: str | None = None
@@ -102,8 +105,15 @@ class Settings:
     tee_max_age_s: int = 300
 
     @property
+    def ai_provider(self) -> str | None:
+        """"anthropic" (direct, ANTHROPIC_API_KEY), else "openrouter" (OPENROUTER_API_KEY), else None."""
+        if not self.ai_model:
+            return None
+        return "anthropic" if self.ai_api_key else "openrouter" if self.openrouter_api_key else None
+
+    @property
     def has_ai(self) -> bool:
-        return bool(self.ai_api_key and self.ai_model)
+        return self.ai_provider is not None
 
     @property
     def has_razorpay(self) -> bool:
@@ -140,6 +150,7 @@ def get_settings() -> Settings:
         firebase_service_account_json=_env("FIREBASE_SERVICE_ACCOUNT_JSON"),
         google_application_credentials=_env("GOOGLE_APPLICATION_CREDENTIALS"),
         youtube_api_key=_env("YOUTUBE_API_KEY"),
+        openrouter_api_key=_env("OPENROUTER_API_KEY"),
         token_enc_key=_env("TOKEN_ENC_KEY"),
         ig_app_id=_env("IG_APP_ID"),
         ig_app_secret=_env("IG_APP_SECRET"),
