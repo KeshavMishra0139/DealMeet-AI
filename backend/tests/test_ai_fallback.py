@@ -80,7 +80,7 @@ def openrouter(monkeypatch, db):
     """OpenRouter as the provider (OPENROUTER_API_KEY, no ANTHROPIC_API_KEY), its API faked."""
     import httpx
 
-    settings = replace(get_settings(), ai_api_key=None, openrouter_api_key="or-key", ai_model="anthropic/claude-test")
+    settings = replace(get_settings(), ai_api_key=None, openrouter_api_key="or-key", ai_model="anthropic/test-model")
     monkeypatch.setattr(llm, "get_settings", lambda: settings)
     state = {"calls": [], "status": 200, "content": None, "finish": "stop", "raise": None}
 
@@ -109,7 +109,7 @@ def test_openrouter_json_reply_is_used_and_cached(openrouter):
     assert src == "ai" and out.tags[0].language == "ta"
     call = openrouter["calls"][0]
     assert call["url"] == llm.OPENROUTER_URL and call["headers"]["Authorization"] == "Bearer or-key"
-    assert call["json"]["model"] == "anthropic/claude-test" and "JSON Schema" in call["json"]["messages"][0]["content"]
+    assert call["json"]["model"] == "anthropic/test-model" and "JSON Schema" in call["json"]["messages"][0]["content"]
     assert llm.generate("or1", "prompt-or1", CaptionTags, lambda: _tag("en"))[1] == "cache" and len(openrouter["calls"]) == 1
 
 

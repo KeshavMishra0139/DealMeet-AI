@@ -83,7 +83,7 @@ class Settings:
     google_application_credentials: str | None = None
     youtube_api_key: str | None = None
     # OpenRouter (https://openrouter.ai): used for AI copy when ANTHROPIC_API_KEY isn't set.
-    # AI_MODEL is then OpenRouter's model id, e.g. a Claude model listed as "anthropic/...".
+    # AI_MODEL is then OpenRouter's model id, e.g. an Anthropic model listed as "anthropic/...".
     openrouter_api_key: str | None = None
     token_enc_key: str | None = None
     ig_app_id: str | None = None

@@ -83,7 +83,7 @@ def _json_object(text: str) -> str:
 
 def _openrouter(prompt: str, schema: type[T], max_tokens: int) -> T:
     """One call through OpenRouter's chat completions API (AI_MODEL is its model id, such as
-    a Claude model under "anthropic/"). The reply must be JSON for `schema`; it's checked with
+    an Anthropic model under "anthropic/"). The reply must be JSON for `schema`; it's checked with
     Pydantic like the direct path's structured output."""
     s = get_settings()
     shape = json.dumps(schema.model_json_schema(), separators=(",", ":"))
