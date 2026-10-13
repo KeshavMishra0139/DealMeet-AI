@@ -59,3 +59,13 @@ def test_deals_in_progress_block_deletion(client, db):
     db.deals.update_one({"_id": "dl_real"}, {"$set": {"stage": "paid"}})
     assert a.post("/api/auth/delete-account", json={"confirm": "DELETE"}).status_code == 200
     assert db.deals.find_one({"_id": "dl_real"})  # the brand keeps its record of a paid deal
+
+
+def test_a_collective_seat_is_declined_not_deleted(client, db):
+    a, cid = _new_creator(client, db)
+    db.deals.insert_many([
+        {"_id": "dl_col", "creator_id": cid, "brand_id": "br_senpai", "kind": "collective", "stage": "offer", "amount": 3000},
+        {"_id": "dl_one", "creator_id": cid, "brand_id": "br_senpai", "stage": "offer", "amount": 3000},
+    ])
+    assert a.post("/api/auth/delete-account", json={"confirm": "DELETE"}).status_code == 200
+    assert db.deals.find_one({"_id": "dl_col"})["stage"] == "declined" and db.deals.find_one({"_id": "dl_one"}) is None

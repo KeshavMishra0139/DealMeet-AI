@@ -255,6 +255,12 @@ def save_for_creator(creator_id: str, report: dict) -> dict:
         db.posts.delete_many({"creator_id": creator_id, "platform": "youtube"})
         db.metric_snapshots.delete_many({"creator_id": creator_id, "platform": "youtube"})
     db.creators.update_one({"_id": creator_id}, {"$set": {"channels.youtube": summary}})
+    dated = [v["published_at"] for v in report["videos"] if v.get("published_at")]
+    if prev.get("channel_id") == ch["id"] and dated:
+        # Videos the channel removed or made private since the last read: they're gone from
+        # its newest videos, so they leave the profile too. Older ones are out of the read's range.
+        db.posts.delete_many({"creator_id": creator_id, "platform": "youtube", "published_at": {"$gte": min(dated)},
+                              "post_id": {"$nin": [v["post_id"] for v in report["videos"]]}})
     for v in report["videos"]:
         db.posts.update_one(
             {"creator_id": creator_id, "platform": "youtube", "post_id": v["post_id"]},
@@ -368,14 +374,25 @@ def apply_to_profile(creator_id: str) -> bool:
     if subscribers is not None:
         update["followers"] = int(subscribers)
         prov["followers"] = "real"
+    elif not first and prov.get("followers") == "real":
+        # The channel hid its count since it was last read: the count from before linking
+        # comes back rather than an old YouTube number labelled live.
+        before = c["pre_youtube"]
+        update["followers"] = before.get("followers")
+        prov.pop("followers", None)
+        if source_of({**c, **before}, "followers") == "manual":
+            prov["followers"] = "manual"
+        elif (old := (before.get("provenance") or {}).get("followers")):
+            prov["followers"] = old
     videos = db.posts.find({"creator_id": creator_id, "platform": "youtube"}).sort("published_at", -1).limit(PROFILE_VIDEOS)
     reels = [_reel(v, day) for v in videos if (day := _ist_date(v.get("published_at")))]
     if reels:
         update["reels"] = reels
         prov["reels"] = "real"
         update["insights_source"] = SOURCE
-    elif c.get("insights_source") == "synthetic":
-        # Sample reels never stand in for a real channel that has no public videos yet.
+    elif c.get("insights_source") in ("synthetic", SOURCE):
+        # Sample reels, or videos the channel has since removed, never stand in for a
+        # real channel that has no public videos now.
         update["reels"] = []
         update["insights_source"] = SOURCE
     update["provenance"] = prov
@@ -400,7 +417,19 @@ def _restore(creator_id: str) -> None:
         pre_ig = c.get("pre_instagram")
         if pre_ig is not None:
             update["$set"] = {"pre_instagram": {**pre_ig, **{k: before.get(k) for k in pre_ig if k in before}}}
-        update.setdefault("$set", {})["reference_note"] = before.get("reference_note")
+        sets = update.setdefault("$set", {})
+        sets["reference_note"] = before.get("reference_note")
+        sets["insights_connected.youtube"] = False
+        if c.get("insights_source") == SOURCE:
+            # Instagram is connected but hasn't brought its posts in yet: the channel's
+            # videos still on show go, and the posts from before the channel come back.
+            sets["reels"] = before.get("reels") or []
+            sets["provenance"] = {**{k: v for k, v in (c.get("provenance") or {}).items() if not k.startswith("reels")},
+                                  **{k: v for k, v in (before.get("provenance") or {}).items() if k.startswith("reels")}}
+            if before.get("insights_source") is None:
+                update["$unset"]["insights_source"] = ""
+            else:
+                sets["insights_source"] = before["insights_source"]
     else:
         update["$set"] = {k: v for k, v in before.items() if v is not None}
         update["$set"]["insights_connected"] = {**(before.get("insights_connected") or {}), "youtube": False}

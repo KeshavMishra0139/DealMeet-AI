@@ -137,7 +137,7 @@ function textWidth(s: string, size: number, weight = 400) {
 function scale(max: number) {
   const raw = max / 3;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = Math.max(1, [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag);
+  const step = Math.max(1, [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag);
   const steps = Math.max(1, Math.ceil(max / step - 1e-9));
   return { top: steps * step, ticks: Array.from({ length: steps + 1 }, (_, i) => i * step) };
 }
@@ -321,7 +321,7 @@ function ReachChart({
               width={slot}
               height={H}
               fill="transparent"
-              onPointerEnter={() => setActive(i)}
+              onPointerEnter={(e) => e.pointerType === "mouse" && setActive(i)}
               onClick={() => setActive((a) => (a === i ? null : i))}
             />
           ))}

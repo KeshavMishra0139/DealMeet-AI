@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import uuid
 import re
 from typing import Annotated, Literal
 
@@ -179,12 +180,11 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         raise HTTPException(409, "This account already has a creator profile.")
     if body.sample_insights and not get_settings().demo_mode:
         raise HTTPException(422, "Sample insights exist only in demo mode. Connect Instagram or YouTube for real numbers.")
-    if db.creators.count_documents({"created_by": "onboarding"}) >= 100:
+    if get_settings().demo_mode and db.creators.count_documents({"created_by": "onboarding"}) >= 100:
         raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
     followers = body.followers if body.followers is not None else STAGE_FOLLOWERS[body.audience_stage]
-    cid = f"cr_new_{db.creators.count_documents({'created_by': 'onboarding'}) + 1}"
-    while db.creators.count_documents({"_id": cid}):
-        cid += "x"
+    # Never reused: a deleted account's id must not pass its kept records (paid deals) to someone new.
+    cid = f"cr_new_{uuid.uuid4().hex[:10]}"
     rng = random.Random(cid)
     city = body.city if body.city in CITIES else "Mumbai"
     connected = body.sample_insights  # sample data stands in for a connected account, labelled so

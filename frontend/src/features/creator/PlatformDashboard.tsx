@@ -108,7 +108,7 @@ function PlatformView({ d }: { d: Dashboard }) {
       <dl className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {d.kpis.map((k) => (
           <div key={k.key} className="card-surface rounded-2xl p-3.5 sm:p-4">
-            <dt className="text-[11px] font-medium leading-snug text-muted first-letter:uppercase">{t(`platform.kpi.${k.key}` as keyof Dict, { posts: words.posts, audience: words.audience })}</dt>
+            <dt className="text-[11px] font-medium leading-snug text-muted first-letter:uppercase">{t(`platform.kpi.${k.key}` as keyof Dict, { posts: words.posts, audience: words.audience, n: d.chart.recent.length })}</dt>
             <dd className="num mt-1.5 font-display text-2xl font-semibold">
               {k.hidden ? <span className="text-base text-fg-2">{t("platform.hidden")}</span> : k.value == null ? "—" : formatKpi(k.key, k.value)}
             </dd>

@@ -204,3 +204,47 @@ def test_removing_sample_data_keeps_real_accounts(client, youtube, db):
     moves = a.get(f"/api/creators/{cid}/home").json()["plan"]["moves"]
     assert len(moves) == 3 and "dream_brands" not in {m["kind"] for m in moves}
     assert remove_sample(db) == {}  # safe to repeat
+
+
+def test_a_refresh_follows_removed_videos_and_a_hidden_count(client, youtube, db):
+    _, cid = _new_creator(client, db, channel=CHANNEL, followers=850)
+    assert db.creators.find_one({"_id": cid})["followers"] == 21_300
+    report = yt.channel_report(CHANNEL)
+    newest = sorted(report["videos"], key=lambda v: v["published_at"], reverse=True)
+    # The newest video was made private and the channel hid its subscriber count.
+    report["videos"] = newest[1:]
+    report["channel"]["subscribers"] = None
+    yt.save_for_creator(cid, report)
+    c = db.creators.find_one({"_id": cid})
+    assert db.posts.count_documents({"creator_id": cid, "post_id": newest[0]["post_id"]}) == 0
+    assert len(c["reels"]) == len(newest) - 1
+    assert c["followers"] == 850 and source_of(c, "followers") == "manual"  # not an old YouTube number labelled live
+    # Every video removed: the profile shows none rather than the old ones.
+    db.posts.delete_many({"creator_id": cid, "platform": "youtube"})
+    yt.apply_to_profile(cid)
+    assert db.creators.find_one({"_id": cid})["reels"] == []
+
+
+def test_unlinking_youtube_before_instagram_brings_its_posts_restores_the_posts(login, youtube, db):
+    a = login("cr_b")
+    original = db.creators.find_one({"_id": "cr_b"})
+    a.post("/api/creators/cr_b/youtube/link", json={"handle": "@testkitchen"})
+    # Instagram connected, but its posts aren't in yet: the channel's videos are still on show.
+    db.creators.update_one({"_id": "cr_b"}, {"$set": {"channels.instagram": {"followers": 999}, "followers": 999}})
+    a.delete("/api/creators/cr_b/youtube/link")
+    c = db.creators.find_one({"_id": "cr_b"})
+    assert c["reels"] == original["reels"] and c.get("insights_source") == original.get("insights_source")
+    assert c["insights_connected"]["youtube"] is False and c["followers"] == 999
+
+
+def test_removing_sample_data_also_removes_demo_accounts_but_not_claimed_pages(client, db):
+    from app.seed.load import remove_sample
+
+    demo = au.new_user("creator", "Guest", demo=True)
+    db.users.update_one({"_id": demo["_id"]}, {"$set": {"creator_id": "cr_guest"}})
+    db.creators.insert_one({"_id": "cr_guest", "name": "Guest"})
+    owner = au.new_user("brand", "Senpai", email=f"owner-{uuid.uuid4().hex[:8]}@example.test")
+    db.brands.update_one({"_id": "br_senpai"}, {"$set": {"owner_user_id": owner["_id"], "claimed": True}})
+    remove_sample(db)
+    assert db.users.find_one({"_id": demo["_id"]}) is None and db.creators.find_one({"_id": "cr_guest"}) is None
+    assert db.brands.find_one({"_id": "br_senpai"}) and db.users.find_one({"_id": owner["_id"]})

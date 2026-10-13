@@ -80,6 +80,8 @@ export function RateCards({ creatorId }: { creatorId: string }) {
     queryKey: ["estimate", creatorId, format, count, usage, excl],
     queryFn: () => api<EstimateOut>(`/creators/${creatorId}/pricing/estimate?${params}`),
     placeholderData: keepPreviousData,
+    // Waits for the creator's own first format rather than estimating a reel for a YouTube creator.
+    enabled: !!rates.data || picked !== null,
   });
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["rates", creatorId] });

@@ -29,14 +29,17 @@ FEATURES = [
 def features(c: dict) -> list[float] | None:
     if not c.get("insights_connected", {}).get("instagram") or not c.get("reels"):
         return None
+    if metrics.recent(c)[0].get("source") == "youtube_api":
+        return None  # measured on Instagram's insights only
     hist = c.get("follower_history") or [c["followers"]]
     growth = [(b - a) / a for a, b in zip(hist, hist[1:]) if a > 0]
     typical = float(np.median(growth)) if growth else 0.0
     spike = max(growth) / max(typical, 0.002) if growth else 1.0
     f = max(c.get("followers", 1), 1)
     r = metrics.recent(c)
-    likes = sum(x["likes"] for x in r) / len(r)
-    comments = sum(x["comments"] for x in r) / len(r)
+    likes = sum(x.get("likes") or 0 for x in r) / len(r)
+    comments = sum(x.get("comments") or 0 for x in r) / len(r)
+    following = c.get("following")  # None on a live site until a platform reports it
     # Each feature is one-sided: the healthy extreme is clipped, so a creator
     # whose reels out-reach their follower count is never "anomalous" for it.
     return [
@@ -47,7 +50,7 @@ def features(c: dict) -> list[float] | None:
         max((c.get("comment_insights") or {}).get("generic_share", 0.15), 0.10),
         # Small accounts naturally follow relatively more people; only judge
         # the follow ratio once an account has a real audience.
-        math.log1p(min(f / max(c.get("following", 1), 1), 3.0) if f >= 1_000 else 3.0),
+        math.log1p(min(f / max(following, 1), 3.0) if f >= 1_000 and following else 3.0),
     ]
 
 

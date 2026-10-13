@@ -99,6 +99,14 @@ def remove_sample(db) -> dict:
     stay. Safe to repeat. Returns what was removed, per collection."""
     creator_ids = [c["_id"] for c in all_creators()]
     brand_ids = [b["_id"] for b in LISTERS]
+    # A sample brand page a real (non-demo) account has claimed is theirs now; it stays.
+    claimed = {b["_id"] for b in db.brands.find({"_id": {"$in": brand_ids}, "owner_user_id": {"$ne": None}}, {"owner_user_id": 1})
+               if db.users.count_documents({"_id": b.get("owner_user_id"), "demo": {"$ne": True}})}
+    brand_ids = [b for b in brand_ids if b not in claimed]
+    # Demo accounts made during the demo (new personas, guest brands) and their profiles.
+    demo_users = list(db.users.find({"$or": [{"seeded": True}, {"demo": True}]}, {"creator_id": 1, "brand_id": 1}))
+    creator_ids += [u["creator_id"] for u in demo_users if u.get("creator_id")]
+    brand_ids += [u["brand_id"] for u in demo_users if u.get("brand_id") and u["brand_id"] not in claimed]
     sample_ids = creator_ids + brand_ids
     removed: dict[str, int] = {}
     for name in COLLECTIONS:
@@ -107,10 +115,12 @@ def remove_sample(db) -> dict:
         q: dict = {"$or": [{"source": SYNTHETIC}] + [{f: {"$in": sample_ids}} for f in OWNER_FIELDS]}
         if name in ("creators", "brands"):
             q["$or"].append({"_id": {"$in": sample_ids}})
+        if name == "brands" and claimed:
+            q = {"$and": [q, {"_id": {"$nin": list(claimed)}}]}
         n = db[name].delete_many(q).deleted_count
         if n:
             removed[name] = n
-    users = [u["_id"] for u in db.users.find({"seeded": True}, {"_id": 1})]
+    users = [u["_id"] for u in demo_users]
     if users:
         removed["sessions"] = db.sessions.delete_many({"user_id": {"$in": users}}).deleted_count
         removed["users"] = db.users.delete_many({"_id": {"$in": users}}).deleted_count

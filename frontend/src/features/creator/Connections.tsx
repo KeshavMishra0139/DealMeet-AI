@@ -69,7 +69,8 @@ function YouTubeCard({ creatorId, status }: { creatorId: string; status: Platfor
   const q = useQuery({ queryKey: ["youtube", creatorId], queryFn: () => api<LinkedYouTube>(`/creators/${creatorId}/youtube`), enabled: status.status !== "unavailable" });
   const done = (d: LinkedYouTube) => {
     qc.setQueryData(["youtube", creatorId], d);
-    void qc.invalidateQueries({ queryKey: ["connections", creatorId] });
+    // The channel's numbers now drive the whole profile: every screen built from it refetches.
+    void qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "youtube" });
   };
   const link = useMutation({
     mutationFn: (h: string) => post<LinkedYouTube>(`/creators/${creatorId}/youtube/link`, { handle: h }),

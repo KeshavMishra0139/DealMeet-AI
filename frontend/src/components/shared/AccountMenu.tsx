@@ -37,7 +37,7 @@ export function AccountMenu({ role, links, children, className }: { role: Role; 
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label="Account menu" className={cn("group relative block w-full rounded-2xl text-left", className)}>
+          <button type="button" aria-label={`${user?.name ?? "Your account"}, account menu`} className={cn("group relative block w-full rounded-2xl text-left", className)}>
             {children}
             <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted transition-transform group-data-[state=open]:rotate-180" />
           </button>

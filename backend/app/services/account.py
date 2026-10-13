@@ -13,8 +13,9 @@ from . import auth as au
 
 # Work or money in flight: the other side still needs this account.
 IN_FLIGHT = ("contract", "escrow_funded", "live", "verified")
-# Never removed with an account: shared cache, moderation records, and deals handled below.
-KEEP = {"ai_cache", "reports", "deals", "creators", "brands"}
+# Never removed with an account: shared cache, moderation and money records, the consent
+# trail, pitches already in a brand's inbox, and deals handled below.
+KEEP = {"ai_cache", "reports", "deals", "creators", "brands", "invoices", "consent_audit", "pitches"}
 
 
 def _blocked(field: str, value: str) -> None:
@@ -45,7 +46,9 @@ def delete_account(user: dict) -> dict:
             if name not in KEEP:
                 drop(name, {"creator_id": cid})
         drop("notifications", {"to": cid})
-        drop("deals", {"creator_id": cid, "stage": {"$in": ["offer", "declined"]}})  # never started
+        # A collective's seat is declined rather than deleted, so the collective's split still adds up.
+        db.deals.update_many({"creator_id": cid, "kind": "collective", "stage": "offer"}, {"$set": {"stage": "declined"}})
+        drop("deals", {"creator_id": cid, "kind": {"$ne": "collective"}, "stage": {"$in": ["offer", "declined"]}})  # never started
         drop("creators", {"_id": cid})
     if bid:
         listings = [x["_id"] for x in db.listings.find({"owner_id": bid}, {"_id": 1})]

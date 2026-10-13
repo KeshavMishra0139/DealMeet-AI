@@ -132,7 +132,7 @@ export default function Home() {
         {context.has_reels && (
           <>
             <span aria-hidden>·</span>
-            <span className="num">{t(yt ? "home.medianViewsYt" : "home.medianViews", { n: count(context.median_views) })}</span>
+            <span className="num">{t(yt ? "home.medianViewsYt" : "home.medianViews", { n: count(context.median_views), k: context.recent?.length || 6 })}</span>
           </>
         )}
         {context.trust && (

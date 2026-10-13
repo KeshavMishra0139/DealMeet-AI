@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from ..config import now_iso, today
+from ..config import get_settings, now_iso, today
 from ..db import get_db
 from ..seed.catalog import NICHES
 from . import brand_safety, hindi, metrics
@@ -22,6 +22,8 @@ CATEGORY_ORDER = ["money", "growth", "opportunity"]
 def week_start(week: int):
     t = today()
     monday = t - timedelta(days=t.weekday())
+    if not get_settings().demo_mode:
+        return monday  # a live site: the week the plan is made in
     return monday + timedelta(days=7 * (week - 1))
 
 
@@ -542,7 +544,7 @@ def current_plan(c: dict, ctx: dict) -> dict:
         plan = _save(c, 1, moves, [])
     elif len(plan["moves"]) < 3 and all(m["status"] == "open" for m in plan["moves"]):
         # Saved before plans were filled to 3, and not acted on yet: build it again.
-        moves, _ = generate_moves(c, ctx)
+        moves, _ = generate_moves(c, ctx, db.plans.find_one({"creator_id": c["_id"], "week": plan["week"] - 1}))
         if len(moves) > len(plan["moves"]):
             plan = _save(c, plan["week"], moves, plan.get("changes") or [])
     return _out(plan)
@@ -559,8 +561,10 @@ def next_week(c: dict, ctx: dict) -> dict:
 
 
 def rebuild(c: dict, ctx: dict, week: int, reason: str) -> dict:
-    """This week's moves again, from new numbers. Only for a plan nobody has acted on yet."""
-    moves, _ = generate_moves(c, ctx)
+    """This week's moves again, from new numbers. Only for a plan nobody has acted on yet.
+    Last week's plan still shapes it (follow-ups, moves already done)."""
+    prev = get_db().plans.find_one({"creator_id": c["_id"], "week": week - 1})
+    moves, _ = generate_moves(c, ctx, prev)
     return _out(_save(c, week, moves, [reason]))
 
 
