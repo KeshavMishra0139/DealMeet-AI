@@ -1,4 +1,3 @@
-render-
 # Render Blueprint: New > Blueprint, pick this repository, then Apply.
 services:
   - type: web
