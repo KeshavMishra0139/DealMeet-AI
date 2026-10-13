@@ -548,11 +548,16 @@ await step("Live demo: a counter on the phone appears in the brand console witho
   await desk.getByText(/Synced · Deal updated/).waitFor();
 });
 
-await step("3D: the reach chart and the match space draw with WebGL", async () => {
+await step("Charts: the flat reach chart draws every post; the match space draws with WebGL", async () => {
   await desk.goto(`${BASE}/creator?as=cr_a&phone=0`);
-  const reach = desk.locator("section[aria-labelledby=reach]");
-  await reach.scrollIntoViewIfNeeded();
-  await reach.locator("canvas").waitFor();
+  const reach = desk.locator("section", { has: desk.getByRole("heading", { name: "Reach vs followers" }) });
+  const chart = reach.locator("svg[role=img]");
+  await chart.scrollIntoViewIfNeeded();
+  await chart.waitFor();
+  // One bar per post, each with its date under it.
+  const dates = await reach.locator("svg[role=img] text").allTextContents();
+  if ((await reach.locator("svg[role=img] path").count()) < 6) throw new Error("Reach chart: fewer than 6 bars");
+  if (dates.filter((d) => /\d{1,2}\s?[A-Z][a-z]+/.test(d)).length < 6) throw new Error(`Reach chart: dates missing (${dates.join(", ")})`);
   await desk.goto(`${BASE}/brand/campaigns/lst_senpai_hoodie?as=br_senpai`);
   const space = desk.locator("section[aria-labelledby=space]");
   await space.locator("canvas").waitFor();

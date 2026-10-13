@@ -203,6 +203,18 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | README setup section, every env var, seed, switching mock and real data | Done | README: "Setup: from the demo to real services", "Environment variables" |
 | `DEMO_SCRIPT.md` | Done | Click paths match the browser journeys named in it |
 
+## 22. Live data, platform dashboards and accounts
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| A linked YouTube channel drives the profile (subscribers, recent videos), restored on unlink; Instagram keeps priority | Tested | `test_youtube_profile.py` |
+| One dashboard per connected platform in its own words; tabs when both are connected | Tested | `test_platforms.py`; live journey below |
+| Every week has 3 moves (fallbacks from the creator's own numbers) | Tested | `test_youtube_profile.py` |
+| Live mode invents nothing (no generated audience), uses the real date, and `REMOVE_SAMPLE_DATA=1` removes sample records | Tested | `test_youtube_profile.py`; `make accounts` (16 of 16) |
+| Live YouTube journey with demo mode off: sign-up, Link channel in the UI, every Studio screen checked for live numbers, YouTube words and no sample data, at 1280 and 390 px | Tested | Browser run against the app with the YouTube Data API faked (this machine can't reach Google) |
+| Account menu, sign out and account deletion | Tested | `test_account_delete.py`; browser run at 1280 and 390 px |
+| AI through OpenRouter (`OPENROUTER_API_KEY`, `AI_MODEL`) | Unverified | `test_ai_fallback.py` against a fake OpenRouter; not run with a real key |
+
 ## Bugs found by the new tests and fixed
 
 - A new marketplace with no listings crashed the creator's Home and Opportunities (the duplicate-listing check had nothing to compare). Found by `make accounts`; regression test in `test_acceptance.py`.
