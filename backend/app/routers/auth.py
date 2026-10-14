@@ -9,6 +9,7 @@ with Instagram" and "Continue with YouTube" (services/social_signin.py).
 """
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -22,6 +23,7 @@ from ..services import firebase_auth, ratelimit, social_signin
 from ..services import instagram as ig
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+log = logging.getLogger("jodidar.auth")
 
 EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
@@ -265,6 +267,14 @@ def youtube_signin(body: YouTubeIn, request: Request, response: Response):
         linked = social_signin.claim_channel(user, channel)
         if linked:
             notes.append(linked)
+        if user.get("creator_id"):
+            # The same Google consent covers YouTube Analytics: each sign-in refreshes it.
+            from ..services import youtube_analytics as yta
+
+            try:
+                yta.connect(user["creator_id"], body.access_token)
+            except Exception as e:  # Analytics is a bonus; sign-in goes ahead either way
+                log.info("YouTube Analytics at sign-in skipped for %s (%s)", user["_id"], getattr(e, "detail", type(e).__name__))
     else:
         notes.append("This Google account doesn't have a YouTube channel, so no channel was linked.")
     out = _signed_in(request, response, user, "youtube")

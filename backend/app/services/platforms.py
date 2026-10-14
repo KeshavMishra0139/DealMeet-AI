@@ -184,7 +184,7 @@ def dashboard(c: dict, platform: str) -> dict:
         if audience is None:
             notes.append("This channel hides its subscriber count. Views still count; subscribers don't set your price.")
         if not ch.get("ownership_verified"):
-            notes.append("Public channel data. Connect YouTube Analytics on Connections to confirm the channel is yours and add watch time and audience.")
+            notes.append("Public channel data. Sign in with Continue with YouTube (or Add Analytics on Connections) to confirm the channel is yours and add watch time and audience.")
         notes.append("YouTube doesn't share saves or shares, so they aren't shown here.")
     else:
         notes += [n for n in ch.get("notes") or []]

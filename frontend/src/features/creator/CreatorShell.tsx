@@ -7,6 +7,7 @@ import {
   IndianRupee,
   Inbox,
   Languages,
+  LifeBuoy,
   Link2,
   Map as MapIcon,
   Menu,
@@ -19,7 +20,7 @@ import {
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
-import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
+import { AccountMenu } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
@@ -51,6 +52,7 @@ const SECONDARY: NavItem[] = [
   { to: "/creator/connections", key: "nav.connections", icon: Link2 },
   { to: "/creator/kit", key: "nav.kit", icon: FileText },
   { to: "/creator/privacy", key: "nav.privacy", icon: ShieldCheck },
+  { to: "/creator/help", key: "nav.help", icon: LifeBuoy },
 ];
 
 export function useCreator() {
@@ -100,6 +102,7 @@ function Studio() {
             { label: "Profile", to: "/creator/profile" },
             { label: "Connections", to: "/creator/connections" },
             { label: "Privacy", to: "/creator/privacy" },
+            { label: "Help and account", to: "/creator/help" },
           ]}
         >
           <ProfileCard creator={creator.data} />
@@ -301,7 +304,6 @@ function ShellControls({ onDone }: { onDone?: () => void }) {
         </Button>
       )}
       <SignOutButton role="creator" onDone={onDone} className="w-full justify-start" />
-      <DeleteAccountButton role="creator" onDone={onDone} size="md" />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">{t("common.sharedDemo")}</p>}
     </div>
   );

@@ -1,6 +1,7 @@
 // The account menu at the top of the Studio and Console sidebars: who's signed in, links to
-// the account's settings, Sign out and Delete account. Deleting needs the word DELETE typed,
-// and the server refuses while a deal has work or money in progress (services/account.py).
+// the account's settings and Help, and Sign out. Deleting the account lives in Help
+// (DeleteAccountButton): it needs the word DELETE typed, and the server refuses while a deal
+// has work or money in progress (services/account.py).
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -30,9 +31,7 @@ function useDeletable(role: Role) {
 export function AccountMenu({ role, links, children, className }: { role: Role; links: { label: string; to: string }[]; children: ReactNode; className?: string }) {
   const user = useSession(role).data?.user;
   const signOut = useSignOut(role);
-  const deletable = useDeletable(role);
   const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState(false);
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
@@ -68,28 +67,15 @@ export function AccountMenu({ role, links, children, className }: { role: Role; 
               >
                 <LogOut className="size-4" aria-hidden /> Sign out
               </button>
-              {deletable && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-danger hover:bg-surface-2"
-                  onClick={() => {
-                    setOpen(false);
-                    setConfirm(true);
-                  }}
-                >
-                  <Trash2 className="size-4" aria-hidden /> Delete account
-                </button>
-              )}
             </div>
           )}
         </PopoverContent>
       </Popover>
-      <DeleteAccountDialog role={role} open={confirm} onOpenChange={setConfirm} />
     </>
   );
 }
 
-/** Delete account in the mobile menu and sidebar controls; hidden for demo profiles. */
+/** Delete account, in Help → Your account; hidden for demo profiles. */
 export function DeleteAccountButton({ role, className, size = "sm" }: { role: Role; onDone?: () => void; className?: string; size?: "sm" | "md" }) {
   const deletable = useDeletable(role);
   const [open, setOpen] = useState(false);

@@ -436,10 +436,13 @@ await step("Accounts: sign up as a brand, set up the brand, sign out", async () 
   await p.getByLabel("Password").fill("a long qa password");
   await p.getByRole("button", { name: "Create account" }).click();
   await p.waitForURL(/\/brand\/onboarding/);
+  // Quick setup: the brand's name fills in the form (keyword rules here; the AI when it's on).
   await p.getByLabel("Brand name").fill("QA Snacks");
+  await p.getByRole("button", { name: "Fill in my profile" }).click();
+  await p.getByText("We filled in what we could").waitFor();
+  const food = p.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Food and cooking" });
+  if ((await food.getAttribute("aria-checked")) !== "true") throw new Error("the snack brand's niche wasn't filled in");
   await p.getByLabel("Category").fill("Snacks");
-  await p.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Food and cooking" }).click();
-  await p.getByRole("group", { name: "Languages" }).getByRole("checkbox", { name: /Hindi/ }).first().click();
   await p.getByRole("button", { name: "Continue to your first campaign" }).click();
   await p.waitForURL(/\/brand\/campaigns\/new/);
   await p.goto(`${BASE}/brand`);

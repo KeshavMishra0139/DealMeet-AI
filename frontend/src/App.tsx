@@ -12,6 +12,7 @@ const LoginComplete = lazy(() => import("@/features/public/LoginComplete"));
 const NotFound = lazy(() => import("@/features/public/NotFound"));
 const CreatorShell = lazy(() => import("@/features/creator/CreatorShell"));
 const BrandShell = lazy(() => import("@/features/brand/BrandShell"));
+const HelpCenter = lazy(() => import("@/components/shared/HelpCenter"));
 const CreatorHome = lazy(() => import("@/features/creator/Home"));
 const CreatorRoadmap = lazy(() => import("@/features/creator/Roadmap"));
 const CreatorMoney = lazy(() => import("@/features/creator/Money"));
@@ -99,6 +100,7 @@ export default function App() {
           <Route path="pitches" element={<CreatorPitches />} />
           <Route path="privacy" element={<CreatorPrivacy />} />
           <Route path="connections" element={<CreatorConnections />} />
+          <Route path="help" element={<HelpCenter role="creator" />} />
           <Route path="profile" element={<CreatorProfile />} />
         </Route>
 
@@ -122,6 +124,7 @@ export default function App() {
           <Route path="collectives/:id" element={<CollectiveDetail />} />
           <Route path="profile" element={<BrandProfile />} />
           <Route path="inbox" element={<BrandFanInbox />} />
+          <Route path="help" element={<HelpCenter role="brand" />} />
         </Route>
 
         <Route path="/admin" element={<AdminConsole />} />

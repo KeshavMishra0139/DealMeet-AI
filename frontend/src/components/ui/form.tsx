@@ -24,7 +24,8 @@ Textarea.displayName = "Textarea";
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   ({ className, children, ...props }, ref) => (
     <div className="relative">
-      <select ref={ref} className={cn(field, "h-11 appearance-none pr-10", className)} {...props}>
+      {/* A solid background: Windows draws the open list from it, and a see-through one comes out white. */}
+      <select ref={ref} className={cn(field, "h-11 appearance-none bg-[var(--surface-solid)] pr-10", className)} {...props}>
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />

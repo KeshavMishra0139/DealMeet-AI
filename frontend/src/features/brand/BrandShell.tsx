@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
+import { Building2, Handshake, Inbox, LayoutDashboard, LifeBuoy, Megaphone, Menu, Plus, RotateCcw, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
 import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
-import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
+import { AccountMenu } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
@@ -38,6 +38,7 @@ const NAV = [
   { to: "/brand/deals", label: "Deals", icon: Handshake },
   { to: "/brand/inbox", label: "Fan Inbox", icon: Inbox },
   { to: "/brand/profile", label: "Brand profile", icon: Building2 },
+  { to: "/brand/help", label: "Help", icon: LifeBuoy },
 ];
 
 export function useBrand() {
@@ -98,7 +99,7 @@ function Console() {
         <Link to="/brand" className="mx-1.5 rounded-lg" aria-label="DealMeet AI: your Console home">
           <Wordmark />
         </Link>
-        <AccountMenu role="brand" className="mt-5" links={[{ label: "Brand profile", to: "/brand/profile" }]}>
+        <AccountMenu role="brand" className="mt-5" links={[{ label: "Brand profile", to: "/brand/profile" }, { label: "Help and account", to: "/brand/help" }]}>
           <BrandSwitcher />
         </AccountMenu>
         <Button asChild variant="primary" size="sm" className="mx-0.5 mt-4 justify-start">
@@ -203,7 +204,6 @@ function Controls({ onDone }: { onDone?: () => void }) {
         </Button>
       )}
       <SignOutButton role="brand" onDone={onDone} size="sm" className="w-full justify-start" />
-      <DeleteAccountButton role="brand" onDone={onDone} />
       {shared && <p className="px-3 pt-1 text-[11px] leading-snug text-muted">Shared demo: everyone sees the same data. Reset only when you start your own walkthrough.</p>}
     </div>
   );

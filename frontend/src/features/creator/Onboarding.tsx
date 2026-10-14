@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CityOptions } from "@/components/shared/CityOptions";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Instagram, Lock, Sparkles, Youtube } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/shared/Bits";
@@ -10,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChipGroup, FieldHint, Input, Label, Progress, Select, Slider, Switch, Textarea } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
+import { takeYouTubeToken } from "@/lib/firebase";
 import { inr } from "@/lib/format";
+import { useSession } from "@/lib/session";
 import { useDemoMode } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -52,13 +55,87 @@ type Form = {
   scopes: { stats: boolean; demographics: boolean; rate_card: boolean };
 };
 
+interface AutoOut {
+  id: string;
+  notes: string[];
+  setup: { source: "youtube" | "instagram"; name: string; niche_label: string; languages: string[]; formats: string[]; followers: number | null; review: string[] };
+}
+
+/** Signed in with YouTube or Instagram: the profile is set up from that account, no form.
+ * If it can't be (nothing to read, an API down), the short form is shown instead. */
 export default function Onboarding() {
+  const providers = useSession("creator").data?.user.providers ?? [];
+  const social = providers.includes("youtube") ? "youtube" : providers.includes("instagram") ? "instagram" : null;
+  const [form, setForm] = useState(!social);
+  return form || !social ? <OnboardingForm /> : <AutoSetup source={social} onFallback={() => setForm(true)} />;
+}
+
+const STEPS_FOR: Record<"youtube" | "instagram", string[]> = {
+  youtube: ["Reading your channel", "Understanding your niche and language", "Connecting YouTube Analytics", "Pricing your videos"],
+  instagram: ["Reading your Instagram", "Understanding your niche and language", "Bringing in your reels", "Pricing your reels"],
+};
+
+function AutoSetup({ source, onFallback }: { source: "youtube" | "instagram"; onFallback: () => void }) {
+  useTheme("creator");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const started = useRef(false);
+  const [step, setStep] = useState(0);
+  const steps = STEPS_FOR[source];
+  useEffect(() => {
+    const id = window.setInterval(() => setStep((s) => Math.min(steps.length - 1, s + 1)), 1400);
+    return () => window.clearInterval(id);
+  }, [steps.length]);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    post<AutoOut>("/creators/auto", { access_token: source === "youtube" ? takeYouTubeToken() : null })
+      .then(async (out) => {
+        await qc.invalidateQueries({ queryKey: ["session"] });
+        toast.success(`Welcome, ${out.setup.name}`, { description: `Set up from your ${source === "youtube" ? "YouTube channel" : "Instagram"}: ${out.setup.niche_label}.` });
+        out.notes.forEach((n) => toast(n));
+        navigate("/creator", { replace: true });
+      })
+      .catch((e) => {
+        toast.info("A few quick questions instead", { description: (e as Error).message });
+        onFallback();
+      });
+  }, [navigate, onFallback, qc, source]);
+
+  return (
+    <div className="theme-creator grain relative grid min-h-dvh place-items-center px-6">
+      <div className="aurora" aria-hidden>
+        <span />
+      </div>
+      <div className="relative z-10 w-full max-w-sm text-center" role="status" aria-live="polite">
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-signature text-white shadow-[0_12px_40px_-12px_rgb(219_39_119/0.7)]">
+          {source === "youtube" ? <Youtube className="size-6" aria-hidden /> : <Instagram className="size-6" aria-hidden />}
+        </span>
+        <h1 className="mt-5 font-display text-2xl font-semibold tracking-tight">Setting up your Studio</h1>
+        <p className="mt-1 text-sm text-fg-2">From your {source === "youtube" ? "YouTube channel" : "Instagram account"}. No forms: you can change anything later.</p>
+        <ol className="mx-auto mt-6 w-fit space-y-2.5 text-left">
+          {steps.map((s, i) => (
+            <li key={s} className={cn("flex items-center gap-2.5 text-sm transition-colors", i <= step ? "text-fg" : "text-muted")}>
+              <span className={cn("grid size-5 place-items-center rounded-full border", i < step ? "border-success bg-success text-white" : i === step ? "border-accent" : "border-line")}>
+                {i < step ? <Check className="size-3" aria-hidden /> : i === step ? <span className="size-1.5 animate-pulse rounded-full bg-accent" /> : null}
+              </span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingForm() {
   useTheme("creator");
   const navigate = useNavigate();
   const meta = useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/meta") });
+  const signedInAs = useSession("creator").data?.user.name ?? "";
   const [step, setStep] = useState(0);
   const [f, setF] = useState<Form>({
-    name: "",
+    name: signedInAs.includes("@") ? "" : signedInAs,
     niche: "",
     formats: ["reels"],
     platforms: ["instagram"],
@@ -278,11 +355,7 @@ export default function Onboarding() {
                       <Label htmlFor="city">City</Label>
                       <Select id="city" value={f.city} onChange={(e) => set("city", e.target.value)}>
                         <option value="">Choose your city</option>
-                        {meta.data.cities.map((c) => (
-                          <option key={c.name} value={c.name}>
-                            {c.name}, {c.state}
-                          </option>
-                        ))}
+                        <CityOptions cities={meta.data.cities} />
                       </Select>
                     </div>
                     <div>

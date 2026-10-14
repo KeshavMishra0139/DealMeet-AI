@@ -16,10 +16,10 @@ from ..db import get_db
 from ..engines import brand_safety, money_paths, next_step, roadmap
 from ..engines.fair_price import fair_price
 from ..engines.matching import audience_fit
-from ..seed.catalog import CITIES, NICHES
+from ..seed.catalog import CITIES, LANGS, NICHES
 from ..seed.creators import AGE_PROFILES, _audience, _follower_history, _reels
 from ..services import auth as au
-from ..services import cache, ratelimit, reach, social_signin
+from ..services import auto_setup, cache, ratelimit, reach, social_signin
 from ..services import creator_ctx as cc
 from ..services.views import creator_card
 
@@ -185,6 +185,12 @@ def _handle(name: str) -> str:
 @router.post("/creators")
 def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     """Onboarding: creates the signed-in creator account's profile, once."""
+    return _create_profile(body, user)
+
+
+def _create_profile(body: OnboardingIn, user: dict, setup: dict | None = None) -> dict:
+    """Creates the profile from the form, or from the account the creator signed in with
+    (`setup`, from services/auto_setup.py: no city is guessed then)."""
     au.require_role(user, "creator")
     if body.niche not in NICHES:
         raise HTTPException(422, "Unknown niche")
@@ -199,7 +205,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     # Never reused: a deleted account's id must not pass its kept records (paid deals) to someone new.
     cid = f"cr_new_{uuid.uuid4().hex[:10]}"
     rng = random.Random(cid)
-    city = body.city if body.city in CITIES else "Mumbai"
+    city = body.city if body.city in CITIES else (None if setup else "Mumbai")
     connected = body.sample_insights  # sample data stands in for a connected account, labelled so
     # Demo mode fills in an audience mix and counts for exploring, marked simulated. A live
     # site (DEMO_MODE=0) invents nothing: audience stays unknown until a platform reports it.
@@ -209,7 +215,7 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     caption_tags = tag_captions(captions) if captions else None
     doc = {
         "_id": cid,
-        "handle": _handle(body.name),
+        "handle": _handle((setup or {}).get("handle_hint") or body.name),
         "name": body.name.strip(),
         "avatar_hue": rng.randint(0, 359),
         "is_reference": False,
@@ -218,22 +224,22 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
             else "Your profile, from what you typed in onboarding. Audience details are sample data, marked simulated." if sandbox
             else "Your profile, from what you typed in onboarding."
         ),
-        "bio": f"{NICHES[body.niche]['label']} from {city}.",
+        "bio": f"{NICHES[body.niche]['label']} from {city}." if city else f"{NICHES[body.niche]['label']} on {(body.platforms or ['instagram'])[0].capitalize()}.",
         "niche": body.niche,
         "sub_niches": [],
         "platforms": body.platforms or ["instagram"],
         "formats": body.formats or ["reels"],
         "languages": langs,
         "city": city,
-        "state": CITIES[city][0],
-        "region": CITIES[city][1],
+        "state": CITIES[city][0] if city else None,
+        "region": CITIES[city][1] if city else None,
         "followers": followers,
         "following": (max(50, int(followers * 0.05)) if followers else 0) if sandbox else None,
         "posts": 0,
         "reels": _reels(cid, body.niche, langs, followers, {}, rng) if connected and followers > 0 else [],
         "follower_history": _follower_history(followers, {}, rng) if connected and followers > 0 else [],
         "comment_insights": {"generic_share": 0.14, "sample_size": 60} if connected else {},
-        "audience": _audience(body.niche, langs, city, rng) if sandbox else {},
+        "audience": _audience(body.niche, langs, city or "Mumbai", rng) if sandbox else {},
         "income_goal": {"monthly": body.income_goal, "types": body.income_types},
         "income_history": [],
         "past_deals": [],
@@ -251,6 +257,8 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
         "caption_tags": caption_tags,
         "onboarded": True,
         "created_by": "onboarding",
+        # Set up from YouTube or Instagram: what was filled in, and what to review (Home asks once).
+        "auto_setup": {k: setup[k] for k in ("source", "read_by_ai", "review")} | {"at": now_iso()} if setup else None,
         "created_at": now_iso(),
         "provenance": {},
         "provenance_default": "real",
@@ -278,6 +286,50 @@ def create_creator(body: OnboardingIn, user: dict = Depends(au.current_user)):
     cache.invalidate("trust:")  # per-creator scores; the trained model stays
     cache.invalidate("spam")
     return {"id": cid, "handle": doc["handle"], "notes": notes}
+
+
+class AutoIn(BaseModel):
+    # "Continue with YouTube" asks Google for YouTube Analytics too; the browser passes that
+    # access token here once so the new profile gets its Analytics. Never stored.
+    access_token: str | None = Field(default=None, min_length=20, max_length=4096)
+
+
+@router.post("/creators/auto")
+def create_creator_auto(body: AutoIn, user: dict = Depends(au.current_user)):
+    """Signed in with YouTube or Instagram: the profile is set up from that account, with no
+    form. 409 when there's nothing to set up from (the app then shows the form)."""
+    au.require_role(user, "creator")
+    d = auto_setup.draft(user)
+    if not d:
+        raise HTTPException(409, "There's no YouTube or Instagram account to set you up from. Fill in the short form instead.")
+    form = OnboardingIn(
+        name=d["name"], niche=d["niche"], platforms=d["platforms"], formats=d["formats"], audience_stage=d["audience_stage"],
+        followers=d["followers"], income_goal=auto_setup.DEFAULT_GOAL, income_types=["brand"], languages=d["languages"],
+        city="", captions=d["captions"],
+    )
+    out = _create_profile(form, user, setup=d)
+    if body.access_token and d["source"] == "youtube":
+        from ..services import youtube_analytics as yta
+
+        try:
+            yta.connect(out["id"], body.access_token)
+            out["notes"].append("YouTube Analytics connected: views, watch time and audience for the last 28 days.")
+        except HTTPException as e:
+            out["notes"].append(f"YouTube Analytics wasn't connected: {e.detail}")
+        except Exception:  # Analytics is a bonus: the profile is set up either way
+            out["notes"].append("YouTube Analytics wasn't connected this time. It connects at your next YouTube sign-in.")
+    c = get_db().creators.find_one({"_id": out["id"]}) or {}
+    out["setup"] = {
+        "source": d["source"],
+        "name": c.get("name"),
+        "niche": c.get("niche"),
+        "niche_label": NICHES.get(c.get("niche"), {}).get("label"),
+        "languages": [LANGS[x]["label"] for x in c.get("languages") or [] if x in LANGS],
+        "formats": c.get("formats"),
+        "followers": c.get("followers"),
+        "review": d["review"],
+    }
+    return out
 
 
 class TagIn(BaseModel):

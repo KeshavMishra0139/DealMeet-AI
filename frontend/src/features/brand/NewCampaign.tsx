@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CityOptions } from "@/components/shared/CityOptions";
 import { AlertCircle, ArrowLeft, Minus, Plus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -270,11 +271,7 @@ export default function NewCampaign() {
               className="h-10 text-sm"
             >
               <option value="">Add a city</option>
-              {meta.data?.cities.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
+              {meta.data && <CityOptions cities={meta.data.cities} />}
             </Select>
             {f.cities.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Priority cities">

@@ -2,7 +2,7 @@
 // Shorts for YouTube; reels, followers, saves and shares for Instagram. With both connected,
 // tabs switch between them and nothing is mixed (GET /creators/{id}/platforms).
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, ExternalLink, Instagram, Lightbulb, Youtube } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChevronDown, ExternalLink, Instagram, Lightbulb, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/shared/Bits";
 import { SourceBadge } from "@/components/shared/SourceBadge";
@@ -236,10 +236,19 @@ function Audience({ d, className }: { d: Dashboard; className?: string }) {
 function RecentPosts({ d, words }: { d: Dashboard; words: { posts: string } }) {
   const { t } = useI18n();
   const ig = d.platform === "instagram";
+  const Logo = ig ? Instagram : Youtube;
+  // Collapsed by default, so the dashboard stays clean: one line with the app's logo.
   return (
-    <section className="card-surface overflow-hidden rounded-[var(--radius-card)]">
-      <h3 className="px-5 pt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{t("platform.recent", { posts: words.posts })}</h3>
-      <ul className="mt-2 divide-y divide-line">
+    <details className="group card-surface overflow-hidden rounded-[var(--radius-card)]">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+        <span className="grid size-8 place-items-center rounded-lg bg-surface-2">
+          <Logo className={cn("size-4", ig ? "text-[#e1306c]" : "text-[#ff0033]")} aria-hidden />
+        </span>
+        <span className="flex-1 text-sm font-semibold">{t("platform.seeRecent", { posts: words.posts })}</span>
+        <span className="num text-xs text-muted">{d.posts.length}</span>
+        <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <ul className="divide-y divide-line border-t border-line">
         {d.posts.map((p) => {
           const stats = [
             t("platform.views", { n: count(p.views) }),
@@ -271,6 +280,6 @@ function RecentPosts({ d, words }: { d: Dashboard; words: { posts: string } }) {
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }

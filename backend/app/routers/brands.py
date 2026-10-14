@@ -536,6 +536,39 @@ def book_collective(listing_id: str, body: BookIn, user: dict = Depends(au.curre
     return collectives.book(x, brand, list(dict.fromkeys(body.member_ids)), adjust, body.combined_reach, user)
 
 
+class SuggestIn(BaseModel):
+    name: str = Field(min_length=2, max_length=60)
+    website: str | None = Field(default=None, max_length=200)
+
+
+@router.get("/brands/setup/hints")
+def brand_setup_hints(user: dict = Depends(au.current_user)):
+    """What the account already says about the brand: its name, and a website from a company email."""
+    au.require_role(user, "brand")
+    from ..ai import brand_setup
+
+    return brand_setup.hints(user)
+
+
+@router.post("/brands/setup/suggest")
+def brand_setup_suggest(body: SuggestIn, user: dict = Depends(au.current_user)):
+    """The brand form, filled in by the AI from the brand's name and website, for the brand to
+    confirm or change. Nothing is saved here."""
+    au.require_role(user, "brand")
+    from ..ai import brand_setup
+    from ..services import ratelimit
+
+    ratelimit.enforce(f"brandsuggest:{user['_id']}", 20, 3600, "That's a lot of suggestions this hour. Fill in the form, or try again later.")
+    website = None
+    if body.website and body.website.strip():
+        w = body.website.strip()
+        try:
+            website = bp.clean_website(w if w.lower().startswith(("http://", "https://")) else f"https://{w}")
+        except ValueError:
+            website = None  # not a website: suggest from the name alone
+    return brand_setup.suggest(body.name, website)
+
+
 class BrandIn(BaseModel):
     name: str = Field(min_length=2, max_length=60)
     category: str = Field(min_length=2, max_length=60)

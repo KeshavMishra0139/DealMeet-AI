@@ -60,15 +60,27 @@ export async function confirmPhoneCode(confirmation: ConfirmationResult, code: s
 const YOUTUBE_READONLY = "https://www.googleapis.com/auth/youtube.readonly";
 const YOUTUBE_SCOPES = [YOUTUBE_READONLY, "https://www.googleapis.com/auth/yt-analytics.readonly"];
 
+// The access token from "Continue with YouTube", kept in memory only (never storage) until
+// the new profile's automatic setup uses it once for YouTube Analytics.
+let pendingYouTubeToken: string | null = null;
+
+/** The sign-in's YouTube access token, once; null afterwards or after a page reload. */
+export function takeYouTubeToken(): string | null {
+  const t = pendingYouTubeToken;
+  pendingYouTubeToken = null;
+  return t;
+}
+
 /**
  * "Continue with YouTube" (creators): a Google sign-in that also asks for read-only YouTube
- * access, so the server can see which channel this Google account owns. Returns the ID token
- * (who you are) and the access token, which the server uses once and never keeps.
+ * and YouTube Analytics access, so the server can see which channel this Google account
+ * owns and read its Analytics in the same step. Returns the ID token (who you are) and the
+ * access token, which the server uses at once and never keeps.
  */
 export async function youtubeSignIn(): Promise<{ idToken: string; accessToken: string }> {
   const { auth, instance } = await load();
   const provider = new auth.GoogleAuthProvider();
-  provider.addScope(YOUTUBE_READONLY);
+  YOUTUBE_SCOPES.forEach((s) => provider.addScope(s));
   provider.setCustomParameters({ prompt: "select_account" });
   const result = await auth.signInWithPopup(instance, provider);
   const accessToken = auth.GoogleAuthProvider.credentialFromResult(result)?.accessToken;
@@ -76,13 +88,14 @@ export async function youtubeSignIn(): Promise<{ idToken: string; accessToken: s
     await auth.signOut(instance);
     throw new Error("Google didn't return YouTube access. Try again and allow DealMeet to see your YouTube account.");
   }
+  pendingYouTubeToken = accessToken;
   return { idToken: await result.user.getIdToken(), accessToken };
 }
 
 /**
- * Asks Google for read-only YouTube access, only when a creator clicks "Connect YouTube
- * Analytics" (ordinary sign-in never asks, so brands are never asked). Returns the
- * access token for the server to use once; it isn't kept anywhere.
+ * Asks Google for read-only YouTube and Analytics access, for a creator who linked a channel
+ * without signing in with YouTube (brands are never asked). Returns the access token for the
+ * server to use once; it isn't kept anywhere.
  */
 export async function youtubeAnalyticsToken(): Promise<string> {
   const { auth, instance } = await load();

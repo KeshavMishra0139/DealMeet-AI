@@ -364,3 +364,10 @@
 [lang="hi"] [class*="tracking-"] {
   letter-spacing: normal;
 }
+
+/* Native dropdown lists (Windows draws them from the select): readable in both themes. */
+select option,
+select optgroup {
+  background-color: var(--surface-solid);
+  color: var(--fg);
+}

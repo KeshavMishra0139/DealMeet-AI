@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CityOptions, type CityOption } from "@/components/shared/CityOptions";
 import { CheckCircle2, CircleDashed, Link2, MinusCircle, Save, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -54,7 +55,7 @@ interface Meta {
   niches: { id: string; label: string }[];
   languages: { id: string; label: string }[];
   formats: { id: string; label: string }[];
-  cities: { name: string }[];
+  cities: CityOption[];
 }
 
 export default function Profile() {
@@ -247,11 +248,7 @@ function EditForm({ data, meta, creatorId, onSaved }: { data: ProfileData; meta:
           <Label htmlFor="pf-city">City</Label>
           <Select id="pf-city" value={f.city} onChange={(e) => set("city", e.target.value)}>
             <option value="">Choose a city</option>
-            {meta.cities.map((x) => (
-              <option key={x.name} value={x.name}>
-                {x.name}
-              </option>
-            ))}
+            <CityOptions cities={meta.cities} />
           </Select>
         </div>
         <div className="md:col-span-2">

@@ -288,6 +288,19 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 **Google Cloud setup**: console.cloud.google.com → create a project → APIs & Services → Library → enable **YouTube Data API v3** → Credentials → Create credentials → API key. Restrict it to the YouTube Data API v3 and set `YOUTUBE_API_KEY`. The default quota is 10,000 units a day; one uncached lookup costs 3.
 
+## Sign-up without forms, Connections and Help
+
+- **Creators who sign in with YouTube or Instagram skip the form** (`backend/app/services/auto_setup.py`, `POST /api/creators/auto`). The profile is drafted from that account:
+  - name and handle;
+  - niche and language, read from video titles or captions by the AI, with keyword rules as the fallback;
+  - formats, followers or subscribers, and audience stage.
+
+  The account's city isn't known, so it isn't guessed: Home asks for it once. "Continue with YouTube" asks Google for YouTube Analytics in the same consent, so the new profile gets its Analytics straight away and each later YouTube sign-in refreshes them. If the account can't be read, the creator gets the short form, starting with their name.
+- **Brands start with their name and website** (`backend/app/ai/brand_setup.py`). A company email prefills both. The AI fills in category, description, niches, audience ages and gender, languages, budget band and goal from what it knows; the server never fetches the site. Every value is checked against the app's lists, and the brand checks it before saving. **Fill it in myself** skips to the form.
+- **Connections** is one row per app with a status dot: green live, amber reconnect needed, red a problem, grey not connected. The numbers live on Home, where recent uploads are one collapsed **See your recent videos/reels** line with the app's logo.
+- **Help** (`/creator/help`, `/brand/help`) covers getting started, connected apps (creators) and your account. **Remove an app's access** (YouTube, only its Analytics, or Instagram) asks "Are you sure?" first. **Delete account** lives here too; the account menu keeps Sign out and links to Help.
+- **Cities**: 126 cities across all 28 states and 8 union territories (`seed/catalog.py`). Dropdowns group them by state, with **Delhi NCR** first (Delhi, Noida, Greater Noida, Ghaziabad, Gurugram, Faridabad).
+
 ## AI across the app
 
 With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for OpenRouter), the language model works in these places. Every answer is checked against a Pydantic schema, the copy rules (no promises) and the facts it was given (no invented numbers); anything that fails, and everything when AI is off, uses the template or formula instead, so no screen depends on it. `/api/health` shows `"ai": "live"`, the provider and model, and `ai_last_error`: the last failed AI call in the past 24 hours with what usually fixes it (for example "OpenRouter error 402" and "add credits"), never keys or message content.

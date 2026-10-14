@@ -139,6 +139,7 @@ for (const width of [390, 1280]) {
     await brand.getByLabel("Password").fill("a long qa password");
     await brand.getByRole("button", { name: "Create account" }).click();
     await brand.waitForURL(/\/brand\/onboarding/);
+    await brand.getByRole("button", { name: "Fill it in myself" }).click();
     await brand.getByLabel("Brand name").fill(`Thayir Foods ${tag}`);
     await brand.getByLabel("Category").fill("Masala and spices");
     await brand.getByRole("group", { name: "Niches" }).getByRole("checkbox", { name: "Food and cooking" }).click();

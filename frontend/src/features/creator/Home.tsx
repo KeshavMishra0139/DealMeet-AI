@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SetupNote } from "./SetupNote";
 import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, CalendarClock, Clock, FileWarning, Handshake, IndianRupee, Wand2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -61,6 +62,7 @@ export default function Home() {
       </h1>
       {creator.reference_note && <ReferenceNote text={tr(creator.reference_note)} className="mt-2" />}
 
+      <SetupNote className="mt-5" />
       <WeeklyReport creatorId={id} youtube={context.terms.platform === "youtube"} className="mt-5" />
 
       <PlatformDashboards creatorId={id} className="mt-5" />

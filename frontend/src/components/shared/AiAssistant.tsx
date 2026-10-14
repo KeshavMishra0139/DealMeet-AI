@@ -98,6 +98,11 @@ export function AiAssistantProvider({ role, children }: { role: Role; children: 
   );
 }
 
+/** Opens DealMeet AI from inside a shell (optionally with a message to send); null outside one. */
+export function useAiAssistant() {
+  return useContext(Ctx);
+}
+
 const IDEAS: Record<Role, string[]> = {
   creator: ["What should I charge a brand?", "Are my views growing?", "Draft a pitch to a brand that fits me", "What should I post this week?"],
   brand: ["How are my campaigns doing?", "What needs my attention?", "Draft a brief for a festive launch", "Who is on my shortlist?"],

@@ -74,6 +74,9 @@ export interface Creator {
   language_labels: string[];
   city: string | null;
   region: string | null;
+  formats?: string[];
+  /** Set up from YouTube or Instagram instead of the form: what to review (e.g. "city"). */
+  auto_setup?: { source: "youtube" | "instagram"; read_by_ai: boolean; review: string[]; at: string } | null;
   followers: number;
   following: number;
   posts: number;
