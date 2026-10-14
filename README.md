@@ -6,7 +6,6 @@ A creator monetisation and brand opportunity engine, built by **Team TheVortex**
 
 - **Creator Studio** (mobile-first, dark): your stage, your next 3 moves, a fair price for every brand reel, a growth roadmap, ranked money paths, opportunities you opt in to, and deals funded through escrow before you post. English or हिंदी.
 - **Brand Console** (desktop, light): campaigns, creators ranked by audience fit with only the fields each creator chose to share, a collective builder for small creators, and the same deal rail from the brand's side.
-- **Demo screens**: `/demo/compare` puts Creator A and Creator B side by side with a guided, captioned walkthrough; `/demo/live` runs a creator phone and a brand console next to each other, in sync.
 
 ## Run it
 
@@ -23,8 +22,8 @@ The first run creates a Python virtual environment and installs dependencies (a 
 | What | Where |
 | --- | --- |
 | App | http://localhost:5173 |
-| Creator A vs Creator B, guided | http://localhost:5173/demo/compare?guide=1 |
-| Live deal demo (phone + console) | http://localhost:5173/demo/live |
+| Creator A's Studio (demo) | http://localhost:5173/creator?as=cr_a |
+| Senpai Supply Co.'s Console (demo) | http://localhost:5173/brand?as=br_senpai |
 | API health | http://localhost:8000/api/health |
 
 Other commands. Each `make` command has an `npm run` twin for Windows. Run `make setup` or `make dev` once first to install dependencies; `e2e`, `shots` and `reset` also need the app running.
@@ -146,7 +145,6 @@ flowchart LR
   subgraph WEB["Web app: React + TypeScript (Vite)"]
     CS["Creator Studio<br/>EN / हिंदी"]
     BC["Brand Console"]
-    DEMO["/demo/compare and /demo/live<br/>phone and browser frames"]
     SYNC(["Live sync<br/>BroadcastChannel"])
   end
 
@@ -174,8 +172,7 @@ flowchart LR
   PAY["Razorpay test mode<br/>(optional)"]
   FB["Firebase Auth<br/>(optional)"]
 
-  CS & BC & DEMO -->|"/api (JSON)"| ROUTES
-  DEMO -.->|frames| CS & BC
+  CS & BC -->|"/api (JSON)"| ROUTES
   SYNC -.-|refetch on every write| CS & BC
   ROUTES --> ENG & SVC
   ENG & SVC --> DB
@@ -187,7 +184,7 @@ flowchart LR
 
 **Request flow.** A screen asks the API for one view (for example `/api/creators/cr_a/home`). The router loads the creator, runs the engines (stage, fair price, opportunities, money paths, durable income, next moves), and returns numbers together with a `why` block for each one: reasons, inputs with `real`/`simulated` provenance, and assumptions. The web app renders the numbers and puts the `why` one tap away.
 
-**Live sync.** Every successful write in the web app is announced on a `BroadcastChannel`; every other open window or demo frame refetches what it shows. That is how the creator phone and the brand console on `/demo/live` stay in step without a server push.
+**Live sync.** Every successful write in the web app is announced on a `BroadcastChannel`; every other open window refetches what it shows. That is how a creator tab and a brand tab stay in step without a server push.
 
 ### The engines, in short
 
@@ -257,22 +254,22 @@ Offer → Contract (both sides accept the same version) → Escrow funded → Po
 
 ## 3-minute demo script
 
-Before you start, click **Reset demo** (top of `/demo/compare`). On a shared URL, reset only when you start your own walkthrough: it resets the data for everyone. Present on a laptop or projector at 1440 px or wider.
+Before you start, click **Reset demo** (in the Studio or Console menu). On a shared URL, reset only when you start your own walkthrough: it resets the data for everyone. Use two browser windows side by side on a laptop or projector: the creator's on the left, the brand's on the right.
 
 | Time | Do this | Say this |
 | --- | --- | --- |
-| 0:00 | Open the app (http://localhost:5173 locally, or your deployed URL) and click **Watch the demo**. The guided demo starts on `/demo/compare`. | "Same engine, two very different creators. Every number has a reason, and every range is an estimate, not a promise." |
-| 0:15 | Step 1 → 2 (press →). | "Creator A makes anime edits, 21.3K followers, and already earns. Creator B cooks Tamil home food with 2K followers. A is *Earning, underpriced*; B is *Starting*." |
-| 0:40 | Step 3: Fair price. Open A's **Why?**. | "A's reels reach about 7x their followers. Priced on reach that's ₹17K–18K a reel; priced on followers it's ₹7K, which is what they quote. Every adjustment is capped and explained." |
-| 1:05 | Steps 4–5: Roadmap and money paths. | "A keeps their best format and adds original voiceover, which removes a copyright risk. B fills a gap nobody else in Tamil food is covering: quick breakfasts. Money paths are ranked against each goal: anime-merch affiliate and gaming collectives for A; a food collective, a ₹199 e-book and kitchenware affiliate for B." |
-| 1:30 | Steps 6–7. Then switch the layout to **Two phones**. | "Matches are opt-in: brands see only what each creator shares. And this is what each creator actually sees each week: their next 3 moves." On A's phone, tap **हिं** to show the Hindi Studio. |
-| 1:55 | Click **Live deal demo**. On the phone tap **Counter at ₹17,362**, then **Send counter**. | "Senpai offered ₹7,300, 58% below fair. One tap counters at the fair price." |
-| 2:15 | In the console: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. On the phone: **Submit post link** (any `instagram.com/reel/...` link). In the console: **Approve post**. | "Both sides sign. The brand funds escrow before the creator posts, then reviews the post and approves it. In the demo the payment and payout are simulated and say so; with Razorpay connected the deal stops at 'payout not connected' until a payout partner is added. Each side updates live." |
-| 2:35 | Open the Brand Console campaign (`/brand/campaigns/lst_senpai_hoodie?as=br_senpai`) and turn the **Match space**. | "Brands see every match by price, reach and trust. Up and to the left is more reach per rupee; hollow spheres are weak trust or unshared stats." |
-| 2:45 | Back on **Live deal demo**, switch the scenario to **Collective**. On the phone, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. The pack updates in the Thalam Foods console. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
+| 0:00 | Left window: `/creator?as=cr_a` (Creator A). Right window: `/creator?as=cr_b` (Creator B). | "Same engine, two very different creators. Every number has a reason, and every range is an estimate, not a promise." |
+| 0:15 | Point at each Home's stage. | "Creator A makes anime edits, 21.3K followers, and already earns. Creator B cooks Tamil home food with 2K followers. A is *Earning, underpriced*; B is *Starting*." |
+| 0:40 | On A, open **Money** and the fair price's **Why?**. | "A's reels reach about 7x their followers. Priced on reach that's ₹17K–18K a reel; priced on followers it's ₹7K, which is what they quote. Every adjustment is capped and explained." |
+| 1:05 | **Roadmap** and **Money** on both. | "A keeps their best format and adds original voiceover, which removes a copyright risk. B fills a gap nobody else in Tamil food is covering: quick breakfasts. Money paths are ranked against each goal." |
+| 1:30 | Back on A's **Home**: the next 3 moves. Tap **हिंदी में देखें**. | "Matches are opt-in: brands see only what each creator shares. And this is what each creator sees each week: their next 3 moves, in Hindi too." |
+| 1:55 | Left: `/creator/deals/dl_a_senpai?as=cr_a`. Right: `/brand/deals/dl_a_senpai?as=br_senpai`. On the left tap **Counter at ₹17,362**, then **Send counter**. | "Senpai offered ₹7,300, 58% below fair. One tap counters at the fair price, and the brand's window updates on its own." |
+| 2:15 | Right: **Accept ₹17,362 and sign** (confirm in the dialog) → **Fund escrow** → **Pay ₹17,362 (simulated)**. Left: **Submit post link** (any `instagram.com/reel/...` link). Right: **Approve post**. | "Both sides sign. The brand funds escrow before the creator posts, then reviews the post and approves it. In the demo the payment and payout are simulated and say so; with Razorpay connected the deal stops at 'payout not connected' until a payout partner is added." |
+| 2:35 | Right: `/brand/campaigns/lst_senpai_hoodie?as=br_senpai` and turn the **Match space**. | "Brands see every match by price, reach and trust. Up and to the left is more reach per rupee; hollow spheres are weak trust or unshared stats." |
+| 2:45 | Left: `/creator/opportunities?as=cr_b`, open the Thalam Foods collective, tap **Opt in**, then **Opt in and share**. Right: `/brand/campaigns/lst_thalam_collective?as=br_thalam` shows the pack update. | "Small creators get big-brand deals as a 20-creator collective, with overlap removed and low-trust profiles left out." |
 | 2:55 | Close. | "No guarantees, no scraping, and the reference creator stays anonymous. That's DealMeet AI." |
 
-Keyboard: in the guided demo, **←** and **→** move between steps and **Esc** ends it. `/demo/compare?phones=1` opens Compare as two phones, and any link takes `?lang=hi` to open the Studio in Hindi.
+Any link takes `?lang=hi` to open the Studio in Hindi.
 
 ## Real YouTube data and "Know your page"
 
@@ -607,7 +604,7 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 ## Accessibility
 
 - Checked with axe-core (WCAG 2 A/AA plus best practices) on every screen at 390 px and 1440 px.
-- Skip links in the Studio, the Console and the demo screens; visible focus rings; and keyboard support for all dialogs, popovers, segmented controls and the guided demo.
+- Skip links in the Studio and the Console; visible focus rings; and keyboard support for all dialogs, popovers and segmented controls.
 - Charts have text equivalents.
 - Respects reduced motion: Framer Motion and CSS transitions are switched off.
 - Hindi text uses Noto Sans Devanagari with letter-spacing turned off, so the headline bar stays intact.
@@ -619,7 +616,7 @@ Demo mode only (`DEMO_MODE=1`, which `make dev` and the Docker image set). Sign 
 | `make test` | 425 API tests (below), the copy rules on about 5,900 UI strings, and the TypeScript type check |
 | `make accounts` | Real accounts with demo mode off, at 390 px and 1280 px, on its own API (:8010) and a fresh web build: email sign-up and onboarding, profile edits, Money, Roadmap and Opportunities on a new marketplace, a campaign from draft to live, an application, an offer the creator signs, and signing out. Every write is followed by a reload to check it was saved |
 | `make e2e` | 30 journeys in a real browser (below). `QA_ONLY="Admin" make e2e` runs only the journeys whose names contain that text |
-| `make shots` | 98 screenshots (49 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
+| `make shots` | 88 screenshots (44 screens × 390 px and 1440 px). Each screen is also checked with axe-core, against the copy rules, for console errors and for horizontal scrolling. Output in `qa/shots` and `qa/report/qa.json` |
 
 **CI**: `.github/workflows/test.yml` runs `make test` on every push and pull request, then the demo journeys (`make e2e`) and the real-account journeys (`make accounts`) in headless Chromium. No secrets are needed; everything runs on the in-memory database. Failure screenshots are kept as a build artifact for a week.
 
@@ -686,7 +683,6 @@ The e2e journeys:
 - The full deal rail.
 - Link-in-bio booking.
 - Hindi.
-- The guided compare.
 - Live sync.
 - The 3D scenes drawing with WebGL.
 

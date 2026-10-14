@@ -42,7 +42,7 @@ def test_rules_catch_examples():
 def test_api_responses_have_no_promises(client, login, db):
     """Runtime copy (engine output, English and Hindi) is checked too, not just source strings."""
     creators = ["cr_a", "cr_b", "cr_n01", "cr_t01", "cr_f08", "cr_g09"] + [c["_id"] for c in db.creators.find({}, {"_id": 1})][::9]
-    paths = [(None, "/api/meta"), (None, "/api/auth/personas"), (None, "/api/demo/compare")]
+    paths = [(None, "/api/meta"), (None, "/api/auth/personas")]
     for cid in dict.fromkeys(creators):
         paths += [(cid, f"/api/creators/{cid}{s}") for s in ("", "/home", "/money", "/roadmap", "/opportunities", "/kit")]
     for bid in ("br_senpai", "br_thalam"):

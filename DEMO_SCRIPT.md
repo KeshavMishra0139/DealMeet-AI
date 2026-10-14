@@ -5,7 +5,7 @@ Exact click paths for the four walkthroughs judges ask about. Every path here is
 **Before you start**
 
 - Local: `make dev`, then open http://localhost:5173. Deployed: your URL (for example `https://dealmeet-ai.onrender.com`).
-- Click **Reset demo** first (on `/demo/compare`, or in the Studio or Console menu). On a shared URL it resets the data for everyone, so do it only when your walkthrough starts.
+- Click **Reset demo** first (in the Studio or Console menu). On a shared URL it resets the data for everyone, so do it only when your walkthrough starts.
 - `?as=<profile id>` signs a tab in as a demo profile: `cr_a` (Creator A), `cr_b` (Creator B), `br_senpai` (Senpai Supply Co.), `br_thalam` (Thalam Foods). Use two browser windows, one per side.
 - Say it plainly: prices are **estimates**, the demo's numbers are **Sample data** unless a badge says **Live data**, and demo payments are **simulated**.
 

@@ -1,7 +1,7 @@
-// Live sync between open DealMeet windows and demo frames.
+// Live sync between open DealMeet windows.
 // Every successful write (POST) is announced on a BroadcastChannel; every
-// other frame refetches what it shows. The creator phone and the brand
-// console on /demo/live stay in step without a server push.
+// other open window refetches what it shows, so a creator tab and a brand tab
+// stay in step without a server push.
 import type { QueryClient } from "@tanstack/react-query";
 
 export interface SyncEvent {

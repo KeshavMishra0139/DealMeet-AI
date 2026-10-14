@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConfirmationResult } from "firebase/auth";
-import { ArrowRight, Building2, Instagram, Phone, ShieldCheck, Sparkles, UserPlus, Youtube } from "lucide-react";
+import { ArrowRight, Building2, Instagram, Phone, ShieldCheck, UserPlus, Youtube } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext } from "@/components/shared/AuthGate";
@@ -78,15 +78,6 @@ export default function Login() {
           <AccountForm role={role} next={next} demo={demo} startWithSignup={params.get("mode") === "signup"} />
           {demo && <DemoProfiles role={role} next={next} />}
 
-          {demo && (
-            <Link
-              to="/demo/compare"
-              className="mt-6 flex items-center gap-2 rounded-2xl border border-line bg-surface-2 p-3.5 text-sm text-fg-2 hover:text-fg"
-            >
-              <Sparkles className="size-4 text-accent" aria-hidden />
-              Short on time? See Creator A and Creator B side by side.
-            </Link>
-          )}
         </main>
         {health.data && (
           <footer className="mt-8 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">

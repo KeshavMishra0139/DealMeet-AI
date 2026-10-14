@@ -527,37 +527,24 @@ await step("Know your page: only for visitors; signed-in creators get their own 
   await ctx.close();
 });
 
-// Presenting on a laptop: compare and the live split.
+// On a laptop: two tabs in step, and the charts.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 desk.on("pageerror", (e) => errors.push(String(e)));
 page = desk;
 
-await step("Compare: guided demo steps through both creators with captions", async () => {
+await step("Live sync: a counter in the creator's tab appears in the brand's tab without a reload", async () => {
   await reset();
-  await desk.goto(`${BASE}/demo/compare`);
-  await desk.getByText("Earning, underpriced").first().waitFor();
-  await desk.getByText("Starting").first().waitFor();
-  await desk.getByRole("button", { name: "Guided demo" }).click();
-  const bar = desk.getByRole("region", { name: "Guided demo" });
-  await bar.getByText("Step 1 of 7").waitFor();
-  await desk.keyboard.press("ArrowRight");
-  await desk.keyboard.press("ArrowRight");
-  await bar.getByText("Step 3 of 7").waitFor();
-  await bar.getByText(/Fair price ₹17K–18K a reel/).waitFor();
-  await desk.keyboard.press("Escape");
-  await bar.waitFor({ state: "detached" });
-});
-
-await step("Live demo: a counter on the phone appears in the brand console without a reload", async () => {
-  await reset();
-  await desk.goto(`${BASE}/demo/live`);
-  const phone = desk.frameLocator('iframe[title="Creator A\'s Creator Studio"]');
-  const consoleFrame = desk.frameLocator('iframe[title="Senpai Supply Co. Brand Console"]');
-  await consoleFrame.getByText(/58% below the fair price/).waitFor();
-  await phone.getByRole("button", { name: /Counter at/ }).click();
-  await phone.getByRole("button", { name: "Send counter" }).click();
-  await consoleFrame.getByRole("button", { name: /Accept .* and sign/ }).waitFor({ timeout: 2500 });
-  await desk.getByText(/Synced · Deal updated/).waitFor();
+  // Two tabs of one browser, as a person would open them.
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const [creatorTab, brandTab] = [await ctx.newPage(), await ctx.newPage()];
+  for (const t of [creatorTab, brandTab]) t.on("pageerror", (e) => errors.push(String(e)));
+  await brandTab.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
+  await brandTab.getByText(/58% below the fair price/).waitFor();
+  await creatorTab.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);
+  await creatorTab.getByRole("button", { name: /Counter at/ }).click();
+  await creatorTab.getByRole("button", { name: "Send counter" }).click();
+  await brandTab.getByRole("button", { name: /Accept .* and sign/ }).waitFor({ timeout: 4000 });
+  await ctx.close();
 });
 
 await step("Charts: the flat reach chart draws every post; the match space draws with WebGL", async () => {

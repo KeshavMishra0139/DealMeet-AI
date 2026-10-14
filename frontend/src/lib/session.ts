@@ -4,9 +4,7 @@
 // - Real accounts (email and password, or Firebase) keep their session in an
 //   HttpOnly cookie the page can't read.
 // - Demo mode only: the persona picker keeps a demo token per side (creator,
-//   brand), so a creator phone and a brand console can run side by side, and
-//   `?as=<profile id>` signs one frame in as that demo profile (kept in memory).
-// - `?embed=1` marks a frame rendered inside a phone or browser mock.
+//   brand), and `?as=<profile id>` signs one tab in as that demo profile (kept in memory).
 import { useQuery } from "@tanstack/react-query";
 import { safeStorage } from "./utils";
 
@@ -33,7 +31,6 @@ const store = safeStorage();
 const KEYS = { creator: "jd.token.creator", brand: "jd.token.brand" } as const;
 const pinned: Partial<Record<Role, string>> = {};
 const memTokens: Partial<Record<Role, string>> = {};
-let embedded = false;
 
 (function readUrlOnce() {
   if (typeof window === "undefined") return;
@@ -41,12 +38,7 @@ let embedded = false;
   const as = params.get("as");
   if (as?.startsWith("cr_") || as === "new_creator") pinned.creator = as;
   else if (as) pinned.brand = as;
-  embedded = params.get("embed") === "1";
 })();
-
-export function isEmbedFrame() {
-  return embedded;
-}
 
 /** The side of the app this page belongs to, from its address. */
 export function activeRole(): Role | undefined {

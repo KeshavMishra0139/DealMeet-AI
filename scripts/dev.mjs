@@ -217,7 +217,7 @@ setTimeout(() => {
     console.log(
       `\n${bold("DealMeet AI is starting (single port)")}\n` +
         `  App   ${cyan("http://localhost:8000")}\n` +
-        `  Demo  ${cyan("http://localhost:8000/demo/compare")}\n` +
+        `  Demo  ${cyan("http://localhost:8000/login")}\n` +
         dim("  Press Ctrl+C to stop.\n"),
     );
     return;
@@ -225,7 +225,7 @@ setTimeout(() => {
   console.log(
     `\n${bold("DealMeet AI is starting")}\n` +
       `  App   ${cyan("http://localhost:5173")}\n` +
-      `  Demo  ${cyan("http://localhost:5173/demo/compare")}\n` +
+      `  Demo  ${cyan("http://localhost:5173/login")}\n` +
       `  API   ${magenta("http://localhost:8000/api/health")}\n` +
       dim("  Press Ctrl+C to stop.\n"),
   );

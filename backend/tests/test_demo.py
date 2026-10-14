@@ -1,17 +1,4 @@
-"""Demo screens: Creator A vs B, Hindi copy and silent brand-safety notes."""
-
-
-def test_compare_shows_both_creators_and_a_guided_script(client, db):
-    d = client.get("/api/demo/compare").json()
-    assert d["a"]["stage"]["id"] == "underpriced" and d["b"]["stage"]["id"] == "starting"
-    assert d["a"]["rate_gap"]["fair"]["low"] >= 17_000
-    assert [m["kind"] for m in d["a"]["moves"]] == ["raise_rate", "double_down", "apply_matches"]
-    assert {p["type"] for p in d["b"]["paths"]} == {"collective", "digital", "affiliate"}
-    assert any(o["type"] == "collective" for o in d["b"]["opportunities"])
-    steps = {g["id"]: g for g in d["guide"]}
-    assert list(steps) == ["who", "stage", "price", "roadmap", "money", "opportunities", "moves"]
-    assert "₹17K–18K" in steps["price"]["caption"] and "voiceover" in steps["roadmap"]["caption"]
-    assert "basic editing" in steps["roadmap"]["caption"] and "Thalam Foods" in steps["opportunities"]["caption"]
+"""Demo profiles: Hindi copy, silent brand-safety notes and the reach chart."""
 
 
 def test_hindi_copy_travels_with_the_english(login, db):

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Play, Scale, ShieldCheck, Youtube } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Scale, ShieldCheck, Youtube } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
@@ -45,7 +45,7 @@ export default function Landing() {
 
   return (
     <div className="theme-site relative min-h-dvh overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-6">
-      <Hero demo={demo} />
+      <Hero />
       <WorksWith />
 
       <main id="main" className="relative z-10 mx-auto mt-16 max-w-6xl sm:mt-24">
@@ -63,18 +63,8 @@ export default function Landing() {
         </section>
 
         <motion.div {...rise(0.3)} className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-7">
-          {demo && (
-            <>
-              <Button asChild variant="outline" size="lg" className="h-11 sm:h-12">
-                <Link to="/demo/compare?guide=1">
-                  <Play className="fill-current" aria-hidden /> Watch the demo
-                </Link>
-              </Button>
-              <span className="text-sm text-muted">Two creators, two different plans, side by side.</span>
-            </>
-          )}
           {!signedIn && (
-            <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
+            <Button asChild variant="outline" size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
               <Link to="/worth">
                 <Youtube aria-hidden /> Know your page: what your YouTube channel can charge
               </Link>
@@ -125,7 +115,7 @@ export default function Landing() {
 }
 
 /** Video hero card with the tile mosaic, the headline and the floating navigation. */
-function Hero({ demo }: { demo: boolean }) {
+function Hero() {
   const reduce = useReducedMotion();
   return (
     <section
@@ -164,7 +154,7 @@ function Hero({ demo }: { demo: boolean }) {
           and makes sure they get paid.
         </p>
       </motion.div>
-      <FloatingNav demo={demo} />
+      <FloatingNav />
     </section>
   );
 }
@@ -189,7 +179,7 @@ function useDashboard(): string | null {
 }
 
 /** Pill navigation floating at the bottom of the hero. Every item goes to a real page. */
-function FloatingNav({ demo }: { demo: boolean }) {
+function FloatingNav() {
   const reduce = useReducedMotion();
   const dashboard = useDashboard();
   return (
@@ -213,11 +203,6 @@ function FloatingNav({ demo }: { demo: boolean }) {
       <NavItem to="/brands" className="hidden sm:inline-flex">
         Brands
       </NavItem>
-      {demo && (
-        <NavItem to="/demo/compare" className="hidden md:inline-flex">
-          Demo
-        </NavItem>
-      )}
       {!dashboard && (
         <NavItem to="/login" className="hidden sm:inline-flex">
           Sign in

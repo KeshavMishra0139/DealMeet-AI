@@ -1,9 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
-import { EmbedBridge } from "@/components/demo/FrameBridge";
 import { RequireSession } from "@/components/shared/AuthGate";
 import { LangScope } from "@/i18n";
-import { isEmbedFrame } from "@/lib/session";
 
 const Landing = lazy(() => import("@/features/public/Landing"));
 const Login = lazy(() => import("@/features/public/Login"));
@@ -40,11 +38,8 @@ const PitchShare = lazy(() => import("@/features/public/PitchShare"));
 const BrandFanInbox = lazy(() => import("@/features/brand/FanInbox"));
 const CreatorConnections = lazy(() => import("@/features/creator/Connections"));
 const CreatorProfile = lazy(() => import("@/features/creator/Profile"));
-const DemoCompare = lazy(() => import("@/features/demo/Compare"));
-const DemoLive = lazy(() => import("@/features/demo/Live"));
 const AdminConsole = lazy(() => import("@/features/admin/AdminConsole"));
 
-const embedded = isEmbedFrame();
 
 function Fallback() {
   return <div className="min-h-dvh" aria-busy="true" aria-label="Loading" />;
@@ -53,7 +48,6 @@ function Fallback() {
 export default function App() {
   return (
     <Suspense fallback={<Fallback />}>
-      {embedded && <EmbedBridge />}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
@@ -114,8 +108,6 @@ export default function App() {
         </Route>
 
         <Route path="/admin" element={<AdminConsole />} />
-        <Route path="/demo/compare" element={<DemoCompare />} />
-        <Route path="/demo/live" element={<DemoLive />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

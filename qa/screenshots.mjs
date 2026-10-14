@@ -55,10 +55,6 @@ const ROUTES = [
   ["brand-creator-audience", "/brand/creators/cr_b?as=br_thalam"],
   ["brand-deals", "/brand/deals?as=br_senpai"],
   ["brand-deal", "/brand/deals/dl_senpai_g11?as=br_senpai"],
-  ["demo-compare", "/demo/compare"],
-  ["demo-compare-guide", "/demo/compare?guide=1&step=3"],
-  ["demo-compare-phones", "/demo/compare?phones=1"],
-  ["demo-live", "/demo/live"],
   ["creator-home-hi", "/creator?as=cr_a&lang=hi"],
   ["not-found", "/this-does-not-exist"],
   // Admin screens sign in with the local demo admin's cookie, in a context of their own.
