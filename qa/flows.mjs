@@ -503,7 +503,7 @@ await step("Admin: a deal party reports a problem; the admin resolves it, suspen
   await ctx.close();
 });
 
-await step("What am I worth?: public page says plainly when YouTube data isn't connected", async () => {
+await step("Know your page: public page says plainly when YouTube data isn't connected", async () => {
   page = mobile;
   await page.goto(`${BASE}/worth`);
   await page.getByLabel("YouTube handle or channel link").fill("@somechannel");
@@ -512,16 +512,16 @@ await step("What am I worth?: public page says plainly when YouTube data isn't c
   await page.getByRole("alert").getByText(/YouTube data isn't connected on this server/).waitFor();
 });
 
-await step("What am I worth?: only for visitors; signed-in creators get their own price instead", async () => {
+await step("Know your page: only for visitors; signed-in creators get their own price instead", async () => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const p = await ctx.newPage();
   await p.goto(`${BASE}/`);
-  await p.getByRole("link", { name: /Check your worth/ }).first().waitFor();
+  await p.getByRole("link", { name: /Know your page/ }).first().waitFor();
   const r = await p.evaluate(async (BASE) => (await fetch(`${BASE}/api/auth/demo`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: true }) })).status, BASE);
   if (r !== 200) throw new Error(`demo sign-in ${r}`);
   await p.goto(`${BASE}/creator`);
   await p.getByRole("button", { name: /More/ }).first().click();
-  if (await p.getByText(/Check your worth/).count()) throw new Error("Check your worth is in the signed-in Studio");
+  if (await p.getByText(/Know your page/).count()) throw new Error("Know your page is in the signed-in Studio");
   await p.goto(`${BASE}/worth`);
   await p.waitForURL(/\/creator\/money$/);
   await ctx.close();

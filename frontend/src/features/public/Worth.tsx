@@ -71,7 +71,7 @@ function WorthLookup() {
           <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-fg-2">
             <Youtube className="size-3.5 text-accent" aria-hidden /> Free, no sign-in, official YouTube data
           </p>
-          <h1 className="mt-4 font-display text-[32px] font-semibold leading-tight tracking-tight sm:text-5xl">What am I worth?</h1>
+          <h1 className="mt-4 font-display text-[32px] font-semibold leading-tight tracking-tight sm:text-5xl">Know your page</h1>
           <p className="mt-3 max-w-2xl text-[15px] text-fg-2 sm:text-base">
             Type your YouTube handle. We read your channel's public numbers and estimate a fair fee for a brand video from the views your recent videos
             get, not your subscriber count. Shorts and long videos are priced separately.

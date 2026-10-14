@@ -10,7 +10,7 @@ It never sets a price on its own:
 
 A creator's review is stored on their profile (`ai_price`) and applied everywhere the
 price is shown while their numbers stay the same (`basis`); it is refreshed in the
-background when they change. The public "What am I worth?" lookup reviews a channel on
+background when they change. The public "Know your page" lookup reviews a channel on
 the spot.
 """
 from __future__ import annotations

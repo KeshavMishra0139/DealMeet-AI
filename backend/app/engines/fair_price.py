@@ -46,7 +46,7 @@ PUBLIC_MIN_VIDEOS = 3
 
 def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int = 0) -> dict:
     """An estimate from public numbers only (a channel's recent views), for the public
-    'What am I worth?' page. Same base and production floor as fair_price; with no
+    'Know your page' page. Same base and production floor as fair_price; with no
     engagement, audience or trust data there are no adjustments, so the range is wider
     and the confidence lower. Too few videos -> no price, and it says so."""
     label = {"shorts": "Shorts", "long": "long videos"}[fmt]

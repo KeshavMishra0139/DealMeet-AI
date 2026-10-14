@@ -70,7 +70,7 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | Real Atlas round trip (write, reconnect, read) | Unverified | `test_db.py` integration test is skipped without `TEST_MONGODB_URI` |
 | Seed script that replaces only synthetic records | Tested | `test_seed.py` |
 
-## 5. Real YouTube data and "What am I worth?"
+## 5. Real YouTube data and "Know your page"
 
 | Part | Status | Evidence |
 | --- | --- | --- |
@@ -220,12 +220,12 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 
 | Part | Status | Evidence |
 | --- | --- | --- |
-| AI market review of the fair price: capped at -30% to +40%, reasons grounded in the facts, stored per creator and applied everywhere, stale when the numbers change; on the spot for "What am I worth?" | Tested against a fake model | `test_price_review.py`; not run with a real key |
+| AI market review of the fair price: capped at -30% to +40%, reasons grounded in the facts, stored per creator and applied everywhere, stale when the numbers change; on the spot for "Know your page" | Tested against a fake model | `test_price_review.py`; not run with a real key |
 | The week's moves reworded by the AI in English and Hindi; the engine's choice and numbers kept; moves already acted on untouched | Tested against a fake model | `test_ai_moves.py` |
 | Pitches and coach answers in 10 languages; without AI, English or Hindi and the reply says which | Tested (fallbacks) | `test_pitches.py`, `test_coach.py`; regional output not run with a real key |
 | Main language of a channel from its titles (rules, refined by the model) | Tested | `test_price_review.py` |
 | No hourly AI cap unless `AI_MAX_CALLS_PER_HOUR` is set | Tested | `test_ai_moves.py` |
-| "What am I worth?" only for signed-out visitors; signed-in people go to their dashboard | Tested | `qa/flows.mjs` |
+| "Know your page" only for signed-out visitors; signed-in people go to their dashboard | Tested | `qa/flows.mjs` |
 | One AI assistant window (creators and brands) replacing Ask and Assistant: conversation with memory, the account's data as context, tools with Confirm, rupee-amount and copy checks, template answers without AI | Tested against a fake model; browser journeys without AI | `test_assistant_chat.py`; `qa/flows.mjs`; not run with a real key |
 
 ## Bugs found by the new tests and fixed

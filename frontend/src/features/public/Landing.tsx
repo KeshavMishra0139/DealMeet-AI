@@ -76,7 +76,7 @@ export default function Landing() {
           {!signedIn && (
             <Button asChild variant={demo ? "ghost" : "outline"} size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
               <Link to="/worth">
-                <Youtube aria-hidden /> What am I worth? Check your YouTube channel
+                <Youtube aria-hidden /> Know your page: what your YouTube channel can charge
               </Link>
             </Button>
           )}

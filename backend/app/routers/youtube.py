@@ -1,4 +1,4 @@
-"""YouTube public data: the public "What am I worth?" lookup and linking a channel."""
+"""YouTube public data: the public "Know your page" lookup and linking a channel."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request

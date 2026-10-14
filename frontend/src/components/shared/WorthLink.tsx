@@ -1,4 +1,4 @@
-// "Check your worth" (/worth): the tool creators come for, emphasised in the landing's
+// "Know your page" (/worth): the tool creators come for, emphasised in the landing's
 // navigation for visitors who haven't signed in (signed-in creators see their price in the Studio). A soft signature-gradient glow breathes behind it (opacity only, so it stays
 // cheap; still with reduced motion), and the sparkle turns on hover.
 import { motion, useReducedMotion } from "framer-motion";
@@ -15,7 +15,7 @@ const ICON = { pill: "size-3.5 text-violet-600" } as const;
 
 export function WorthLink({
   variant,
-  label = "Check your worth",
+  label = "Know your page",
   onClick,
   className,
 }: {
