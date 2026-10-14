@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/shared/Bits";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
+import { RowBones } from "@/components/shared/Skeletons";
 import { useBrandId } from "@/lib/session";
 import { CampaignTable, useConsole } from "./BrandHome";
 
@@ -24,7 +24,7 @@ export default function Campaigns() {
       </div>
       <div className="mt-5">
         {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
-        {!q.data && !q.isError && <Skeleton className="h-64 rounded-xl" />}
+        {!q.data && !q.isError && <RowBones rows={3} />}
         {q.data && <CampaignTable campaigns={q.data.campaigns} />}
       </div>
     </div>

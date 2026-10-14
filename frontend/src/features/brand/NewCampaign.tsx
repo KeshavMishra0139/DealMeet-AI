@@ -4,9 +4,10 @@ import { AlertCircle, ArrowLeft, Minus, Plus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, FormSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState } from "@/components/shared/Bits";
 import { Button } from "@/components/ui/button";
-import { ChipGroup, FieldHint, Input, Label, Segmented, Select, Skeleton, Switch, Textarea } from "@/components/ui/form";
+import { ChipGroup, FieldHint, Input, Label, Segmented, Select, Switch, Textarea } from "@/components/ui/form";
 import { api, ApiError, post, type MissingItem } from "@/lib/api";
 import type { Listing } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
@@ -176,8 +177,9 @@ export default function NewCampaign() {
     onError: fail,
   });
 
+  const ready = useLoadWipe(loaded);
   if (editId && existing.isError) return <ErrorState error={existing.error} onRetry={() => existing.refetch()} />;
-  if (!loaded) return <Skeleton className="h-96 rounded-xl" />;
+  if (!loaded || !ready) return <FormSkeleton label="Loading campaign" fields={6} />;
   const status = existing.data?.status;
   const valid = f.title.trim().length >= 4;
   const busy = create.isPending || save.isPending;

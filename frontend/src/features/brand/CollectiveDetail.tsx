@@ -6,12 +6,12 @@ import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
 import type { CollectiveView } from "@/lib/deal-types";
 import { STAGE_LABEL } from "@/lib/deal-types";
 import { count, inr, pct } from "@/lib/format";
 import { PayDialog } from "../deals/DealView";
+import { useLoadWipe, DetailSkeleton } from "@/components/shared/Skeletons";
 
 export default function CollectiveDetail() {
   const { id = "" } = useParams();
@@ -28,8 +28,9 @@ export default function CollectiveDetail() {
       });
     },
   });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-xl" />;
+  if (!q.data || !ready) return <DetailSkeleton label="Loading collective" />;
   const c = q.data;
   const live = c.members.filter((m) => m.stage === "live").length;
   const conf = c.confirmations;

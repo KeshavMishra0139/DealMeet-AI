@@ -138,7 +138,7 @@ function Studio() {
       <div className="relative z-10 lg:pl-[248px]">
         <main
           id="main"
-          className="mx-auto w-full max-w-[1000px] px-4 pb-[calc(160px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-32 lg:pt-10"
+          className="load-wipe mx-auto w-full max-w-[1000px] px-4 pb-[calc(160px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-32 lg:pt-10"
         >
           <PageFade>
             <Outlet />

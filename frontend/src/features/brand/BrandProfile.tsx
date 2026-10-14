@@ -6,11 +6,12 @@ import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FieldHint, Input, Label, Skeleton, Textarea } from "@/components/ui/form";
+import { FieldHint, Input, Label, Textarea } from "@/components/ui/form";
 import { api } from "@/lib/api";
 import { inr } from "@/lib/format";
 import { useBrandId } from "@/lib/session";
 import { useBrand } from "./BrandShell";
+import { useLoadWipe, FormSkeleton } from "@/components/shared/Skeletons";
 
 interface Org {
   id: string;
@@ -31,9 +32,10 @@ export default function BrandProfile() {
   const id = useBrandId();
   const q = useBrand();
   const org = useQuery({ queryKey: ["brand-profile", id], queryFn: () => api<Org>(`/brands/${id}/profile`) });
+  const ready = useLoadWipe(!!(q.data && org.data));
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   if (org.isError) return <ErrorState error={org.error} onRetry={() => org.refetch()} />;
-  if (!q.data || !org.data) return <Skeleton className="h-64 rounded-xl" />;
+  if (!q.data || !org.data || !ready) return <FormSkeleton label="Loading your brand profile" />;
   const b = q.data;
   const rows: [string, React.ReactNode][] = [
     ["Goal", b.goal ?? "—"],

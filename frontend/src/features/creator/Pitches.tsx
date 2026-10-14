@@ -3,11 +3,12 @@ import { Copy, Link2, Mail, PenLine, Search, Send, Sparkles, Trash2, X } from "l
 import { useDeferredValue, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, ListSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState } from "@/components/shared/Bits";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FieldHint, Input, Label, Select, Skeleton, Textarea } from "@/components/ui/form";
+import { FieldHint, Input, Label, Select, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, del, post } from "@/lib/api";
 import { inrRange, shortDate } from "@/lib/format";
@@ -71,8 +72,9 @@ export default function Pitches() {
   const [open, setOpen] = useState<string | null>(null);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["pitches", id] });
 
+  const ready = useLoadWipe(!!list.data);
   if (list.isError) return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
-  if (!list.data) return <Skeleton className="h-96 rounded-[28px]" />;
+  if (!list.data || !ready) return <ListSkeleton label="Loading your pitches" action />;
   const d = list.data;
   const current = d.items.find((p) => p.id === open);
 

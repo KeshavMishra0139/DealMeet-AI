@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bot, CheckCircle2, FileText, GraduationCap, Lightbulb, Repeat, Search, Sparkles, UserRound } from "lucide-react";
+import { useLoadWipe, RoadmapSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState, ReferenceNote, SectionTitle } from "@/components/shared/Bits";
 import { Reveal } from "@/components/motion/Motion";
 import { WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import type { Roadmap as RoadmapData } from "@/lib/api-types";
@@ -26,8 +26,9 @@ export default function Roadmap() {
   const id = useCreatorId();
   const { t } = useI18n();
   const q = useQuery({ queryKey: ["roadmap", id], queryFn: () => api<RoadmapData>(`/creators/${id}/roadmap`) });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <RoadmapSkeleton />;
+  if (!q.data || !ready) return <RoadmapSkeleton />;
   const r = q.data;
 
   return (
@@ -204,16 +205,3 @@ function langCode(label: string) {
   return { Tamil: "ta", Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Marathi: "mr", Hindi: "hi", Gujarati: "gu" }[label] ?? "en";
 }
 
-function RoadmapSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading">
-      <Skeleton className="h-6 w-40" />
-      <Skeleton className="mt-3 h-9 w-64" />
-      <div className="mt-6 grid gap-3 lg:grid-cols-2">
-        <Skeleton className="h-56 rounded-[var(--radius-card)]" />
-        <Skeleton className="h-56 rounded-[var(--radius-card)]" />
-      </div>
-      <Skeleton className="mt-8 h-40 rounded-[var(--radius-card)]" />
-    </div>
-  );
-}

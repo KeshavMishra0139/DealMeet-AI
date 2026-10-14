@@ -23,7 +23,7 @@ import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { ReportButton } from "@/components/shared/ReportButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Skeleton, Textarea } from "@/components/ui/form";
+import { Input, Label, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
 import type { FairPrice } from "@/lib/api-types";
@@ -32,6 +32,7 @@ import { STAGE_LABEL } from "@/lib/deal-types";
 import { inr, possessive, shortDate, timeOfDay } from "@/lib/format";
 import { fundEscrow } from "@/lib/payments";
 import { cn } from "@/lib/utils";
+import { useLoadWipe, DetailSkeleton } from "@/components/shared/Skeletons";
 
 type Role = "creator" | "brand";
 
@@ -65,8 +66,9 @@ export default function DealView({ role }: { role: Role }) {
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-2xl" />;
+  if (!q.data || !ready) return <DetailSkeleton label="Loading deal" />;
   const d = q.data;
   const other = role === "creator" ? { name: d.brand.name, hue: d.brand.hue, generic: false } : { name: d.creator.name, hue: d.creator.avatar_hue, generic: d.creator.is_reference };
   const back = role === "creator" ? "/creator/deals" : d.collective ? `/brand/collectives/${d.collective.id}` : "/brand/deals";

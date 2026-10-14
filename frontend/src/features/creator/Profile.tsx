@@ -4,10 +4,11 @@ import { CheckCircle2, CircleDashed, Link2, MinusCircle, Save, XCircle } from "l
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, SettingsSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState, ScoreRing } from "@/components/shared/Bits";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Button } from "@/components/ui/button";
-import { ChipGroup, FieldHint, Input, Label, Segmented, Select, Skeleton, Textarea } from "@/components/ui/form";
+import { ChipGroup, FieldHint, Input, Label, Segmented, Select, Textarea } from "@/components/ui/form";
 import { api } from "@/lib/api";
 import { count, shortDate } from "@/lib/format";
 import { useCreatorId } from "@/lib/session";
@@ -67,8 +68,9 @@ export default function Profile() {
     qc.setQueryData(["profile", id], d);
     void qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "profile" });
   };
+  const ready = useLoadWipe(!!(q.data && meta.data));
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data || !meta.data) return <Skeleton className="h-96 rounded-[var(--radius-card)]" />;
+  if (!q.data || !meta.data || !ready) return <SettingsSkeleton label="Loading your profile" form />;
   const d = q.data;
 
   return (

@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Heart, Search, Send, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, ListSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton, Switch } from "@/components/ui/form";
+import { Switch } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api, del, post, put } from "@/lib/api";
 import { shortDate } from "@/lib/format";
@@ -37,8 +38,9 @@ export default function DreamBrands() {
   });
   const read = useMutation({ mutationFn: () => post(`/creators/${id}/dream-brands/read`), onSuccess: refresh });
 
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-[28px]" />;
+  if (!q.data || !ready) return <ListSkeleton label="Loading your dream brands" rows={5} action />;
   const d = q.data;
 
   return (

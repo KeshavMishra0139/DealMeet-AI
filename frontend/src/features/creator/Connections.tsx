@@ -7,9 +7,10 @@ import { Instagram, Link2, RefreshCw, ShieldCheck, Youtube } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, ConnectionsSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState } from "@/components/shared/Bits";
 import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@/components/ui/form";
+import { Input } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { useI18n } from "@/i18n";
 import { api, post } from "@/lib/api";
@@ -53,8 +54,9 @@ export default function Connections() {
   const { t } = useI18n();
   const id = useCreatorId();
   const q = useQuery({ queryKey: ["connections", id], queryFn: () => api<{ platforms: PlatformStatus[]; sample_data: boolean }>(`/creators/${id}/connections`) });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-64 rounded-[var(--radius-card)]" />;
+  if (!q.data || !ready) return <ConnectionsSkeleton />;
   const by = Object.fromEntries(q.data.platforms.map((p) => [p.platform, p]));
   return (
     <div>

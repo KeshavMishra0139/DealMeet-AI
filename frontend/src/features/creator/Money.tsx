@@ -12,12 +12,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Waterfall } from "@/components/charts/Waterfall";
+import { useLoadWipe, MoneySkeleton } from "@/components/shared/Skeletons";
 import { ErrorState, ReferenceNote } from "@/components/shared/Bits";
 import { Reveal } from "@/components/motion/Motion";
 import { RangeValue } from "@/components/shared/Estimate";
 import { EstimateNote, SimulatedChip, WhyPopover } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
-import { Segmented, Skeleton } from "@/components/ui/form";
+import { Segmented } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import { AiReviewNote } from "@/components/shared/AiReview";
@@ -46,8 +47,9 @@ export default function Money() {
   const { t } = useI18n();
   const money = useQuery({ queryKey: ["money", id], queryFn: () => api<MoneyData>(`/creators/${id}/money`) });
 
+  const ready = useLoadWipe(!!money.data);
   if (money.isError) return <ErrorState error={money.error} onRetry={() => money.refetch()} />;
-  if (!money.data) return <PageSkeleton />;
+  if (!money.data || !ready) return <MoneySkeleton />;
   const m = money.data;
 
   return (
@@ -253,13 +255,4 @@ function PathCard({ path }: { path: MoneyPath }) {
   );
 }
 
-function PageSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading">
-      <Skeleton className="h-6 w-40" />
-      <Skeleton className="mt-3 h-9 w-64" />
-      <Skeleton className="mt-6 h-[520px] rounded-[28px]" />
-    </div>
-  );
-}
 

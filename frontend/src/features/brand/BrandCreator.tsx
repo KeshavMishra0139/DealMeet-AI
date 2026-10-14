@@ -12,7 +12,6 @@ import { TrustBadge } from "@/components/shared/TrustBadge";
 import { SimulatedChip } from "@/components/shared/Why";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
 import { api, post } from "@/lib/api";
 import type { FairPrice, PriceStep } from "@/lib/api-types";
 import { count, inr, inrRange, pct, shortDate } from "@/lib/format";
@@ -20,6 +19,7 @@ import type { Safety, Scopes } from "@/lib/market-types";
 import { useBrandId } from "@/lib/session";
 import type { Provenance } from "@/lib/types";
 import { OfferDialog } from "./Campaign";
+import { useLoadWipe, DetailSkeleton } from "@/components/shared/Skeletons";
 
 interface CreatorView {
   id: string;
@@ -78,8 +78,9 @@ export default function BrandCreator() {
     onSuccess: () => toast.success("Request sent", { description: "The creator decides. You'll see the data here if they allow it." }),
   });
 
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-xl" />;
+  if (!q.data || !ready) return <DetailSkeleton label="Loading creator" />;
   const c = q.data;
   const fp = { steps: c.fair.steps ?? [], total: c.fair.total, base: c.fair.steps?.[0]?.amount ?? 0 };
 

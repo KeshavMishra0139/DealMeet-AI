@@ -3,12 +3,13 @@ import { Bot, Copy, Download, ExternalLink, Globe, History, Link2, Save, Trash2 
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, KitSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState, SectionTitle } from "@/components/shared/Bits";
 import { KitCard } from "@/components/shared/KitCard";
 import { QrCode } from "@/components/shared/QrCode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FieldHint, Input, Label, Segmented, Skeleton, Switch, Textarea } from "@/components/ui/form";
+import { FieldHint, Input, Label, Segmented, Switch, Textarea } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api, post, put, del } from "@/lib/api";
 import { inr, shortDate } from "@/lib/format";
@@ -36,8 +37,9 @@ export default function Kit() {
       void qc.invalidateQueries({ queryKey: ["kit", id] });
     },
   });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-[600px] rounded-[28px]" />;
+  if (!q.data || !ready) return <KitSkeleton />;
   const k = q.data;
   const pub = { collabs: true, ...(k.public ?? { stats: true, demographics: false, rates: true }) };
   const url = `${window.location.origin}${k.path}`;

@@ -24,7 +24,7 @@
 
   --animate-drift-a: drift-a 26s ease-in-out infinite alternate;
   --animate-drift-b: drift-b 32s ease-in-out infinite alternate;
-  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
   /* Logo scroller: the track holds the list twice, so -50% lands on an identical frame. */
   --animate-marquee: marquee 40s linear infinite;
   /* Hero mosaic columns: each holds its tiles twice and drifts by half its height,
@@ -274,10 +274,42 @@
   }
 }
 
+/* Loading bones: a soft band of light sweeping across, in the theme's own surfaces. */
 @utility skeleton {
-  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
+}
+
+/* Skeleton to content: the page is the view transition's subject (see useLoadWipe). The
+   skeleton's snapshot sits on top and a mask sweeps it away left to right, revealing the page. */
+@property --wipe {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: -100%;
+}
+@keyframes dm-wipe {
+  from { --wipe: 100%; }
+  to { --wipe: -100%; }
+}
+@utility load-wipe {
+  view-transition-name: dm-load;
+}
+::view-transition-group(dm-load) {
+  animation-duration: 0.6s;
+}
+::view-transition-old(dm-load) {
+  z-index: 2;
+  animation: dm-wipe 0.6s ease-in-out both;
+  mask-image: linear-gradient(to right, black var(--wipe), transparent calc(var(--wipe) + 100%));
+}
+::view-transition-new(dm-load) {
+  animation: none;
+}
+/* Only the page moves: the rest of the screen swaps without a cross-fade. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
 }
 
 @utility scrollbar-none {

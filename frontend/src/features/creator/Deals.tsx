@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Avatar, EmptyState, ErrorState, SectionTitle } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Skeleton } from "@/components/ui/form";
+import { Input, Label } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { useI18n } from "@/i18n";
 import { api, post } from "@/lib/api";
@@ -15,6 +15,7 @@ import { STAGE_LABEL } from "@/lib/deal-types";
 import { inr, shortDate } from "@/lib/format";
 import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
+import { useLoadWipe, ListSkeleton } from "@/components/shared/Skeletons";
 
 interface DealsData {
   deals: DealRow[];
@@ -35,8 +36,9 @@ export default function Deals() {
     },
   });
 
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-[var(--radius-card)]" />;
+  if (!q.data || !ready) return <ListSkeleton label="Loading your deals" />;
   const offers = q.data.deals.filter((d) => d.stage === "offer");
   const active = q.data.deals.filter((d) => ["contract", "escrow_funded", "live", "verified"].includes(d.stage));
   const done = q.data.deals.filter((d) => d.stage === "paid" || d.stage === "declined");

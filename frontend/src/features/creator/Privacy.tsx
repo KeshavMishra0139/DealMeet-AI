@@ -5,7 +5,7 @@ import { Avatar, ErrorState, SectionTitle } from "@/components/shared/Bits";
 import { ScopePicker } from "@/components/shared/ScopePicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton, Switch } from "@/components/ui/form";
+import { Switch } from "@/components/ui/form";
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import { shortDate, timeOfDay } from "@/lib/format";
@@ -14,6 +14,7 @@ import { useCreatorId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { ProtectedStatus } from "@/components/shared/ProtectedStatus";
 import { useHealth } from "@/lib/shared-demo";
+import { useLoadWipe, SettingsSkeleton } from "@/components/shared/Skeletons";
 
 const ACTION = {
   granted: { label: "Access granted", icon: KeyRound, tone: "text-success" },
@@ -40,8 +41,9 @@ export default function Privacy() {
     },
   });
 
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-[var(--radius-card)]" />;
+  if (!q.data || !ready) return <SettingsSkeleton label="Loading your privacy settings" />;
   const p = q.data;
 
   return (

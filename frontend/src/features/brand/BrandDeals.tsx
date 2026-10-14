@@ -3,18 +3,19 @@ import { Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/form";
 import { api } from "@/lib/api";
 import type { CollectiveView, DealRow } from "@/lib/deal-types";
 import { STAGE_LABEL } from "@/lib/deal-types";
 import { count, inr, shortDate } from "@/lib/format";
 import { useBrandId } from "@/lib/session";
+import { useLoadWipe, ListSkeleton } from "@/components/shared/Skeletons";
 
 export default function BrandDeals() {
   const id = useBrandId();
   const q = useQuery({ queryKey: ["brand-deals", id], queryFn: () => api<{ deals: DealRow[]; collectives: CollectiveView[] }>(`/brands/${id}/deals`), refetchInterval: 4000 });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-96 rounded-xl" />;
+  if (!q.data || !ready) return <ListSkeleton label="Loading deals" small />;
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold tracking-tight">Deals</h1>

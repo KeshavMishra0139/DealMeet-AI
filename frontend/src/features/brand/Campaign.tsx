@@ -23,6 +23,7 @@ import { useBrandId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { ApplicationsPanel, CampaignControls, HistoryPanel } from "./CampaignManage";
 import { ComparePanel, RankWhy, ShortlistPanel, ShortlistToggle } from "./Shortlist";
+import { useLoadWipe, DetailSkeleton } from "@/components/shared/Skeletons";
 
 export default function Campaign() {
   const { id = "" } = useParams();
@@ -37,8 +38,9 @@ export default function Campaign() {
     if (listing.data && !tab) setTab(listing.data.type === "collective" ? "collective" : "matches");
   }, [listing.data, tab]);
 
+  const ready = useLoadWipe(!!listing.data);
   if (listing.isError) return <ErrorState error={listing.error} onRetry={() => listing.refetch()} />;
-  if (!listing.data) return <Skeleton className="h-96 rounded-xl" />;
+  if (!listing.data || !ready) return <DetailSkeleton label="Loading campaign" />;
   const l = listing.data;
   const b = l.budget;
 

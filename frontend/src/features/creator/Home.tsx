@@ -5,12 +5,12 @@ import { AlertTriangle, ArrowRight, CalendarClock, Clock, FileWarning, Handshake
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useLoadWipe, HomeSkeleton } from "@/components/shared/Skeletons";
 import { ErrorState, ReferenceNote, ScoreRing } from "@/components/shared/Bits";
 import { RangeValue } from "@/components/shared/Estimate";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { WhyPopover } from "@/components/shared/Why";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
 import { useI18n, useTr } from "@/i18n";
 import { api, post } from "@/lib/api";
 import type { Durable, Home as HomeData, Pipeline, Plan, RateGap, Stage } from "@/lib/api-types";
@@ -43,8 +43,9 @@ export default function Home() {
     },
   });
 
+  const ready = useLoadWipe(!!home.data);
   if (home.isError) return <ErrorState error={home.error} onRetry={() => home.refetch()} />;
-  if (!home.data) return <HomeSkeleton />;
+  if (!home.data || !ready) return <HomeSkeleton />;
   const { creator, stage, plan, durable, rate_gap, pipeline, context } = home.data;
   const yt = context.terms.platform === "youtube";
 
@@ -355,22 +356,4 @@ function PipelineCard({ pipeline, label }: { pipeline: Pipeline; label: string }
   );
 }
 
-function HomeSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading your plan">
-      <Skeleton className="h-5 w-48" />
-      <Skeleton className="mt-3 h-9 w-72" />
-      <div className="mt-6 flex gap-3 overflow-hidden lg:grid lg:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-[360px] w-[86%] shrink-0 rounded-[26px] lg:w-auto" />
-        ))}
-      </div>
-      <div className="mt-8 grid gap-3 md:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-56 rounded-[var(--radius-card)]" />
-        ))}
-      </div>
-    </div>
-  );
-}
 

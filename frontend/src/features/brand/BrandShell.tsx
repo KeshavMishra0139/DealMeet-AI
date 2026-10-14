@@ -128,7 +128,7 @@ function Console() {
       </header>
 
       <div className="lg:pl-[232px]">
-        <main id="main" className="mx-auto w-full max-w-[1200px] px-4 pb-32 pt-5 sm:px-6 lg:px-10 lg:pt-8">
+        <main id="main" className="load-wipe mx-auto w-full max-w-[1200px] px-4 pb-32 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <ScrollProgress />
           <PageFade>
             <Outlet />

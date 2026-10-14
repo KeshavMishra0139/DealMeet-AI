@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, ApiError, post, type MissingItem } from "@/lib/api";
 import { shortDate, timeOfDay } from "@/lib/format";
@@ -14,6 +13,7 @@ import type { CampaignAction, CampaignApplications, Listing } from "@/lib/market
 import { useBrandId } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { CampaignStatusBadge } from "./CampaignStatus";
+import { useLoadWipe, DetailSkeleton } from "@/components/shared/Skeletons";
 
 const ACTION: Record<CampaignAction, { label: string; Icon: typeof Play; done: string }> = {
   publish: { label: "Publish", Icon: CircleDot, done: "Campaign live: matching creators can see it and apply." },
@@ -130,8 +130,9 @@ export function ApplicationsPanel({ listing }: { listing: Listing }) {
     onSuccess: (d) => qc.setQueryData(["applications", listing.id], d),
     onError: (e) => toast.error((e as Error).message),
   });
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <Skeleton className="h-48 rounded-xl" />;
+  if (!q.data || !ready) return <DetailSkeleton label="Loading campaign" />;
   const d = q.data;
   if (d.items.length === 0)
     return (

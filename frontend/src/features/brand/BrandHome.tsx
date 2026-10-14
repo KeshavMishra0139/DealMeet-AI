@@ -8,7 +8,6 @@ import { DealFlow3D } from "@/components/three/lazy";
 import { Avatar, EmptyState, ErrorState } from "@/components/shared/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/form";
 import { api } from "@/lib/api";
 import { inr, inrShort, shortDate } from "@/lib/format";
 import type { Console } from "@/lib/market-types";
@@ -16,6 +15,7 @@ import { useBrandId } from "@/lib/session";
 import { CampaignStatusBadge } from "./CampaignStatus";
 import { CreatorSearch } from "./CreatorSearch";
 import { cn } from "@/lib/utils";
+import { useLoadWipe, ConsoleSkeleton } from "@/components/shared/Skeletons";
 
 export const TYPE_LABEL: Record<string, string> = {
   brand_campaign: "Campaign",
@@ -32,8 +32,9 @@ export function useConsole(id: string) {
 export default function BrandHome() {
   const id = useBrandId();
   const q = useConsole(id);
+  const ready = useLoadWipe(!!q.data);
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (!q.data) return <ConsoleSkeleton />;
+  if (!q.data || !ready) return <ConsoleSkeleton />;
   const d = q.data;
   const live = d.campaigns.filter((c) => c.status === "live");
   const maxCount = Math.max(1, ...d.stages.map((s) => s.count));
@@ -276,20 +277,6 @@ export function CampaignTable({ campaigns }: { campaigns: Console["campaigns"] }
   );
 }
 
-function ConsoleSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading">
-      <Skeleton className="h-4 w-40" />
-      <Skeleton className="mt-2 h-7 w-56" />
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-44 rounded-xl" />
-        ))}
-      </div>
-      <Skeleton className="mt-6 h-56 rounded-xl" />
-    </div>
-  );
-}
 
 /** A bar that grows to its width when it scrolls into view. */
 function GrowBar({ pct }: { pct: number }) {
