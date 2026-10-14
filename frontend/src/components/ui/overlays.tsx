@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-function themeClass() {
+export function themeClass() {
   if (typeof document === "undefined") return "";
   return document.documentElement.classList.contains("theme-brand") ? "theme-brand" : "theme-creator";
 }

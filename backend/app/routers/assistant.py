@@ -1,5 +1,7 @@
-"""The AI growth coach (questions about the signed-in creator's own numbers, and goals)
-and assistant actions (tools that run as the signed-in user, with confirmation)."""
+"""The AI assistant window (ai/assistant.py: one conversation that answers and does tasks),
+and the endpoints it grew from: the growth coach (questions about the signed-in creator's
+own numbers, and goals) and assistant actions (tools that run as the signed-in user, with
+confirmation)."""
 from __future__ import annotations
 
 import time
@@ -8,6 +10,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..ai import assistant
+from ..config import get_settings
 from ..db import get_db
 from ..services import assistant_tools as at
 from ..services import auth as au
@@ -99,3 +103,52 @@ def confirm(proposal_id: str, user: dict = Depends(au.current_user)):
 @router.post("/assistant/proposals/{proposal_id}/cancel")
 def cancel(proposal_id: str, user: dict = Depends(au.current_user)):
     return at.cancel(proposal_id, user)
+
+
+# ------------------------------------------------------------------ the AI assistant window
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    conversation_id: str | None = Field(default=None, max_length=40)
+    ui_lang: Literal["en", "hi"] = "en"
+
+
+CHAT_PER_HOUR = 120
+
+
+def _chat_user(user: dict) -> dict:
+    if user.get("role") == "creator" and not user.get("creator_id"):
+        raise HTTPException(409, "Finish onboarding first.")
+    if user.get("role") == "brand" and not user.get("brand_id"):
+        raise HTTPException(409, "Set up your brand first.")
+    if user.get("role") not in ("creator", "brand"):
+        raise HTTPException(403, "The assistant is for creator and brand accounts.")
+    return user
+
+
+@router.get("/assistant/chat")
+def chat_state(user: dict = Depends(au.current_user)):
+    """The latest conversation, conversation starters, and whether live AI is on."""
+    _chat_user(user)
+    return {"conversation": assistant.view(assistant.latest(user)), "starters": assistant.STARTERS[user["role"]], "ai": get_settings().has_ai}
+
+
+@router.post("/assistant/chat")
+def chat_send(body: ChatIn, user: dict = Depends(au.current_user)):
+    """One message to the assistant. It answers from the account's own data, and can run the
+    account's tools: anything that sends, publishes or pauses waits for Confirm."""
+    _chat_user(user)
+    ratelimit.enforce(f"chat:{user['_id']}", CHAT_PER_HOUR, 3600, "That's a lot of messages this hour. Take a short break and try again.")
+    return assistant.send(user, body.message, body.conversation_id, body.ui_lang)
+
+
+@router.post("/assistant/chat/{conversation_id}/actions/{proposal_id}/{decision}")
+def chat_settle(conversation_id: str, proposal_id: str, decision: Literal["confirm", "cancel"], user: dict = Depends(au.current_user)):
+    _chat_user(user)
+    return {"conversation": assistant.settle(user, conversation_id, proposal_id, decision == "confirm")}
+
+
+@router.delete("/assistant/chats")
+def chat_clear(user: dict = Depends(au.current_user)):
+    """Deletes this account's conversations with the assistant."""
+    _chat_user(user)
+    return {"deleted": assistant.clear(user)}

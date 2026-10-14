@@ -267,19 +267,23 @@ await step("Public page: write a positioning, show it on the page with badges, a
   await page.getByRole("link", { name: "Download QR" }).waitFor();
 });
 
-await step("Assistant: pausing a campaign waits for Confirm, then runs once", async () => {
+await step("AI assistant (brand): pausing a campaign from the chat waits for Confirm, then runs once", async () => {
   await reset();
   await page.goto(`${BASE}/brand?as=br_senpai`);
-  await page.getByRole("button", { name: "Assistant: do something for me" }).first().click();
+  await page.getByRole("button", { name: /AI assistant/ }).first().click();
   const dlg = page.getByRole("dialog");
-  await dlg.getByRole("button", { name: "Pause the winter hoodie drop" }).click();
-  await dlg.getByText("Needs your confirmation").waitFor();
+  await dlg.getByRole("heading", { name: "DealMeet AI" }).waitFor();
+  await dlg.getByText("Get things done").waitFor();
+  await dlg.getByLabel("Message DealMeet AI").fill("Pause the winter hoodie drop");
+  await dlg.getByLabel("Message DealMeet AI").press("Enter");
+  await dlg.getByText("Waiting for you").waitFor();
   const before = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
   if (before.status !== "live") throw new Error(`paused before confirming: ${before.status}`);
   await dlg.getByRole("button", { name: "Confirm" }).click();
-  await page.getByText("Campaign paused").first().waitFor();
+  await dlg.getByText(/^Paused\./).waitFor();
   const after = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
   if (after.status !== "paused") throw new Error(`not paused: ${after.status}`);
+  await page.keyboard.press("Escape");
 });
 
 await step("TEE: the audience overlap says where it was computed, and the health check agrees", async () => {
@@ -368,18 +372,22 @@ await step("Profile: edit the bio and preferences; completeness rises and it per
   await page.locator("section[aria-labelledby=ready]").getByText("connect to check").first().waitFor();
 });
 
-await step("Coach: ask about views, see the numbers used with their sources, then make a plan", async () => {
+await step("AI assistant (creator): ask about views, keep the conversation, then make a plan from the chat", async () => {
   await reset();
   await page.goto(`${BASE}/creator?as=cr_a`);
-  await page.getByRole("button", { name: "Ask about your numbers" }).first().click();
+  await page.getByRole("button", { name: /AI assistant/ }).first().click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("button", { name: "Are my views growing?" }).click();
-  await dlg.getByText("Numbers used").waitFor();
-  await dlg.getByText("What's uncertain:").waitFor();
-  await dlg.getByText(/Self-reported|Sample data|Live data/).first().waitFor();
-  await dlg.getByRole("button", { name: "Make me a plan" }).click();
-  await page.getByText(/Plan saved: 3 goals/).waitFor();
+  await dlg.getByText(/views/i).nth(1).waitFor();
+  await dlg.getByLabel("Message DealMeet AI").fill("Make me a growth plan");
+  await dlg.getByLabel("Message DealMeet AI").press("Enter");
+  await dlg.getByText("Made a growth plan", { exact: true }).waitFor();
   await page.keyboard.press("Escape");
+  // The conversation is kept: opening the window again shows it.
+  await page.getByRole("button", { name: /AI assistant/ }).first().click();
+  await page.getByRole("dialog").getByText("Make me a growth plan").waitFor();
+  await page.keyboard.press("Escape");
+  await page.reload();
   await page.getByRole("heading", { name: "Your goals" }).waitFor();
 });
 
@@ -506,7 +514,7 @@ await step("What am I worth?: only for visitors; signed-in creators get their ow
   const p = await ctx.newPage();
   await p.goto(`${BASE}/`);
   await p.getByRole("link", { name: /Check your worth/ }).first().waitFor();
-  const r = await p.evaluate(async () => (await fetch("/api/auth/demo", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: true }) })).status);
+  const r = await p.evaluate(async (BASE) => (await fetch(`${BASE}/api/auth/demo`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: true }) })).status, BASE);
   if (r !== 200) throw new Error(`demo sign-in ${r}`);
   await p.goto(`${BASE}/creator`);
   await p.getByRole("button", { name: /More/ }).first().click();

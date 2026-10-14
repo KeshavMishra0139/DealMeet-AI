@@ -53,6 +53,7 @@ COLLECTIONS = [
     "removal_requests",
     "pitches",
     "assistant_proposals",
+    "chats",
     "reports",
     "ai_cache",
 ]
@@ -168,6 +169,7 @@ def ensure_indexes(db) -> None:
     db.applications.create_index("listing_id")
     db.invoices.create_index("creator_id")
     db.invoices.create_index("deal_id")
+    db.chats.create_index([("user_id", 1), ("updated_at", -1)])
     db.payments.create_index([("kind", 1), ("ref_id", 1)])
     db.payments.create_index("payment_id", unique=True, partialFilterExpression={"payment_id": text})
     db.notifications.create_index("to")

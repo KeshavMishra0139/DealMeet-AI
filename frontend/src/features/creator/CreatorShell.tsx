@@ -22,8 +22,7 @@ import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Mo
 import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
-import { ActionAssistant } from "@/components/shared/ActionAssistant";
-import { AskButton } from "./AskPanel";
+import { AiAssistantButton, AiAssistantProvider } from "@/components/shared/AiAssistant";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
@@ -63,7 +62,9 @@ export default function CreatorShell() {
   return (
     <LangScope>
       <RequireSession role="creator">
-        <Studio />
+        <AiAssistantProvider role="creator">
+          <Studio />
+        </AiAssistantProvider>
       </RequireSession>
     </LangScope>
   );
@@ -103,8 +104,7 @@ function Studio() {
         >
           <ProfileCard creator={creator.data} />
         </AccountMenu>
-        <AskButton className="mx-1 mt-3 justify-start" />
-        <ActionAssistant role="creator" className="mx-1 mt-2 justify-start" />
+        <AiAssistantButton className="mx-1 mt-3 w-auto" />
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
           {[...PRIMARY, ...SECONDARY].map((item, i) => (
             <div key={item.to}>
@@ -122,8 +122,7 @@ function Studio() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
-          <AskButton compact />
-          <ActionAssistant role="creator" compact />
+          <AiAssistantButton compact />
           <LangToggle compact />
           <Button variant="ghost" size="icon-sm" aria-label={t("nav.more")} onClick={() => setMoreOpen(true)}>
             {creator.data ? (

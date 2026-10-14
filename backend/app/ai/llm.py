@@ -65,7 +65,8 @@ def _get_client():
         import anthropic
 
         s = get_settings()
-        _client = anthropic.Anthropic(api_key=s.ai_api_key, timeout=20.0, max_retries=1)
+        # 60 seconds: assistant replies are longer than one-line copy.
+        _client = anthropic.Anthropic(api_key=s.ai_api_key, timeout=60.0, max_retries=1)
     return _client
 
 
@@ -84,10 +85,10 @@ def _json_object(text: str) -> str:
     return text[start : end + 1]
 
 
-def _openrouter(prompt: str, schema: type[T], max_tokens: int) -> T:
+def _openrouter(system: str, messages: list[dict], schema: type[T], max_tokens: int) -> T:
     """One call through OpenRouter's chat completions API (AI_MODEL is its model id, such as
-    an Anthropic model under "anthropic/"). The reply must be JSON for `schema`; it's checked with
-    Pydantic like the direct path's structured output."""
+    an Anthropic model under "anthropic/"). `messages` are user and assistant turns. The reply
+    must be JSON for `schema`; it's checked with Pydantic like the direct path's structured output."""
     s = get_settings()
     shape = json.dumps(schema.model_json_schema(), separators=(",", ":"))
     r = httpx.post(
@@ -97,11 +98,11 @@ def _openrouter(prompt: str, schema: type[T], max_tokens: int) -> T:
             "model": s.ai_model,
             "max_tokens": max_tokens,
             "messages": [
-                {"role": "system", "content": f"{SYSTEM}\n\nReply with one JSON object only, no other text, matching this JSON Schema: {shape}"},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": f"{system}\n\nReply with one JSON object only, no other text, matching this JSON Schema: {shape}"},
+                *messages,
             ],
         },
-        timeout=30.0,
+        timeout=60.0,
     )
     r.raise_for_status()
     choice = (r.json().get("choices") or [{}])[0]
@@ -151,27 +152,31 @@ def generate(
     if not _allow_call():
         log.info("AI %s: hourly limit reached; using template", task)
         return fallback(), "template"
+    result = _call_model(task, SYSTEM, [{"role": "user", "content": prompt}], schema, max_tokens)
+    if result is None:
+        return fallback(), "template"
+    return _checked(task, key, result, fallback, facts)
 
+
+def _call_model(task: str, system: str, messages: list[dict], schema: type[T], max_tokens: int) -> T | None:
+    """One structured call to the configured provider. None for every failure (logged): no key
+    or credits, rate limits, network, refusals, cut-off or invalid output."""
+    s = get_settings()
     if s.ai_provider == "openrouter":
         try:
-            result = _openrouter(prompt, schema, max_tokens)
+            return _openrouter(system, messages, schema, max_tokens)
         except _NoOutput as e:
             log.info("AI %s: no usable output from OpenRouter (%s); using template", task, e)
-            return fallback(), "template"
         except httpx.HTTPStatusError as e:
             # 401: wrong key; 402: no credits on the OpenRouter account; 429: rate limited.
             log.warning("AI %s: OpenRouter error %s; using template", task, e.response.status_code)
-            return fallback(), "template"
         except httpx.HTTPError:
             log.warning("AI %s: OpenRouter unreachable; using template", task)
-            return fallback(), "template"
         except (ValidationError, ValueError) as e:
             log.warning("AI %s: invalid output from OpenRouter (%s); using template", task, type(e).__name__)
-            return fallback(), "template"
-        except Exception as e:  # never let the demo break on an AI call
+        except Exception as e:  # never let a page break on an AI call
             log.warning("AI %s: unexpected OpenRouter error (%s); using template", task, type(e).__name__)
-            return fallback(), "template"
-        return _checked(task, key, result, fallback, facts)
+        return None
 
     try:
         import anthropic
@@ -179,31 +184,42 @@ def generate(
         response = _get_client().messages.parse(
             model=s.ai_model,
             max_tokens=max_tokens,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+            system=system,
+            messages=messages,
             output_format=schema,
         )
         if response.stop_reason == "refusal" or response.parsed_output is None:
             log.info("AI %s: no usable output (stop_reason=%s); using template", task, response.stop_reason)
-            return fallback(), "template"
-        result = response.parsed_output
+            return None
+        return response.parsed_output
     except anthropic.RateLimitError:
         log.warning("AI %s: rate limited; using template", task)
-        return fallback(), "template"
     except anthropic.APIConnectionError:
         log.warning("AI %s: offline; using template", task)
-        return fallback(), "template"
     except anthropic.APIStatusError as e:
         log.warning("AI %s: API error %s; using template", task, e.status_code)
-        return fallback(), "template"
     except (ValidationError, ValueError) as e:
         log.warning("AI %s: invalid output (%s); using template", task, e)
-        return fallback(), "template"
-    except Exception as e:  # never let the demo break on an AI call
+    except Exception as e:  # never let a page break on an AI call
         log.warning("AI %s: unexpected error (%s); using template", task, type(e).__name__)
-        return fallback(), "template"
+    return None
 
-    return _checked(task, key, result, fallback, facts)
+
+def converse(task: str, system: str, messages: list[dict], schema: type[T], max_tokens: int = 1500) -> tuple[T | None, str]:
+    """A multi-turn call (the assistant window). Returns (result, status): status is "ai", or why
+    there's no result: "off" (no AI configured), "limited" (hourly cap), "failed" (the provider
+    call failed) or "rules" (the reply broke the copy rules). Not cached: every turn is new."""
+    if not get_settings().has_ai:
+        return None, "off"
+    if not _allow_call():
+        return None, "limited"
+    result = _call_model(task, system, messages, schema, max_tokens)
+    if result is None:
+        return None, "failed"
+    if breaks_copy_rules(result.model_dump_json()):
+        log.info("AI %s: reply broke the copy rules", task)
+        return None, "rules"
+    return result, "ai"
 
 
 def _checked(task: str, key: str, result: T, fallback: Callable[[], T], facts: str | None) -> tuple[T, str]:

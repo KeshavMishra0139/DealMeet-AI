@@ -297,6 +297,7 @@ With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for Open
 | **Fair price** (`ai/price_review.py`) | Reviews each creator's formula price from their real numbers and post titles (what the content is, the language market, likes and comments per 1,000 views, steadiness) and adds an **AI market review** step with its reasons. Stored per creator and applied everywhere their price shows (Money, rates, media kit, offers, brand search) until their numbers change; refreshed in the background, or on demand from Money (**Review now**) | Move the price more than -30% to +40%; quote numbers that aren't in the facts. The gradient-boosted cross-check stays on the formula alone |
 | **What am I worth?** | The same review for any channel, on the spot, plus the niche and main language from the titles | Override a niche the visitor picked |
 | **The week's 3 moves** (`ai/moves.py`) | Rewords each move's title and reason for this creator, in English and Hindi, once per weekly plan, in the background | Choose the moves, change what they ask or their numbers (the engine decides those); reword a move already acted on |
+| **The AI assistant window** (`ai/assistant.py`) | A conversation for creators and brands that answers from the account's data and does tasks with the tools, in the user's language | Quote rupee amounts that aren't the account's; send, publish or pause without the user's Confirm |
 | **Pitches and the coach** (`ai/regional.py` `WRITE_IN`) | Writes in 10 languages: English, Hindi, Hinglish, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, numbers in 0-9 | Without AI: English or Hindi templates, and the answer says which language it's in |
 | **Language and captions** | Reads a channel's main language from its titles (script and word rules first, refined by the model) for the YouTube dashboard and price review; tags captions with language, niche, tone and brand safety | |
 | **Media kit, branding, topic ideas, assistant actions** | Copy and routing as described in their sections | |
@@ -325,9 +326,20 @@ The top of the Creator Studio home is a **Weekly report**: the 7 days ending tod
 - Each platform shows connected, linked, not connected or unavailable; nothing is simulated for an unconnected account.
 - Creator records now say where each number came from (`sources`: `instagram_api`, `youtube_api`, `manual` or `synthetic`), mapped from the older `real`/`simulated` provenance. Email, phone, earnings and self-reported history never reach brands or public pages.
 
-## Assistant actions
+## The AI assistant window
 
-The **Assistant** (Creator Studio and Brand Console) does things for the signed-in user with a small set of tools (`services/assistant_tools.py`):
+**AI assistant** in the Studio and Console sidebars (the sparkle in the phone header, or Ctrl/⌘ J) opens **DealMeet AI**: one conversation that answers like a person and does tasks. It replaced the separate Ask and Assistant buttons. Code: `backend/app/ai/assistant.py`, `frontend/src/components/shared/AiAssistant.tsx`; tests: `backend/tests/test_assistant_chat.py`.
+
+- **What it knows**: each turn sends the model the account's own data as context. Creators: their numbers with their sources (the coach's facts), the fair price and its steps and AI review, this week's moves, draft pitches and brands in their niche. Brands: the Console summary, campaigns, deals by stage, what needs them, draft offers and shortlists, with only what each creator shares. Nothing about other accounts.
+- **How it talks**: natural and conversational, in the language the user writes in (Hindi, Hinglish, Tamil and the rest), with follow-up suggestions. It remembers the conversation (the last 16 messages go to the model); **New chat** starts over, and conversations are deleted with the account or with `DELETE /api/assistant/chats`.
+- **What it does**: the tools below. Reads and drafts run straight away and the tool's result goes back to the model, which tells the user what it found or made; anything that sends, publishes or pauses shows a card with **Confirm** and **Cancel** in the window.
+- **Checks**: every rupee amount in a reply must be one of the account's own (within 2%, so ₹17K and ₹17,000 both count), and replies can't promise results (copy rules). A reply that fails is asked for again once, then answered from templates. Prices are only explained, never set.
+- **Without AI** (or when a call fails), it still answers: the coach's template answers for creators, the Console summary for brands, and simple rules for tasks. The window says so.
+- `GET/POST /api/assistant/chat`, `POST /api/assistant/chat/{id}/actions/{proposal}/confirm|cancel`; 120 messages an hour per account.
+
+### Tools
+
+The assistant does things for the signed-in user with a small set of tools (`services/assistant_tools.py`):
 
 | Tool | Who | Runs |
 | --- | --- | --- |
@@ -450,7 +462,7 @@ The top of the Brand Console has **Find creators**: a search box with filters fo
 
 ## AI growth coach
 
-**Ask** (in the Studio sidebar, and the phone header) answers questions about the signed-in creator's own numbers: views, best format, fair rate, brands that fit, deals, readiness.
+The coach's facts and template answers now power the [AI assistant window](#the-ai-assistant-window) for creators (the separate Ask button is gone; `POST /api/assistant/ask` still answers one question). It answers questions about the signed-in creator's own numbers: views, best format, fair rate, brands that fit, deals, readiness.
 
 - The answer is built from a fixed set of the creator's own facts (recent posts, median views, format medians, fair-rate estimate, matched brands, open deals, completeness, readiness). Nothing about other creators is used.
 - Every answer lists **Numbers used**, each with its source badge (Live data, Self-reported, Sample data), says **what's uncertain**, and gives next steps.
@@ -638,7 +650,7 @@ The e2e journeys:
 
 - The audience overlap a brand sees saying where it was computed (no TEE configured on the QA server), matching `/api/health`, and the same status on the creator's Privacy page.
 - A deal's brand reporting a problem; the demo admin resolving it, suspending (the account can't sign in) and restoring an account, each with a reason, and finding both in the audit log.
-- Pausing a campaign through the Assistant: nothing changes until Confirm.
+- Pausing a campaign from the AI assistant window: nothing changes until Confirm; a creator asks about views and makes a plan from the chat, and the conversation is kept.
 - A brand adjusting a collective's fee and sending it; funding only after every member confirms.
 - A creator proposing new terms and the brand accepting that version.
 - Writing a positioning and showing it on the public page with badges, an estimate and a QR code.

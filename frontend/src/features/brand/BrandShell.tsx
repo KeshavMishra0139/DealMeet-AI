@@ -3,7 +3,7 @@ import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, Ro
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
-import { ActionAssistant } from "@/components/shared/ActionAssistant";
+import { AiAssistantButton, AiAssistantProvider } from "@/components/shared/AiAssistant";
 import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
@@ -49,7 +49,9 @@ export default function BrandShell() {
   useTheme("brand");
   return (
     <RequireSession role="brand">
-      <Console />
+      <AiAssistantProvider role="brand">
+        <Console />
+      </AiAssistantProvider>
     </RequireSession>
   );
 }
@@ -104,7 +106,7 @@ function Console() {
             <Plus aria-hidden /> New campaign
           </Link>
         </Button>
-        <ActionAssistant role="brand" className="mx-0.5 mt-2 justify-start" />
+        <AiAssistantButton className="mx-0.5 mt-2 w-auto" />
         <div className="mt-4 flex-1">{nav()}</div>
         <Controls />
       </aside>
@@ -114,7 +116,7 @@ function Console() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
-          <ActionAssistant role="brand" compact />
+          <AiAssistantButton compact />
           <Button asChild variant="primary" size="sm">
             <Link to="/brand/campaigns/new">
               <Plus aria-hidden /> New
