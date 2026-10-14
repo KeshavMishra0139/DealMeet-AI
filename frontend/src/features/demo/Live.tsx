@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Columns2, Monitor, RotateCcw, Smartphone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useFrameMessages } from "@/components/demo/PhoneMode";
+import { useFrameMessages } from "@/components/demo/FrameBridge";
 import { BrowserFrame, PHONE_OUTER, PhoneFrame, useFitScale, useMediaQuery } from "@/components/demo/Frames";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";

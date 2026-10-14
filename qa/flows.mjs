@@ -527,14 +527,14 @@ await step("Know your page: only for visitors; signed-in creators get their own 
   await ctx.close();
 });
 
-// Presenting on a laptop: compare, phone view and the live split.
+// Presenting on a laptop: compare and the live split.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 desk.on("pageerror", (e) => errors.push(String(e)));
 page = desk;
 
 await step("Compare: guided demo steps through both creators with captions", async () => {
   await reset();
-  await desk.goto(`${BASE}/demo/compare?phone=0`);
+  await desk.goto(`${BASE}/demo/compare`);
   await desk.getByText("Earning, underpriced").first().waitFor();
   await desk.getByText("Starting").first().waitFor();
   await desk.getByRole("button", { name: "Guided demo" }).click();
@@ -546,20 +546,6 @@ await step("Compare: guided demo steps through both creators with captions", asy
   await bar.getByText(/Fair price ₹17K–18K a reel/).waitFor();
   await desk.keyboard.press("Escape");
   await bar.waitFor({ state: "detached" });
-});
-
-await step("Phone view: P puts the app in a 390 x 844 phone and back", async () => {
-  await desk.goto(`${BASE}/creator?as=cr_b&phone=0`);
-  await desk.getByRole("heading", { name: "Here's what to do this week" }).waitFor();
-  await desk.keyboard.press("p");
-  const phone = desk.frameLocator('iframe[title="DealMeet AI on a phone"]');
-  await phone.getByRole("heading", { name: /Post 2 Tamil quick-breakfast reels/ }).waitFor();
-  const box = await desk.locator('iframe[title="DealMeet AI on a phone"]').boundingBox();
-  if (!box || Math.abs(box.width / box.height - 390 / (844 - 47 - 21)) > 0.02) throw new Error(`Unexpected frame size ${JSON.stringify(box)}`);
-  await phone.getByRole("link", { name: "Money", exact: true }).click();
-  await desk.waitForURL(/\/creator\/money/);
-  await desk.getByRole("button", { name: "Exit phone view" }).click();
-  await desk.getByRole("heading", { name: /Money paths/ }).waitFor();
 });
 
 await step("Live demo: a counter on the phone appears in the brand console without a reload", async () => {
@@ -575,7 +561,7 @@ await step("Live demo: a counter on the phone appears in the brand console witho
 });
 
 await step("Charts: the flat reach chart draws every post; the match space draws with WebGL", async () => {
-  await desk.goto(`${BASE}/creator?as=cr_a&phone=0`);
+  await desk.goto(`${BASE}/creator?as=cr_a`);
   const reach = desk.locator("section", { has: desk.getByRole("heading", { name: "Reach vs followers" }) });
   const chart = reach.locator("svg[role=img]");
   await chart.scrollIntoViewIfNeeded();

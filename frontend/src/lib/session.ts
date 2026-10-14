@@ -148,9 +148,3 @@ export function useCreatorId(): string {
 export function useBrandId(): string {
   return useSession("brand").data?.user.brand_id ?? "";
 }
-
-/** The profile id to pin when this page opens itself in a frame (phone view), demo accounts only. */
-export function framePersona(me: Me | null | undefined): string | undefined {
-  if (!me?.user.demo) return undefined;
-  return me.user.creator_id ?? me.user.brand_id ?? undefined;
-}

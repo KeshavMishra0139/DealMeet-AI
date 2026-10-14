@@ -17,7 +17,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PHONE_OUTER, PhoneFrame, useFitScale, useMediaQuery } from "@/components/demo/Frames";
-import { useFrameMessages } from "@/components/demo/PhoneMode";
 import { Avatar, ErrorState, Kbd, ReferenceNote } from "@/components/shared/Bits";
 import { RangeValue } from "@/components/shared/Estimate";
 import { TrustBadge } from "@/components/shared/TrustBadge";
@@ -30,7 +29,7 @@ import { FitPill } from "@/features/creator/Opportunities";
 import { api, post } from "@/lib/api";
 import type { Compare as CompareData, CompareSide, GuideStep, GuideStepId } from "@/lib/demo-types";
 import { count, inr, inrRange } from "@/lib/format";
-import { framePath, isTypingTarget, postToFrame, setPhoneMode, usePhoneMode } from "@/lib/phone";
+import { framePath, isTypingTarget, postToFrame } from "@/lib/phone";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +49,7 @@ export default function Compare() {
   useTheme("creator");
   const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
-  const phones = usePhoneMode();
+  const [phones, setPhones] = useState(params.get("phones") === "1");
   const reduce = useReducedMotion();
   const q = useQuery({ queryKey: ["compare"], queryFn: () => api<CompareData>("/demo/compare") });
   const initialStep = params.get("guide") === "1" ? Math.max(0, Number(params.get("step") ?? 1) - 1) : null;
@@ -59,8 +58,6 @@ export default function Compare() {
   const frameA = useRef<HTMLIFrameElement>(null);
   const frameB = useRef<HTMLIFrameElement>(null);
   const guide = q.data?.guide ?? [];
-  // P pressed inside one of the phones comes back here.
-  useFrameMessages((msg) => msg.type === "jd:toggle-phone" && setPhoneMode(false));
   const active = step !== null ? guide[step] : undefined;
 
   const go = useCallback(
@@ -157,7 +154,7 @@ export default function Compare() {
               label="Layout"
               size="sm"
               value={phones ? "phones" : "cards"}
-              onChange={(v) => setPhoneMode(v === "phones")}
+              onChange={(v) => setPhones(v === "phones")}
               options={[
                 { value: "cards", label: <span className="inline-flex items-center gap-1.5"><LayoutGrid className="size-3.5" aria-hidden /> Side by side</span> },
                 { value: "phones", label: <span className="inline-flex items-center gap-1.5"><Smartphone className="size-3.5" aria-hidden /> Two phones</span> },
@@ -169,7 +166,7 @@ export default function Compare() {
           </div>
         </div>
         <p className={cn("mt-3 hidden text-xs text-muted", !phones && "lg:block")}>
-          <Kbd>P</Kbd> switches to two phones · in the guided demo, <Kbd>←</Kbd> <Kbd>→</Kbd> move between steps and <Kbd>Esc</Kbd> ends it.
+          In the guided demo, <Kbd>←</Kbd> <Kbd>→</Kbd> move between steps and <Kbd>Esc</Kbd> ends it.
         </p>
         {q.data?.a.creator.reference_note && <ReferenceNote text={`Creator A: ${q.data.a.creator.reference_note}`} className="mt-4 max-w-3xl" />}
 

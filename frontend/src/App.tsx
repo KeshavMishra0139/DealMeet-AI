@@ -1,9 +1,8 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
-import { EmbedBridge, PhoneStage, PhoneToggle, usePhoneShortcut } from "@/components/demo/PhoneMode";
+import { Route, Routes } from "react-router-dom";
+import { EmbedBridge } from "@/components/demo/FrameBridge";
 import { RequireSession } from "@/components/shared/AuthGate";
 import { LangScope } from "@/i18n";
-import { usePhoneMode } from "@/lib/phone";
 import { isEmbedFrame } from "@/lib/session";
 
 const Landing = lazy(() => import("@/features/public/Landing"));
@@ -52,22 +51,9 @@ function Fallback() {
 }
 
 export default function App() {
-  const phone = usePhoneMode();
-  const { pathname } = useLocation();
-  // /demo pages lay out their own phones; everywhere else P puts the app in a phone.
-  const demoPage = pathname.startsWith("/demo");
-  usePhoneShortcut(embedded, pathname !== "/demo/live");
-  if (phone && !embedded && !demoPage) {
-    return (
-      <>
-        <PhoneStage />
-        <PhoneToggle />
-      </>
-    );
-  }
   return (
     <Suspense fallback={<Fallback />}>
-      {embedded ? <EmbedBridge /> : pathname !== "/demo/live" && <PhoneToggle />}
+      {embedded && <EmbedBridge />}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
