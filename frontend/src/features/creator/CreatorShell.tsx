@@ -22,7 +22,7 @@ import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Mo
 import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
-import { AiAssistantButton, AiAssistantProvider } from "@/components/shared/AiAssistant";
+import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
@@ -104,7 +104,6 @@ function Studio() {
         >
           <ProfileCard creator={creator.data} />
         </AccountMenu>
-        <AiAssistantButton className="mx-1 mt-3 w-auto" />
         <nav aria-label="Creator Studio" className="mt-5 flex flex-1 flex-col gap-0.5">
           {[...PRIMARY, ...SECONDARY].map((item, i) => (
             <div key={item.to}>
@@ -122,7 +121,6 @@ function Studio() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
-          <AiAssistantButton compact />
           <LangToggle compact />
           <Button variant="ghost" size="icon-sm" aria-label={t("nav.more")} onClick={() => setMoreOpen(true)}>
             {creator.data ? (
@@ -137,13 +135,16 @@ function Studio() {
       <div className="relative z-10 lg:pl-[248px]">
         <main
           id="main"
-          className="mx-auto w-full max-w-[1000px] px-4 pb-[calc(96px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10"
+          className="mx-auto w-full max-w-[1000px] px-4 pb-[calc(160px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-32 lg:pt-10"
         >
           <PageFade>
             <Outlet />
           </PageFade>
         </main>
       </div>
+
+      {/* DealMeet AI along the bottom: above the tabs on a phone, under the page on a laptop. */}
+      <AiAssistantBar role="creator" className="bottom-[calc(76px+env(safe-area-inset-bottom))] lg:bottom-6 lg:left-[248px]" />
 
       {/* Mobile bottom tabs */}
       <nav

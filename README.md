@@ -290,7 +290,7 @@ Keyboard: **P** toggles phone view anywhere. In the guided demo, **←** and **�
 
 ## AI across the app
 
-With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for OpenRouter), the language model works in these places. Every answer is checked against a Pydantic schema, the copy rules (no promises) and the facts it was given (no invented numbers); anything that fails, and everything when AI is off, uses the template or formula instead, so no screen depends on it. `/api/health` shows `"ai": "live"` and the provider.
+With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for OpenRouter), the language model works in these places. Every answer is checked against a Pydantic schema, the copy rules (no promises) and the facts it was given (no invented numbers); anything that fails, and everything when AI is off, uses the template or formula instead, so no screen depends on it. `/api/health` shows `"ai": "live"`, the provider and model, and `ai_last_error`: the last failed AI call in the past 24 hours with what usually fixes it (for example "OpenRouter error 402" and "add credits"), never keys or message content.
 
 | Where | What the AI does | What it can't do |
 |---|---|---|
@@ -328,13 +328,13 @@ The top of the Creator Studio home is a **Weekly report**: the 7 days ending tod
 
 ## The AI assistant window
 
-**AI assistant** in the Studio and Console sidebars (the sparkle in the phone header, or Ctrl/⌘ J) opens **DealMeet AI**: one conversation that answers like a person and does tasks. It replaced the separate Ask and Assistant buttons. Code: `backend/app/ai/assistant.py`, `frontend/src/components/shared/AiAssistant.tsx`; tests: `backend/tests/test_assistant_chat.py`.
+The **DealMeet AI bar** along the bottom of the Studio and the Console (above the tabs on a phone) opens **DealMeet AI**: type into it and press Enter to send straight away, click the sparkle, or press Ctrl/⌘ J. One conversation that answers like a person and does tasks. It replaced the separate Ask and Assistant buttons. Code: `backend/app/ai/assistant.py`, `frontend/src/components/shared/AiAssistant.tsx`; tests: `backend/tests/test_assistant_chat.py`.
 
 - **What it knows**: each turn sends the model the account's own data as context. Creators: their numbers with their sources (the coach's facts), the fair price and its steps and AI review, this week's moves, draft pitches and brands in their niche. Brands: the Console summary, campaigns, deals by stage, what needs them, draft offers and shortlists, with only what each creator shares. Nothing about other accounts.
 - **How it talks**: natural and conversational, in the language the user writes in (Hindi, Hinglish, Tamil and the rest), with follow-up suggestions. It remembers the conversation (the last 16 messages go to the model); **New chat** starts over, and conversations are deleted with the account or with `DELETE /api/assistant/chats`.
 - **What it does**: the tools below. Reads and drafts run straight away and the tool's result goes back to the model, which tells the user what it found or made; anything that sends, publishes or pauses shows a card with **Confirm** and **Cancel** in the window.
 - **Checks**: every rupee amount in a reply must be one of the account's own (within 2%, so ₹17K and ₹17,000 both count), and replies can't promise results (copy rules). A reply that fails is asked for again once, then answered from templates. Prices are only explained, never set.
-- **Without AI** (or when a call fails), it still answers: the coach's template answers for creators, the Console summary for brands, and simple rules for tasks. The window says so.
+- **Without AI** (or when a call fails), it still answers: greetings and "what can you do?" warmly, the coach's template answers for creators, the Console summary for brands, and simple rules for tasks. The window says so, and `/api/health` says why the AI call failed.
 - `GET/POST /api/assistant/chat`, `POST /api/assistant/chat/{id}/actions/{proposal}/confirm|cancel`; 120 messages an hour per account.
 
 ### Tools

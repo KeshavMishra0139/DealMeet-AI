@@ -127,3 +127,45 @@ def test_conversations_are_deleted_with_the_account_or_on_request(client, db):
     _say(a, "Hi again")
     assert a.post("/api/auth/delete-account", json={"confirm": "DELETE"}).status_code == 200
     assert db.chats.count_documents({"creator_id": cid}) == 0
+
+
+def test_greetings_get_a_warm_reply_even_without_ai(login, db):
+    for persona, word in (("cr_a", "fair price"), ("br_senpai", "campaign")):
+        a = login(persona)
+        for text in ("Hi", "hello", "Namaste"):
+            reply = _say(a, text)["messages"][1]
+            assert reply["text"].startswith("Hi") and "DealMeet AI" in reply["text"] and word in reply["text"], reply["text"]
+        assert _say(a, "thanks")["messages"][1]["text"].startswith("You're welcome")
+    # A question that starts with a greeting is still a question.
+    assert "₹" in _say(login("cr_a"), "Hi, what should I charge a brand?")["messages"][1]["text"]
+
+
+def test_openrouter_replies_with_line_breaks_inside_the_json_are_read(monkeypatch, db, client):
+    import httpx
+
+    from test_ai_fallback import openrouter  # noqa: F401
+    settings = replace(get_settings(), ai_api_key=None, openrouter_api_key="or-key", ai_model="anthropic/test-model")
+    monkeypatch.setattr(llm, "get_settings", lambda: settings)
+    raw = '{"reply": "Hi Ravi.\n\nHow can I help today?", "action": null, "suggestions": ["What should I charge?"]}'
+
+    def post(url, headers=None, json=None, timeout=None):
+        return httpx.Response(200, json={"choices": [{"message": {"content": raw}, "finish_reason": "stop"}]}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(llm.httpx, "post", post)
+    out, status = llm.converse("t", "system", [{"role": "user", "content": "Hi"}], ChatTurn)
+    assert status == "ai" and out.reply == "Hi Ravi.\n\nHow can I help today?"
+
+
+def test_the_last_ai_failure_and_its_fix_show_on_health(monkeypatch, db, client):
+    import httpx
+
+    settings = replace(get_settings(), ai_api_key=None, openrouter_api_key="or-key", ai_model="anthropic/test-model")
+    monkeypatch.setattr(llm, "get_settings", lambda: settings)
+
+    def post(url, headers=None, json=None, timeout=None):
+        return httpx.Response(402, json={"error": {"message": "Insufficient credits"}}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(llm.httpx, "post", post)
+    assert llm.converse("assistant_chat", "system", [{"role": "user", "content": "Hi"}], ChatTurn) == (None, "failed")
+    err = client.get("/api/health").json()["modes"]["ai_last_error"]
+    assert err["reason"] == "OpenRouter error 402" and "credits" in err["hint"] and err["task"] == "assistant_chat"

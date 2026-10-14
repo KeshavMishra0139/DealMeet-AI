@@ -109,7 +109,8 @@ def _openrouter(system: str, messages: list[dict], schema: type[T], max_tokens: 
     text = (choice.get("message") or {}).get("content") or ""
     if choice.get("finish_reason") in ("content_filter", "length") or not text.strip():
         raise _NoOutput(choice.get("finish_reason") or "empty")
-    return schema.model_validate_json(_json_object(text))
+    # strict=False: models often put raw line breaks inside long JSON strings (paragraphs).
+    return schema.model_validate(json.loads(_json_object(text), strict=False))
 
 
 def breaks_copy_rules(text: str) -> bool:
@@ -158,24 +159,57 @@ def generate(
     return _checked(task, key, result, fallback, facts)
 
 
+# The last failed AI call, for /api/health: what went wrong and what usually fixes it.
+_last_error: dict | None = None
+HINTS = {
+    401: "The API key is wrong: paste OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) again.",
+    402: "The OpenRouter account has no credits: add credits at openrouter.ai.",
+    403: "The key isn't allowed to use this model.",
+    400: "The request was refused, usually a wrong AI_MODEL: copy the exact model id from openrouter.ai/models.",
+    404: "The model wasn't found: copy the exact AI_MODEL id from openrouter.ai/models.",
+    429: "Rate limited by the provider: wait a minute.",
+}
+
+
+def _failed(task: str, reason: str, status: int | None = None) -> None:
+    global _last_error
+    from ..config import now_iso
+
+    _last_error = {"at": now_iso(), "ts": time.time(), "task": task, "reason": reason,
+                   "hint": HINTS.get(status or 0) or ("The provider had a problem; it usually passes." if status and status >= 500 else None)}
+
+
+def last_error() -> dict | None:
+    """The last AI failure in the past 24 hours (no keys or message content), else None."""
+    if not _last_error or time.time() - _last_error["ts"] > 86_400:
+        return None
+    return {k: v for k, v in _last_error.items() if k != "ts"}
+
+
 def _call_model(task: str, system: str, messages: list[dict], schema: type[T], max_tokens: int) -> T | None:
-    """One structured call to the configured provider. None for every failure (logged): no key
-    or credits, rate limits, network, refusals, cut-off or invalid output."""
+    """One structured call to the configured provider. None for every failure (logged, and kept
+    for /api/health): no key or credits, rate limits, network, refusals, cut-off or invalid output."""
     s = get_settings()
     if s.ai_provider == "openrouter":
         try:
             return _openrouter(system, messages, schema, max_tokens)
         except _NoOutput as e:
             log.info("AI %s: no usable output from OpenRouter (%s); using template", task, e)
+            _failed(task, f"No usable reply from OpenRouter ({e})")
         except httpx.HTTPStatusError as e:
             # 401: wrong key; 402: no credits on the OpenRouter account; 429: rate limited.
-            log.warning("AI %s: OpenRouter error %s; using template", task, e.response.status_code)
+            code = e.response.status_code
+            log.warning("AI %s: OpenRouter error %s; using template", task, code)
+            _failed(task, f"OpenRouter error {code}", code)
         except httpx.HTTPError:
             log.warning("AI %s: OpenRouter unreachable; using template", task)
+            _failed(task, "OpenRouter unreachable (network or timeout)")
         except (ValidationError, ValueError) as e:
             log.warning("AI %s: invalid output from OpenRouter (%s); using template", task, type(e).__name__)
+            _failed(task, f"The model's reply wasn't valid JSON for {schema.__name__} ({type(e).__name__})")
         except Exception as e:  # never let a page break on an AI call
             log.warning("AI %s: unexpected OpenRouter error (%s); using template", task, type(e).__name__)
+            _failed(task, f"Unexpected error ({type(e).__name__})")
         return None
 
     try:
@@ -190,18 +224,24 @@ def _call_model(task: str, system: str, messages: list[dict], schema: type[T], m
         )
         if response.stop_reason == "refusal" or response.parsed_output is None:
             log.info("AI %s: no usable output (stop_reason=%s); using template", task, response.stop_reason)
+            _failed(task, f"No usable reply (stop reason {response.stop_reason})")
             return None
         return response.parsed_output
     except anthropic.RateLimitError:
         log.warning("AI %s: rate limited; using template", task)
+        _failed(task, "Rate limited", 429)
     except anthropic.APIConnectionError:
         log.warning("AI %s: offline; using template", task)
+        _failed(task, "The API was unreachable (network or timeout)")
     except anthropic.APIStatusError as e:
         log.warning("AI %s: API error %s; using template", task, e.status_code)
+        _failed(task, f"API error {e.status_code}", e.status_code)
     except (ValidationError, ValueError) as e:
         log.warning("AI %s: invalid output (%s); using template", task, e)
+        _failed(task, f"The model's reply didn't fit {schema.__name__} ({type(e).__name__})")
     except Exception as e:  # never let a page break on an AI call
         log.warning("AI %s: unexpected error (%s); using template", task, type(e).__name__)
+        _failed(task, f"Unexpected error ({type(e).__name__})")
     return None
 
 

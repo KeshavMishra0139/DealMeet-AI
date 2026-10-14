@@ -183,6 +183,24 @@ def _value(num: str, unit: str) -> float:
     return float(num.replace(",", "")) * _SCALE.get((unit or "").lower(), 1)
 
 
+def _ranges(text: str) -> list[tuple[float, float]]:
+    """Rupee amounts as (low, high): a single amount is (x, x); a range keeps both ends."""
+    out = []
+    for n1, u1, n2, u2 in _MONEY.findall(text):
+        try:
+            if n2:
+                if not u1 and float(n1.replace(",", "")) <= float(n2.replace(",", "")):
+                    u1 = u2
+                lo, hi = sorted((_value(n1, u1), _value(n2, u2)))
+                out.append((lo, hi))
+            else:
+                v = _value(n1, u1)
+                out.append((v, v))
+        except ValueError:
+            continue
+    return out
+
+
 def rupees(text: str) -> list[float]:
     """Every rupee amount in a text, in rupees (₹17K -> 17000, Rs 1.2 lakh -> 120000, and
     both ends of ₹17K–18K)."""
@@ -200,9 +218,10 @@ def rupees(text: str) -> list[float]:
 
 
 def money_grounded(reply: str, context: str) -> bool:
-    """Every rupee amount in the reply is one of the context's (within 2%, for rounding)."""
-    known = rupees(context)
-    return all(any(abs(a - k) <= max(1.0, 0.02 * k) for k in known) for a in rupees(reply))
+    """Every rupee amount in the reply is one of the context's, or inside one of its ranges
+    ("about ₹2,100" for a ₹2,050–2,150 fair rate), within 2% for rounding."""
+    known = _ranges(context)
+    return all(any(lo * 0.98 - 1 <= a <= hi * 1.02 + 1 for lo, hi in known) for a in rupees(reply))
 
 
 # ------------------------------------------------------------------ conversations
@@ -342,8 +361,36 @@ def _ask(system: str, turns: list[dict], context: str) -> tuple[ChatTurn | None,
     return turn, status
 
 
+_GREETING = re.compile(r"^\s*(hi+|hello+|hey+|hiya|yo|hola|namaste|namaskar|vanakkam|good\s+(morning|afternoon|evening)|नमस्ते|नमस्कार|हेलो|हाय)\b[\s!.,?]*\w{0,12}[\s!.,?]*$", re.IGNORECASE)
+_THANKS = re.compile(r"\b(thanks|thank\s+you|thx|ty|shukriya|dhanyavaad|dhanyavad|धन्यवाद|शुक्रिया)\b", re.IGNORECASE)
+_HELP = re.compile(r"\b(who\s+are\s+you|what\s+(can|do)\s+you\s+do|how\s+can\s+you\s+help|help\s*me|^help$|what\s+are\s+you)\b", re.IGNORECASE)
+
+CAN_DO = {
+    "creator": "Ask me about your views, your fair price, earnings, deals or brands that fit you. I can also draft a pitch, make a growth plan or save your media kit. Anything that sends waits for your OK.",
+    "brand": "Ask me how a campaign is doing, what needs your attention or who is on your shortlist. I can also draft a campaign brief or an offer, and publish, pause or send with your OK.",
+}
+
+
+def small_talk(user: dict, message: str) -> str | None:
+    """Greetings, thanks and "what can you do?", answered warmly without the AI."""
+    role = user.get("role", "creator")
+    # A creator by first name; a brand account's name is usually the company's.
+    first = (user.get("name") or "").split(" ")[0] if role == "creator" else ""
+    if _GREETING.match(message):
+        return f"Hi {first or 'there'}. I'm DealMeet AI, your assistant here.\n\n{CAN_DO[role]}\n\nWhat would you like to start with?"
+    if _THANKS.search(message) and len(message) < 60:
+        return "You're welcome. Anything else I can look at or do for you?"
+    if _HELP.search(message):
+        return f"I'm DealMeet AI. I know your {'numbers' if role == 'creator' else 'campaigns and deals'} in DealMeet and can do things for you.\n\n{CAN_DO[role]}"
+    return None
+
+
 def _template_reply(user: dict, message: str) -> tuple[str, list[str]]:
-    """Without AI: the coach's template answers for creators; a summary for brands."""
+    """Without AI: greetings and small talk, the coach's template answers for creators, a
+    summary for brands."""
+    chat = small_talk(user, message)
+    if chat:
+        return chat, STARTERS[user.get("role", "creator")]
     if user.get("role") == "brand":
         from ..routers.brands import console
 
@@ -358,7 +405,8 @@ def _template_reply(user: dict, message: str) -> tuple[str, list[str]]:
     intent = coach.intent_of(message)
     _, raw = coach.facts_for(c, intent)
     a = coach._template(intent, c, raw)
-    text = a.answer + (f"\n\n{a.uncertain}" if a.uncertain else "") + "".join(f"\n- {s}" for s in a.next_steps)
+    lead = "Here's where things stand.\n\n" if intent == "general" else ""
+    text = lead + a.answer + (f"\n\n{a.uncertain}" if a.uncertain else "") + "".join(f"\n- {s}" for s in a.next_steps)
     return text, STARTERS["creator"]
 
 

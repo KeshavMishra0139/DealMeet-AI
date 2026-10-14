@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Response
 
+from ..ai import llm
 from ..config import get_settings, now_iso, today
 from ..db import db_mode, ping
 from ..services import payments, social_signin, tee
@@ -29,6 +30,8 @@ def health(response: Response):
             "db_ok": db_ok,
             "ai": "live" if s.has_ai else "templates",
             "ai_provider": s.ai_provider,  # anthropic, openrouter or None
+            "ai_model": s.ai_model if s.has_ai else None,
+            "ai_last_error": llm.last_error(),  # the last failed AI call in 24 hours, and what fixes it
             "payments": payments.mode(),
             "payouts": payments.payout_mode(),
             "social": social_mode(),

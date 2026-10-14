@@ -270,12 +270,11 @@ await step("Public page: write a positioning, show it on the page with badges, a
 await step("AI assistant (brand): pausing a campaign from the chat waits for Confirm, then runs once", async () => {
   await reset();
   await page.goto(`${BASE}/brand?as=br_senpai`);
-  await page.getByRole("button", { name: /AI assistant/ }).first().click();
+  // Typed into the bar along the bottom of the Console: the window opens with it sent.
+  await page.getByLabel("Ask DealMeet AI").fill("Pause the winter hoodie drop");
+  await page.getByLabel("Ask DealMeet AI").press("Enter");
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: "DealMeet AI" }).waitFor();
-  await dlg.getByText("Get things done").waitFor();
-  await dlg.getByLabel("Message DealMeet AI").fill("Pause the winter hoodie drop");
-  await dlg.getByLabel("Message DealMeet AI").press("Enter");
   await dlg.getByText("Waiting for you").waitFor();
   const before = await apiAs("br_senpai", "/api/listings/lst_senpai_hoodie");
   if (before.status !== "live") throw new Error(`paused before confirming: ${before.status}`);
@@ -375,8 +374,9 @@ await step("Profile: edit the bio and preferences; completeness rises and it per
 await step("AI assistant (creator): ask about views, keep the conversation, then make a plan from the chat", async () => {
   await reset();
   await page.goto(`${BASE}/creator?as=cr_a`);
-  await page.getByRole("button", { name: /AI assistant/ }).first().click();
+  await page.getByRole("button", { name: "Open DealMeet AI" }).click();
   const dlg = page.getByRole("dialog");
+  await dlg.getByText("Get things done").waitFor();
   await dlg.getByRole("button", { name: "Are my views growing?" }).click();
   await dlg.getByText(/views/i).nth(1).waitFor();
   await dlg.getByLabel("Message DealMeet AI").fill("Make me a growth plan");
@@ -384,7 +384,7 @@ await step("AI assistant (creator): ask about views, keep the conversation, then
   await dlg.getByText("Made a growth plan", { exact: true }).waitFor();
   await page.keyboard.press("Escape");
   // The conversation is kept: opening the window again shows it.
-  await page.getByRole("button", { name: /AI assistant/ }).first().click();
+  await page.getByRole("button", { name: "Open DealMeet AI" }).click();
   await page.getByRole("dialog").getByText("Make me a growth plan").waitFor();
   await page.keyboard.press("Escape");
   await page.reload();

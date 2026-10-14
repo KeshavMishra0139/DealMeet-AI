@@ -63,11 +63,13 @@ const CAN: Record<Role, { icon: typeof MessageCircle; title: string; text: strin
 };
 
 // ------------------------------------------------------------------ one window per shell
-const Ctx = createContext<{ open: () => void } | null>(null);
+const Ctx = createContext<{ open: (message?: string) => void; isOpen: boolean } | null>(null);
 
-/** Wrap a shell once: it owns the window, and any AiAssistantButton inside opens it. Ctrl/⌘ J toggles it too. */
+/** Wrap a shell once: it owns the window; the AiAssistantBar inside opens it (with a message
+ * typed into the bar, sent at once). Ctrl/⌘ J toggles it too. */
 export function AiAssistantProvider({ role, children }: { role: Role; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [initial, setInitial] = useState<string | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
@@ -78,47 +80,96 @@ export function AiAssistantProvider({ role, children }: { role: Role; children: 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const value = useMemo(() => ({ open: () => setOpen(true) }), []);
+  const value = useMemo(
+    () => ({
+      isOpen: open,
+      open: (message?: string) => {
+        if (message?.trim()) setInitial(message.trim());
+        setOpen(true);
+      },
+    }),
+    [open],
+  );
   return (
     <Ctx.Provider value={value}>
       {children}
-      <AssistantWindow role={role} open={open} onOpenChange={setOpen} />
+      <AssistantWindow role={role} open={open} onOpenChange={setOpen} initial={initial} onInitialSent={() => setInitial(null)} />
     </Ctx.Provider>
   );
 }
 
-export function AiAssistantButton({ compact = false, className }: { compact?: boolean; className?: string }) {
+const IDEAS: Record<Role, string[]> = {
+  creator: ["What should I charge a brand?", "Are my views growing?", "Draft a pitch to a brand that fits me", "What should I post this week?"],
+  brand: ["How are my campaigns doing?", "What needs my attention?", "Draft a brief for a festive launch", "Who is on my shortlist?"],
+};
+
+/** The assistant's bar along the bottom of the dashboard: type and press Enter, or click to open. */
+export function AiAssistantBar({ role, className }: { role: Role; className?: string }) {
   const ctx = useContext(Ctx);
-  if (compact) {
-    return (
-      <Button variant="ghost" size="icon-sm" className={className} onClick={() => ctx?.open()} aria-label="Open DealMeet AI assistant">
-        <Sparkles className="text-accent" aria-hidden />
-      </Button>
-    );
-  }
+  const [text, setText] = useState("");
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((v) => v + 1), 4500);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!ctx || ctx.isOpen) return null;
+  const ideas = IDEAS[role];
+  const placeholder = tick % (ideas.length + 1) === 0 ? "Ask DealMeet AI anything…" : `Try: ${ideas[(tick % (ideas.length + 1)) - 1]}`;
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   return (
-    <button
-      type="button"
-      onClick={() => ctx?.open()}
-      className={cn(
-        "group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-line px-3 py-2.5 text-left transition-colors hover:border-line-strong",
-        className,
-      )}
-    >
-      <span aria-hidden className="absolute inset-0 -z-10 bg-signature opacity-[0.12] transition-opacity group-hover:opacity-20" />
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-signature text-white shadow-[0_6px_18px_-8px_rgb(219_39_119/0.7)]">
-        <Sparkles className="size-4 transition-transform duration-300 group-hover:rotate-12" aria-hidden />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold text-fg">AI assistant</span>
-        <span className="block truncate text-xs text-muted">Ask, or get things done</span>
-      </span>
-    </button>
+    <div className={cn("pointer-events-none fixed inset-x-0 z-30 flex justify-center px-3 sm:px-6", className)}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          ctx.open(text);
+          setText("");
+        }}
+        className="pointer-events-auto relative isolate flex w-full max-w-[680px] items-center gap-2 rounded-full border border-line-strong bg-[var(--surface-solid)] p-1.5 pl-1.5 shadow-[0_18px_50px_-16px_rgb(0_0_0/0.55)]"
+      >
+        <span aria-hidden className="absolute -inset-[3px] -z-10 rounded-full bg-signature opacity-25 blur-md" />
+        <button
+          type="button"
+          onClick={() => ctx.open()}
+          aria-label="Open DealMeet AI"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-signature text-white transition-transform hover:scale-105"
+        >
+          <Sparkles className="size-[18px]" aria-hidden />
+        </button>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={2000}
+          placeholder={placeholder}
+          aria-label="Ask DealMeet AI"
+          className="min-w-0 flex-1 truncate bg-transparent py-2 text-[15px] text-fg outline-none placeholder:text-muted"
+        />
+        <kbd className="mr-1 hidden shrink-0 rounded-md border border-line px-1.5 py-0.5 font-sans text-[11px] text-muted md:inline">{mac ? "⌘" : "Ctrl"} J</kbd>
+        <button
+          type="submit"
+          aria-label="Send to DealMeet AI"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-signature-strong text-white transition-opacity disabled:opacity-40"
+        >
+          <ArrowUp className="size-[18px]" aria-hidden />
+        </button>
+      </form>
+    </div>
   );
 }
 
 // ------------------------------------------------------------------ the window
-function AssistantWindow({ role, open, onOpenChange }: { role: Role; open: boolean; onOpenChange: (v: boolean) => void }) {
+function AssistantWindow({
+  role,
+  open,
+  onOpenChange,
+  initial,
+  onInitialSent,
+}: {
+  role: Role;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initial: string | null;
+  onInitialSent: () => void;
+}) {
   const qc = useQueryClient();
   const { lang } = useI18n();
   const reduce = useReducedMotion();
@@ -128,6 +179,7 @@ function AssistantWindow({ role, open, onOpenChange }: { role: Role; open: boole
   const [fresh, setFresh] = useState<string | null>(null); // the reply to type out
   const [draft, setDraft] = useState("");
   const loaded = useRef(false);
+  const [ready, setReady] = useState(false); // the saved conversation is in state
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -135,6 +187,7 @@ function AssistantWindow({ role, open, onOpenChange }: { role: Role; open: boole
     if (state.data && !loaded.current) {
       setConv(state.data.conversation);
       loaded.current = true;
+      setReady(true);
     }
   }, [state.data]);
 
@@ -181,6 +234,15 @@ function AssistantWindow({ role, open, onOpenChange }: { role: Role; open: boole
     setDraft("");
     send.mutate(t);
   };
+
+  // A message typed into the bar: sent as soon as the saved conversation is loaded, so it continues it.
+  useEffect(() => {
+    if (open && initial && ready && !send.isPending) {
+      onInitialSent();
+      submit(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial, ready]);
 
   useEffect(() => {
     if (open) {

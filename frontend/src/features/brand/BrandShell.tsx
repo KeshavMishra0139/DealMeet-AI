@@ -3,7 +3,7 @@ import { Building2, Handshake, Inbox, LayoutDashboard, Megaphone, Menu, Plus, Ro
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
-import { AiAssistantButton, AiAssistantProvider } from "@/components/shared/AiAssistant";
+import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
 import { AccountMenu, DeleteAccountButton } from "@/components/shared/AccountMenu";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
@@ -106,7 +106,6 @@ function Console() {
             <Plus aria-hidden /> New campaign
           </Link>
         </Button>
-        <AiAssistantButton className="mx-0.5 mt-2 w-auto" />
         <div className="mt-4 flex-1">{nav()}</div>
         <Controls />
       </aside>
@@ -116,7 +115,6 @@ function Console() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
-          <AiAssistantButton compact />
           <Button asChild variant="primary" size="sm">
             <Link to="/brand/campaigns/new">
               <Plus aria-hidden /> New
@@ -129,13 +127,16 @@ function Console() {
       </header>
 
       <div className="lg:pl-[232px]">
-        <main id="main" className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-5 sm:px-6 lg:px-10 lg:pt-8">
+        <main id="main" className="mx-auto w-full max-w-[1200px] px-4 pb-32 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <ScrollProgress />
           <PageFade>
             <Outlet />
           </PageFade>
         </main>
       </div>
+
+      {/* DealMeet AI along the bottom of the Console. */}
+      <AiAssistantBar role="brand" className="bottom-[max(12px,env(safe-area-inset-bottom))] lg:bottom-6 lg:left-[232px]" />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent sheet title={brand.data?.name ?? "Menu"} description={brand.data?.category}>
