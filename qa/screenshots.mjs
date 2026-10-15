@@ -33,7 +33,7 @@ const ROUTES = [
   ["creator-kit", "/creator/kit?as=cr_a"],
   ["creator-privacy", "/creator/privacy?as=cr_a"],
   ["link-in-bio", "/c/creator.a"],
-  ["worth", "/worth"],
+  ["creators", "/creators?q=tamil"],
   ["creator-connections", "/creator/connections?as=cr_a"],
   ["creator-profile", "/creator/profile?as=cr_a"],
   ["brand-onboarding", "/brand/onboarding?as=new_brand"],

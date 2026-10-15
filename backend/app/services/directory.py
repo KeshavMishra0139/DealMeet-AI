@@ -2,8 +2,9 @@
 creators' Dream Brands.
 
 Search uses Atlas Search ($search) when the app runs on MongoDB Atlas with an index
-configured, and a case-insensitive regex over escaped input otherwise (mongomock has
-no $search). Unclaimed brands are added by admins only, show just their public name,
+configured, and keyword matching otherwise (mongomock has no $search): the search's words
+against each brand's name, category, the creators it hires, where it sells and its
+description. Signed-out visitors see the first few brands; the rest is for members. Unclaimed brands are added by admins only, show just their public name,
 category and public handles, and say plainly that they aren't on DealMeet AI.
 """
 from __future__ import annotations
@@ -18,9 +19,10 @@ from pymongo.errors import OperationFailure
 
 from ..config import get_settings, now_iso
 from ..db import db_mode, get_db
-from ..seed.catalog import LANGS
+from ..seed.catalog import LANGS, NICHES
 from . import auth as au
 from . import fan_proof
+from . import public_search as ps
 from .brand_profile import unique_slug
 
 log = logging.getLogger("jodidar.directory")
@@ -29,6 +31,7 @@ UNCLAIMED_NOTE = "Not on DealMeet AI and not affiliated with us."
 # Spam examples, guest bookings and removed pages never appear.
 VISIBLE = {"_id": {"$not": {"$regex": "^xx_"}}, "guest": {"$ne": True}, "removed": {"$ne": True}}
 PAGE_SIZE = 24
+VISITOR_LIMIT = 9
 MAX_DREAM = 100
 HANDLE = re.compile(r"^@?[A-Za-z0-9._-]{2,40}$")
 
@@ -89,7 +92,7 @@ def _atlas_ids(q: str, limit: int) -> list[str]:
     return [d["_id"] for d in get_db().brands.aggregate(pipeline)]
 
 
-def search(q: str = "", category: str | None = None, city: str | None = None, language: str | None = None, open_only: bool = False, page: int = 1) -> dict:
+def search(q: str = "", category: str | None = None, city: str | None = None, language: str | None = None, open_only: bool = False, page: int = 1, signed_in: bool = True) -> dict:
     db = get_db()
     filters: list[dict] = [VISIBLE]
     if category:
@@ -114,26 +117,70 @@ def search(q: str = "", category: str | None = None, city: str | None = None, la
                 log.warning("Atlas Search failed (%s); using regex search", e.code)
                 note = f"Atlas Search index '{settings.atlas_search_index}' isn't available, so this is a simpler text match."
         if mode != "atlas":
-            # User input is escaped before it becomes a pattern.
-            rx = {"$regex": re.escape(q), "$options": "i"}
-            filters.append({"$or": [{"name": rx}, {"category": rx}, {"description": rx}]})
-            mode = "regex"
+            mode = "regex"  # keyword matching (the name is kept for the web app)
     query = {"$and": filters}
-    total = db.brands.count_documents(query)
     docs = list(db.brands.find(query))
+    matched: dict[str, list[str]] = {}
     if order:
         rank = {bid: i for i, bid in enumerate(order)}
         docs.sort(key=lambda b: rank.get(b["_id"], 1_000))
+    elif q:
+        scored = [(s, b) for b in docs for s in [_keyword_score(b, q, matched)] if s > 0]
+        scored.sort(key=lambda x: (-x[0], not x[1].get("claimed", True), x[1]["name"].lower()))
+        docs = [b for _, b in scored]
     else:
         docs.sort(key=lambda b: (not b.get("claimed", True), -live.get(b["_id"], 0), b["name"].lower()))
-    start = (max(page, 1) - 1) * PAGE_SIZE
-    items = [card(b, live.get(b["_id"], 0)) for b in docs[start : start + PAGE_SIZE]]
-    return {"items": items, "total": total, "page": max(page, 1), "page_size": PAGE_SIZE, "search": mode, "note": note}
+    total = len(docs)
+    # Visitors see the first few; the rest of the directory is for members.
+    size = PAGE_SIZE if signed_in else VISITOR_LIMIT
+    page = max(page, 1) if signed_in else 1
+    start = (page - 1) * size
+    items = [{**card(b, live.get(b["_id"], 0)), "matched": matched.get(b["_id"], [])[:3]} for b in docs[start : start + size]]
+    hint = None
+    pointed = ps.niches_for(ps.query_words(q)) if q else []
+    if pointed:
+        hint = {"id": pointed[0], "label": NICHES[pointed[0]]["label"]}
+    return {"items": items, "total": total, "page": page, "page_size": size, "search": mode, "note": note,
+            "locked": not signed_in and total > size, "niche_hint": hint}
+
+
+def _keyword_score(b: dict, q: str, matched: dict[str, list[str]]) -> int:
+    """How well a brand fits the search words: its name, its category, the kind of creators
+    it hires (so "dosa" finds brands that hire food creators), where it sells, then its
+    description. Records what matched, for the card."""
+    qw, phrase = ps.query_words(q), q.lower()
+    t = b.get("target") or {}
+    name, cat, desc = set(ps.words(b.get("name"))), set(ps.words(b.get("category"))), set(ps.words(b.get("description")))
+    places = [*(t.get("cities") or []), *(t.get("regions") or [])]
+    langs = [LANGS[x]["label"] for x in t.get("languages") or [] if x in LANGS]
+    score, hits = (4 if phrase in b["name"].lower() else 0), []
+    for w in qw:
+        if ps._hit(w, name):
+            score += 6
+        elif ps._hit(w, cat):
+            score += 5
+            hits.append(b.get("category"))
+        elif hire := next((n for n in b.get("niches") or [] if n in NICHES and ps._hit(w, ps.NICHE_BAGS[n])), None):
+            score += 4
+            hits.append(f"Works with {NICHES[hire]['label'].lower()} creators")
+        elif place := next((x for x in places + langs if ps._hit(w, set(ps.words(x)))), None):
+            score += 2
+            hits.append(place)
+        elif ps._hit(w, desc):
+            score += 2
+            hits.append("their description")
+    matched[b["_id"]] = list(dict.fromkeys(h for h in hits if h))
+    return score
 
 
 def facets() -> dict:
     db = get_db()
-    cats = sorted({b.get("category") for b in db.brands.find(VISIBLE, {"category": 1}) if b.get("category")})
+    # Categories busiest first, so a picker can show the few that matter most.
+    counts: dict[str, int] = {}
+    for b in db.brands.find(VISIBLE, {"category": 1}):
+        if b.get("category"):
+            counts[b["category"]] = counts.get(b["category"], 0) + 1
+    cats = sorted(counts, key=lambda c: (-counts[c], c.lower()))
     cities = sorted({c for b in db.brands.find(VISIBLE, {"target.cities": 1}) for c in (b.get("target") or {}).get("cities") or []})
     langs = sorted({lang for b in db.brands.find(VISIBLE, {"target.languages": 1}) for lang in (b.get("target") or {}).get("languages") or [] if lang in LANGS})
     return {"categories": cats, "cities": cities, "languages": [{"id": x, "label": LANGS[x]["label"]} for x in langs]}

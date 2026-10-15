@@ -13,18 +13,15 @@ For the 3-minute pitch with timings, see [the README's demo script](README.md#3-
 
 ---
 
-## 1. Live data ("Know your page" and linking a channel)
+## 1. Live data (linking a channel)
 
-Needs `YOUTUBE_API_KEY` on the server ([setup](README.md#real-youtube-data-and-what-am-i-worth)). Without it, both screens say YouTube data isn't connected, which is also worth showing: no made-up numbers.
+Needs `YOUTUBE_API_KEY` on the server ([setup](README.md#real-youtube-data)). Without it, Connections says YouTube data isn't connected, which is also worth showing: no made-up numbers.
 
-1. Open **`/worth`** (no sign-in).
-2. In **YouTube handle or channel link**, type a real channel's handle, for example `@yourfavouritecreator`.
-3. Click **Check my price**.
-4. Point at the **Live data** badge and the fetched date: the numbers come from the YouTube Data API, cached for 12 hours.
-5. Point at the two estimates: one brand Short, one brand integration in a long video. Open the explanation: priced on **median views** of recent videos, never subscribers.
-6. Signed in as a creator (`/creator/connections?as=cr_b`), type the same handle in **Your channel's @handle or link** and click **Link channel**. The channel's videos and a daily snapshot are saved with `source: youtube_api`; on **Money**, the YouTube formats in your rates now say "Estimate from YouTube data". The channel is marked "Ownership not verified" until YouTube Analytics is connected.
+1. Signed in as a creator (`/creator/connections?as=cr_b`), click **Connect** on YouTube, type the channel's handle and click **Connect channel**.
+2. Point at the **Live data** badge and the fetched date: the numbers come from the YouTube Data API, cached for 12 hours.
+3. On **Money**, the YouTube formats in your rates now say "Estimate from YouTube data": priced on **median views** of recent videos, never subscribers. The channel is marked "Ownership not verified" until YouTube Analytics is connected.
 
-Without a key: step 3 shows "YouTube data isn't connected on this server" (browser test: *Know your page: public page says plainly when YouTube data isn't connected*).
+There's no public lookup of other people's channels; visitors search creators who keep a public page instead (browser test: *Creators: a visitor picks a niche from the landing bar…*).
 
 ## 2. Connecting Instagram
 

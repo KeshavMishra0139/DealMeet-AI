@@ -1,7 +1,7 @@
-"""YouTube public data: the public "Know your page" lookup and linking a channel."""
+"""YouTube public data: linking a creator's own channel, and YouTube Analytics."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..db import get_db
@@ -14,22 +14,7 @@ from ..services.creator_ctx import load_creator
 
 router = APIRouter(prefix="/api", tags=["youtube"])
 
-PREVIEW_PER_HOUR = 20  # per visitor IP; cached channels don't spend YouTube quota anyway
 LINK_PER_HOUR = 20
-
-
-class PreviewIn(BaseModel):
-    handle: str = Field(min_length=2, max_length=200)
-    niche: str | None = Field(default=None, max_length=40)
-
-
-@router.post("/youtube/preview")
-def preview(body: PreviewIn, request: Request):
-    """Public, no sign-in: real channel numbers and an estimate per format."""
-    ratelimit.enforce(
-        f"ytprev:{ratelimit.client_ip(request)}", PREVIEW_PER_HOUR, 3600, "That's a lot of lookups from here. Try again in an hour."
-    )
-    return yt.public_view(yt.channel_report(body.handle, body.niche if body.niche in NICHES else None, ai=True))
 
 
 class LinkIn(BaseModel):

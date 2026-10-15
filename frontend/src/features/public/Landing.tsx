@@ -1,12 +1,11 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Scale, ShieldCheck, Youtube } from "lucide-react";
+import { ArrowRight, BadgeIndianRupee, Check, ChevronRight, Lock, Scale, Search, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { siFirebase, siGoogle, siInstagram, siMeta, siMongodb, siRazorpay, siYoutube, type SimpleIcon } from "simple-icons";
 import { Reveal, Stagger, StaggerItem, TiltCard } from "@/components/motion/Motion";
 import { Wordmark } from "@/components/shared/Wordmark";
-import { WorthLink } from "@/components/shared/WorthLink";
-import { Button } from "@/components/ui/button";
+import { ExplorePopover } from "@/components/shared/Explore";
 import { useSignedInHome } from "@/lib/session";
 import { useDemoMode, useSharedDemo } from "@/lib/shared-demo";
 import { useTheme } from "@/lib/theme";
@@ -49,7 +48,22 @@ export default function Landing() {
       <WorksWith />
 
       <main id="main" className="relative z-10 mx-auto mt-16 max-w-6xl sm:mt-24">
-        <section aria-label="Choose your side" className="grid gap-3 sm:gap-4 md:grid-cols-2">
+        {!signedIn && (
+          <motion.div {...rise(0.1)} className="mb-5 flex flex-wrap items-end justify-between gap-2 sm:mb-6">
+            <div>
+              <h2 className="font-display text-2xl font-semibold sm:text-[28px]">Join DealMeet AI</h2>
+              <p className="mt-1 text-sm text-fg-2">Free to join. Register as a creator or as a brand.</p>
+            </div>
+            <p className="text-sm text-muted">
+              Already registered?{" "}
+              <Link to="/login" className="font-medium text-accent underline-offset-4 hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </motion.div>
+        )}
+        {!signedIn && (
+        <section aria-label="Register" className="grid gap-3 sm:gap-4 md:grid-cols-2">
           <motion.div {...rise(0.15)}>
             <TiltCard className="h-full rounded-[28px]" max={5}>
               <CreatorEntry />
@@ -61,15 +75,9 @@ export default function Landing() {
             </TiltCard>
           </motion.div>
         </section>
+        )}
 
         <motion.div {...rise(0.3)} className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-7">
-          {!signedIn && (
-            <Button asChild variant="outline" size="lg" className="h-auto min-h-11 whitespace-normal py-2 text-left sm:h-12">
-              <Link to="/worth">
-                <Youtube aria-hidden /> Know your page: what your YouTube channel can charge
-              </Link>
-            </Button>
-          )}
           {shared && <p className="w-full text-xs text-muted">Shared live demo: everyone sees the same data, and it resets automatically when idle.</p>}
         </motion.div>
 
@@ -197,12 +205,23 @@ function FloatingNav() {
       >
         <span aria-hidden>✦</span>
       </Link>
-      {/* The tool creators come for: a fair price from their own channel. Emphasised on purpose,
-          for visitors only: once signed in, their price is in their dashboard. */}
-      {!dashboard && <WorthLink variant="pill" />}
-      <NavItem to="/brands" className="hidden sm:inline-flex">
-        Brands
-      </NavItem>
+      {/* Finding people: each opens a search with the busiest niches or categories. */}
+      <ExplorePopover kind="creators">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-linear-to-r from-violet-500/10 via-pink-500/10 to-orange-400/10 px-3.5 py-2 text-[13px] font-medium text-[#0a1b33] ring-1 ring-violet-500/25 ring-inset transition-shadow hover:ring-violet-500/50"
+        >
+          <Search className="size-3.5 text-violet-600" aria-hidden /> Creators
+        </button>
+      </ExplorePopover>
+      <ExplorePopover kind="brands">
+        <button
+          type="button"
+          className="inline-flex items-center whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
+        >
+          Brands
+        </button>
+      </ExplorePopover>
       {!dashboard && (
         <NavItem to="/login" className="hidden sm:inline-flex">
           Sign in
@@ -275,7 +294,7 @@ function CreatorEntry() {
   ];
   return (
     <Link
-      to="/login?role=creator"
+      to="/login?role=creator&mode=signup"
       className="group relative block h-full overflow-hidden rounded-[28px] border border-line-strong bg-surface p-5 transition-[transform,border-color] duration-300 ease-[var(--ease-soft)] hover:-translate-y-1 hover:border-accent/50 sm:p-7"
     >
       <div
@@ -285,7 +304,7 @@ function CreatorEntry() {
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Creator Studio</p>
-          <h2 className="mt-1.5 font-display text-2xl font-semibold sm:text-[28px]">I'm a creator</h2>
+          <h3 className="mt-1.5 font-display text-2xl font-semibold sm:text-[28px]">Register as a creator</h3>
           <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-fg-2">
             Your next 3 moves, your fair rate, and deals that pay on time.
           </p>
@@ -324,13 +343,13 @@ function BrandEntry() {
   ];
   return (
     <Link
-      to="/login?role=brand"
+      to="/login?role=brand&mode=signup"
       className="theme-brand group relative block h-full overflow-hidden rounded-[28px] border border-white/20 bg-[#F8F7FC] p-5 text-fg shadow-[0_30px_80px_-30px_rgb(124_58_237/0.55)] transition-transform duration-300 ease-[var(--ease-soft)] hover:-translate-y-1 sm:p-7"
     >
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Brand Console</p>
-          <h2 className="mt-1.5 font-display text-2xl font-semibold sm:text-[28px]">I'm a brand</h2>
+          <h3 className="mt-1.5 font-display text-2xl font-semibold sm:text-[28px]">Register as a brand</h3>
           <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-fg-2">
             Find creators who fit, see a fair price with reasons, and book one creator or a whole collective.
           </p>

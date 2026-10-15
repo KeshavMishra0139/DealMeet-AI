@@ -21,7 +21,7 @@ from fastapi import HTTPException
 from ..config import IST, get_settings
 from ..db import get_db
 from ..ai import price_review
-from ..engines.fair_price import public_estimate, with_review
+from ..engines.fair_price import public_estimate
 from ..seed.catalog import LANGS, NICHES
 
 log = logging.getLogger("jodidar.youtube")
@@ -195,9 +195,8 @@ def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(IST).isoformat(timespec="seconds")
 
 
-def channel_report(query: str, niche: str | None = None, ai: bool = False) -> dict:
-    """Live channel numbers, the newest 30 videos and a price per format (estimate).
-    With `ai`, the AI market review checks the prices (ai/price_review.py)."""
+def channel_report(query: str, niche: str | None = None) -> dict:
+    """Live channel numbers, the newest 30 videos and a price per format (estimate)."""
     data, fetched = _call("channels", {"part": "snippet,statistics,topicDetails,contentDetails", **parse_query(query)})
     items = data.get("items") or []
     if not items:
@@ -243,37 +242,12 @@ def channel_report(query: str, niche: str | None = None, ai: bool = False) -> di
         "language_source": language_source,
         "prices": prices,
         "notes": notes,
-        "ai_review": None,
         "source": SOURCE,
         "fetched_at": _iso(fetched),
     }
-    if ai and videos:
-        _review(report, every)
     if report["niche_source"] == "default":
         notes.append(f"We couldn't tell the niche from the channel's topics, so it's priced at a middle rate ({NICHES[use]['label']}). Pick your niche to change it.")
     return report
-
-
-def _review(report: dict, every: list[dict]) -> None:
-    """The AI market review on a channel report: it may name the niche when nobody picked one
-    and YouTube's topics didn't match, and moves each price within -30% to +40%."""
-    chosen_by = {"you": "the person looking it up", "topics": "YouTube's topic categories", "default": "default (the topics didn't match a niche)"}
-    review = price_review.review_channel(report, chosen_by[report["niche_source"]])
-    if not review:
-        return
-    if review["niche"] and report["niche_source"] != "you" and review["niche"] != report["niche"]:
-        report.update(niche=review["niche"], niche_label=NICHES[review["niche"]]["label"], niche_source="ai", prices=prices_for(every, review["niche"]))
-    if review["language"]:
-        report.update(language=review["language"], language_label=LANGS[review["language"]]["label"], language_source="ai")
-    report["prices"] = {k: with_review(p, review) for k, p in report["prices"].items()}
-    report["ai_review"] = {k: review[k] for k in ("adjust_pct", "reasons", "confidence")}
-
-
-def public_view(report: dict) -> dict:
-    """What the public page shows: no video descriptions, last 12 videos."""
-    out = {k: v for k, v in report.items() if k != "videos"}
-    out["videos"] = [{k: v[k] for k in ("post_id", "title", "published_at", "views", "format", "permalink")} for v in report["videos"][:12]]
-    return out
 
 
 def save_for_creator(creator_id: str, report: dict) -> dict:

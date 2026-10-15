@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireSession } from "@/components/shared/AuthGate";
 import { LangScope } from "@/i18n";
 
@@ -29,7 +29,7 @@ const CreatorDeals = lazy(() => import("@/features/creator/Deals"));
 const CreatorKit = lazy(() => import("@/features/creator/Kit"));
 const DealView = lazy(() => import("@/features/deals/DealView"));
 const LinkInBio = lazy(() => import("@/features/public/LinkInBio"));
-const Worth = lazy(() => import("@/features/public/Worth"));
+const Creators = lazy(() => import("@/features/public/Creators"));
 const Brands = lazy(() => import("@/features/public/Brands"));
 const BrandPage = lazy(() => import("@/features/public/BrandPage"));
 const CreatorDreamBrands = lazy(() => import("@/features/creator/DreamBrands"));
@@ -53,7 +53,9 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/login/complete" element={<LoginComplete />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
-        <Route path="/worth" element={<Worth />} />
+        <Route path="/creators" element={<Creators />} />
+        {/* The old public price lookup; anyone could price anyone's channel, so it's gone. */}
+        <Route path="/worth" element={<Navigate to="/creators" replace />} />
         <Route path="/brands" element={<Brands />} />
         <Route path="/brands/:slug" element={<BrandPage />} />
         <Route path="/p/:slug" element={<PitchShare />} />

@@ -25,33 +25,7 @@ def _review(pct=20, niche="comedy", language="hi", reasons=None):
                        reasons=reasons or ["Family sitcom clips holding 50000 median views are easy for brands to place."])
 
 
-def test_worth_lookup_is_reviewed_by_ai_within_bounds(client, youtube, ai_on):
-    ai_on["output"] = _review()
-    plain = client.post("/api/youtube/preview", json={"handle": "@testkitchen", "niche": "food"}).json()  # chosen niche stays
-    assert plain["niche"] == "food" and plain["ai_review"]["adjust_pct"] == 20
-    long = plain["prices"]["long"]
-    assert long["per_video"] == round(max(long["formula_per_video"] * 1.2, fp_mod.PRODUCTION_FLOOR))
-    assert long["ai"]["adjust_pct"] == 20 and any(w.startswith("AI market review: +20%") for w in long["why"])
-    assert plain["language"] == "hi" and plain["language_source"] == "ai"
-
-    # No niche picked: the AI's reading of the titles replaces YouTube's topic guess.
-    guessed = client.post("/api/youtube/preview", json={"handle": "@testkitchen"}).json()
-    assert guessed["niche"] == "comedy" and guessed["niche_source"] == "ai"
-
-
-def test_review_is_capped_and_dropped_when_it_invents_numbers(client, youtube, ai_on):
-    ai_on["output"] = _review(pct=90)
-    r = client.post("/api/youtube/preview", json={"handle": "@testkitchen", "niche": "food"}).json()
-    assert r["ai_review"]["adjust_pct"] == 40
-    ai_on["output"] = _review(reasons=["It gets 9999999 views a day."])
-    price_review.get_db().ai_cache.delete_many({})
-    r = client.post("/api/youtube/preview", json={"handle": "@testkitchen", "niche": "food"}).json()
-    assert r["ai_review"] is None and "ai" not in r["prices"]["long"]
-
-
 def test_without_ai_the_formula_price_stands(client, youtube, db):
-    r = client.post("/api/youtube/preview", json={"handle": "@testkitchen"}).json()
-    assert r["ai_review"] is None and r["niche_source"] == "topics" and r["language"]
     a, cid = _new_creator(client, db, channel=CHANNEL)
     fair = a.get(f"/api/creators/{cid}/fair-price").json()
     assert fair["ai_review"] == {"status": "off"} and all(s["key"] != "ai" for s in fair["steps"])

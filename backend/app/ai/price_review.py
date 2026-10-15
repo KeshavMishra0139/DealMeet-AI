@@ -10,8 +10,7 @@ It never sets a price on its own:
 
 A creator's review is stored on their profile (`ai_price`) and applied everywhere the
 price is shown while their numbers stay the same (`basis`); it is refreshed in the
-background when they change. The public "Know your page" lookup reviews a channel on
-the spot.
+background when they change.
 """
 from __future__ import annotations
 
@@ -110,34 +109,6 @@ def _ask(task: str, facts: str) -> dict | None:
     return _clean(result, facts)
 
 
-# ------------------------------------------------------------------ a public channel lookup
-def review_channel(report: dict, chosen_by: str) -> dict | None:
-    """Reviews a channel_report's prices. None when AI isn't configured or the answer was unusable."""
-    if not get_settings().has_ai:
-        return None
-    ch, videos, prices = report["channel"], report["videos"], report["prices"]
-    lines = [
-        f"Channel: {ch.get('title')} ({ch.get('handle') or 'no handle'}), country {ch.get('country') or 'not given'}. "
-        f"YouTube topics: {', '.join(ch.get('topics') or []) or 'none'}.",
-        f"Subscribers: {ch['subscribers'] if ch.get('subscribers') is not None else 'hidden'}. Total views: {ch.get('total_views')}. "
-        f"Videos on the channel: {ch.get('video_count')}.",
-    ]
-    for fmt, label in (("shorts", "Shorts"), ("long", "Long videos")):
-        p = prices[fmt]
-        if p.get("enough_data"):
-            lines.append(f"{label}: median {p['median_views']} views over the last {p['videos']} settled {label.lower()}; formula price Rs {p['per_video']} per video.")
-        else:
-            lines.append(f"{label}: not priced ({p.get('reason')}).")
-    likes, comments = _per_1k(videos, "likes"), _per_1k(videos, "comments")
-    lines.append(f"Likes per 1,000 views: {likes if likes is not None else 'hidden'}. Comments per 1,000 views: {comments if comments is not None else 'hidden'}.")
-    lines.append(f"Niche the formula used: {report['niche']} ({report['niche_label']}), chosen by {chosen_by}.")
-    lines.append(f"Niche ids to choose from: {niche_menu()}.")
-    lines.append("Recent titles:\n" + "\n".join(f"- {v['title'][:140]}" for v in videos[:MAX_TITLES] if v.get("title")))
-    facts = "Price estimate for one sponsored post on this YouTube channel, for an Indian brand. The formula prices on median views times the niche's rate per 1,000 views.\n" + "\n".join(lines)
-    return _ask("price_review_channel", facts)
-
-
-# ------------------------------------------------------------------ a creator's own price
 def _sig2(x: float) -> int:
     if x <= 0:
         return 0

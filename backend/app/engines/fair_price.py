@@ -45,8 +45,8 @@ PUBLIC_MIN_VIDEOS = 3
 
 
 def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int = 0) -> dict:
-    """An estimate from public numbers only (a channel's recent views), for the public
-    'Know your page' page. Same base and production floor as fair_price; with no
+    """An estimate from public numbers only (a channel's recent views), for a linked
+    channel. Same base and production floor as fair_price; with no
     engagement, audience or trust data there are no adjustments, so the range is wider
     and the confidence lower. Too few videos -> no price, and it says so."""
     label = {"shorts": "Shorts", "long": "long videos"}[fmt]
@@ -81,24 +81,6 @@ def public_estimate(views: list[int], niche: str, fmt: str, newest_excluded: int
         "per_video": round(per),
         "estimate": estimate(per * 0.85, per * 1.15, "inr", "deal", reasons[:2] + ["No engagement, fit or trust adjustments"], "low" if len(views) < 6 else "medium"),
         "why": reasons,
-    }
-
-
-def with_review(price: dict, review: dict) -> dict:
-    """A public estimate with the AI market review applied (capped, never below the floor)."""
-    if not price.get("enough_data"):
-        return price
-    pct = clamp(review["adjust_pct"] / 100, *CAPS["ai"])
-    per = max(price["per_video"] * (1 + pct), PRODUCTION_FLOOR)
-    note = f"AI market review: {_pct(pct)}. {review['reasons'][0]}"
-    est = price["estimate"]
-    return {
-        **price,
-        "formula_per_video": price["per_video"],
-        "per_video": round(per),
-        "estimate": estimate(per * 0.85, per * 1.15, "inr", "deal", list(est.get("assumptions") or [])[:2] + [f"AI market review {_pct(pct)}, capped at -30% to +40%"], est.get("confidence", "medium")),
-        "why": list(price.get("why") or []) + [note],
-        "ai": {"adjust_pct": review["adjust_pct"], "reasons": review["reasons"], "confidence": review["confidence"]},
     }
 
 

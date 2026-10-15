@@ -11,7 +11,7 @@ def _search(client, **params):
 
 
 # ------------------------------------------------------------------ search
-def test_search_by_name_category_language_and_open_campaigns(client, db):
+def test_search_by_name_category_language_and_open_campaigns(client, login, db):
     d = _search(client, q="senpai")
     assert d["search"] == "regex" and [b["slug"] for b in d["items"]] == ["senpai-supply-co"]
     assert _search(client, category="anime MERCH store")["items"][0]["id"] == "br_senpai"
@@ -20,13 +20,16 @@ def test_search_by_name_category_language_and_open_campaigns(client, db):
     live = {x["owner_id"] for x in db.listings.find({"status": "live"})}
     open_ids = {b["id"] for b in _search(client, open="true")["items"]}
     assert open_ids and open_ids <= live
-    every = {b["id"] for b in _search(client)["items"]} | {b["id"] for b in _search(client, page=2)["items"]}
+    member = login("cr_b")
+    every = {b["id"] for p in (1, 2) for b in member.get("/api/directory/brands", params={"page": p}).json()["items"]}
     assert not any(i.startswith("xx_") for i in every)  # spam examples never show
 
 
 def test_search_input_is_escaped(client):
-    for q in ["Senpai.*(", "[a-z]+", "\\", "(?i)x", "$where"]:
+    # Symbols are never a pattern: only the words in a search count.
+    for q in ["[a-z]+", "\\", "(?i)x", "$where"]:
         assert _search(client, q=q)["total"] == 0
+    assert [b["id"] for b in _search(client, q="Senpai.*(")["items"]] == ["br_senpai"]
     assert client.get("/api/directory/brands", params={"q": "x" * 81}).status_code == 422
 
 

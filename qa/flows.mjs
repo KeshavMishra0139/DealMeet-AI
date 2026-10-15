@@ -503,27 +503,48 @@ await step("Admin: a deal party reports a problem; the admin resolves it, suspen
   await ctx.close();
 });
 
-await step("Know your page: public page says plainly when YouTube data isn't connected", async () => {
-  page = mobile;
-  await page.goto(`${BASE}/worth`);
-  await page.getByLabel("YouTube handle or channel link").fill("@somechannel");
-  await page.getByRole("button", { name: "Check my price" }).click();
-  // No YOUTUBE_API_KEY on the QA server: a clear "not connected" message, never made-up numbers.
-  await page.getByRole("alert").getByText(/YouTube data isn't connected on this server/).waitFor();
+await step("Creators: a visitor picks a niche from the landing bar, sees why each creator matched, and is asked to sign in for more", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const p = await ctx.newPage();
+  p.on("pageerror", (e) => errors.push(String(e)));
+  await p.goto(`${BASE}/`);
+  await p.getByRole("button", { name: "Creators" }).click();
+  const pop = p.getByRole("dialog");
+  // The busiest few niches, every other one behind "more".
+  if ((await pop.getByRole("group", { name: "Pick a niche" }).locator("button[aria-pressed]").count()) !== 6) throw new Error("Expected 6 niches before 'more'");
+  await pop.getByRole("button", { name: /6 more niches/ }).click();
+  await pop.getByRole("button", { name: "Travel" }).waitFor();
+  await pop.getByRole("button", { name: "Food and cooking" }).click();
+  await p.waitForURL(/\/creators\?niche=food/);
+  await p.getByRole("button", { name: /more creators/ }).click();
+  const join = p.getByRole("dialog", { name: "Want to know more?" });
+  await join.getByRole("link", { name: "Sign up as a brand" }).waitFor();
+  await join.getByRole("link", { name: "Log in" }).waitFor();
+  await p.keyboard.press("Escape");
+  // Their own words: tags first, and the card says what matched.
+  await p.goto(`${BASE}/creators`);
+  await p.getByLabel("Search creators").fill("tamil breakfast");
+  const best = p.getByRole("link", { name: /Creator B/ }).first();
+  await best.getByText("Best match").waitFor();
+  await best.getByText(/Tamil home cooking, Quick breakfast/).waitFor();
+  await best.click();
+  await p.waitForURL(/\/c\/creator\.b/);
+  // The old price lookup of anyone's channel is gone.
+  await p.goto(`${BASE}/worth`);
+  await p.waitForURL(/\/creators$/);
+  await ctx.close();
 });
 
-await step("Know your page: only for visitors; signed-in creators get their own price instead", async () => {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+await step("Brands: what a creator makes finds brands that work with creators like them; visitors are asked to sign up for more", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const p = await ctx.newPage();
-  await p.goto(`${BASE}/`);
-  await p.getByRole("link", { name: /Know your page/ }).first().waitFor();
-  const r = await p.evaluate(async (BASE) => (await fetch(`${BASE}/api/auth/demo`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Requested-With": "qa" }, body: JSON.stringify({ persona: "cr_b", cookie: true }) })).status, BASE);
-  if (r !== 200) throw new Error(`demo sign-in ${r}`);
-  await p.goto(`${BASE}/creator`);
-  await p.getByRole("button", { name: /More/ }).first().click();
-  if (await p.getByText(/Know your page/).count()) throw new Error("Know your page is in the signed-in Studio");
-  await p.goto(`${BASE}/worth`);
-  await p.waitForURL(/\/creator\/money$/);
+  p.on("pageerror", (e) => errors.push(String(e)));
+  await p.goto(`${BASE}/brands?q=dosa`);
+  await p.getByText(/Including brands that work with food and cooking creators/).waitFor();
+  await p.getByText(/Works with food and cooking creators/).first().waitFor();
+  await p.goto(`${BASE}/brands`);
+  await p.getByRole("button", { name: /more brands/ }).click();
+  await p.getByRole("dialog", { name: "Want to know more?" }).getByRole("link", { name: "Sign up as a creator" }).waitFor();
   await ctx.close();
 });
 

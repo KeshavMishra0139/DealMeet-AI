@@ -117,8 +117,7 @@ export function useSession(role: Role, enabled = true) {
 }
 
 /** The signed-in home for whoever is signed in here (creator, brand or admin), null when
- * nobody is, and `loading` until the sessions are known. Public pages that are only for
- * visitors (Know your page) send signed-in people to their own dashboard instead. */
+ * nobody is, and `loading` until the sessions are known. */
 export function useSignedInHome(): { loading: boolean; to: string | null } {
   const creator = useSession("creator");
   const brand = useSession("brand");

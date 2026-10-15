@@ -56,7 +56,7 @@ The demo needs nothing. To run with real accounts and live data, set these up in
 1. **Real accounts, no demo**: set `DEMO_MODE=0`. No seeded data, no persona sign-in, no reset; people sign up with email and password. Check it with `make accounts` (below).
 2. **Database (MongoDB Atlas)**: follow [Atlas setup](#database), then set `MONGODB_URI`, `MONGODB_DB=jodidar` and `USE_MOCK_DB=0`. For the brand directory's full-text search, create the Atlas Search index from `backend/atlas/brands_search.json` (name `brands_search`, or set `ATLAS_SEARCH_INDEX`); without it the directory uses a plain text match.
 3. **Sample data (optional)**: `make seed` loads the synthetic sample data into empty collections, every record marked `source: "synthetic"` and shown as "Sample data". `make seed ARGS="--reset --confirm-reset"` replaces only synthetic records.
-4. **YouTube API key**: follow [Google Cloud setup](#real-youtube-data-and-what-am-i-worth) and set `YOUTUBE_API_KEY`. Turns on `/worth` and linking a channel by @handle.
+4. **YouTube API key**: follow [Google Cloud setup](#real-youtube-data) and set `YOUTUBE_API_KEY`. Turns on linking a creator's own channel.
 5. **Firebase (Google and phone sign-in)**: follow [Firebase setup](#firebase-setup-one-time) and set the four `VITE_FIREBASE_*` values (build-time) and `FIREBASE_SERVICE_ACCOUNT_JSON` (server).
 6. **Google OAuth test users (YouTube Analytics and "Continue with YouTube")**: in the Firebase project's Google Cloud console, enable the YouTube Analytics API, add the `youtube.readonly` and `yt-analytics.readonly` scopes to the OAuth consent screen, keep the app in **Testing** and add each creator's Google account as a **test user** ([details](#youtube-analytics-optional)). With Firebase and `YOUTUBE_API_KEY` both set, creators also get **Continue with YouTube** on the sign-in page.
 7. **Meta app with Instagram Testers**: follow the [Meta dashboard steps](#connecting-instagram); set `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` (HTTPS), `FRONTEND_URL` and `TOKEN_ENC_KEY`. Each creator who connects must be an Instagram Tester with a Creator or Business account while the app is in development mode. The same settings turn on **Continue with Instagram** on the sign-in page.
@@ -83,7 +83,7 @@ Every variable is optional. Copy `.env.example` to `.env` to turn a service on; 
 | `RAZORPAY_WEBHOOK_SECRET` | Verifies Razorpay webhooks at `/api/payments/razorpay/webhook` (`payment.captured`, `order.paid`, `payment.failed`). Each event is applied once | The webhook answers 503 |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Google and phone (OTP) sign-in in the browser, through Firebase | Email and password only; the page says Google and phone sign-in aren't configured |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_PROJECT_ID` | Server-side check of every Firebase ID token (Admin SDK): signature, expiry, this project, not revoked | `POST /api/auth/firebase` answers 503 |
-| `YOUTUBE_API_KEY` | Real YouTube channel numbers: the public "Know your page" page (`/worth`), linking a channel by @handle and, with Firebase, **Continue with YouTube** | Both say YouTube data isn't connected; no YouTube button on the sign-in page |
+| `YOUTUBE_API_KEY` | Real YouTube channel numbers: linking a creator's own channel and, with Firebase, **Continue with YouTube** | Both say YouTube data isn't connected; no YouTube button on the sign-in page |
 | `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI`, `FRONTEND_URL`, `TOKEN_ENC_KEY` | Connecting Instagram with its official login (read-only), **Continue with Instagram** for creators, real post checks on deals | Instagram shows "not available" and the sign-in page has no Instagram button; post checks read "not checked" |
 | `IG_GRAPH_VERSION`, `IG_DEMOGRAPHICS_TIMEFRAME` | Meta Graph API version and the audience-demographics window | `v25.0`, `this_month` |
 | `DEMO_MODE` | `1`: the sandbox. Seeded personas, persona sign-in, **Reset demo** and timed resets. `make dev`, `make demo` and the Docker image set it unless you set `DEMO_MODE=0` | `0`: real accounts only. No seeded data, no persona sign-in, no reset |
@@ -219,7 +219,7 @@ Motion is there to explain, not decorate. Every effect checks reduced motion fir
 
 | Where | What it does |
 | --- | --- |
-| Landing | A light hero card over a looping background video (paused on its first frame with reduced motion). Over it, a **deal mosaic** (`features/public/DealMosaic.tsx`): three columns of grainy tiles drifting forever in alternating directions, each tile one DealMeet idea (connect Instagram or YouTube, next 3 moves, fair price, audience fit, collectives, escrow, paid on approval, media kit, English or हिंदी), with no numbers or names, and black-and-white photo tiles between them once photos are added to `frontend/src/assets/mosaic/photos.ts` (six slots; an empty slot is left out, so it works with none). Pure CSS loops; the columns ease in once, pause while the hero is off-screen and stand still with reduced motion. Then a floating pill navigation with **Know your page** emphasised, and a "Works with" logo scroller in pure CSS that pauses on hover and becomes a still, wrapped list with reduced motion. The landing loads no 3D |
+| Landing | A light hero card over a looping background video (paused on its first frame with reduced motion). Over it, a **deal mosaic** (`features/public/DealMosaic.tsx`): three columns of grainy tiles drifting forever in alternating directions, each tile one DealMeet idea (connect Instagram or YouTube, next 3 moves, fair price, audience fit, collectives, escrow, paid on approval, media kit, English or हिंदी), with no numbers or names, and black-and-white photo tiles between them once photos are added to `frontend/src/assets/mosaic/photos.ts` (six slots; an empty slot is left out, so it works with none). Pure CSS loops; the columns ease in once, pause while the hero is off-screen and stand still with reduced motion. Then a floating pill navigation whose **Creators** and **Brands** open a search with the busiest niches or categories (see [Finding creators and brands](#finding-creators-and-brands)), and a "Works with" logo scroller in pure CSS that pauses on hover and becomes a still, wrapped list with reduced motion. The landing loads no 3D |
 | Creator Studio home | **Reach vs followers in 3D**: the last 6 reels rise as bars through a glass plane set at the follower count, so "reach is about 7x followers" is visible at a glance. Hover a bar for its views |
 | Brand Console overview | **Deal flow in 3D**: the six rail stages as rings on a glowing track, a coin for each deal at its stage, and tokens flowing from offer to payout |
 | Brand Console campaign | **Match space**: matched creators placed by fair price, reach and trust, coloured and sized by fit. Drag to turn it, hover for details, click to open a profile |
@@ -271,15 +271,15 @@ Before you start, click **Reset demo** (in the Studio or Console menu). On a sha
 
 Any link takes `?lang=hi` to open the Studio in Hindi.
 
-## Real YouTube data and "Know your page"
+## Real YouTube data
 
-`/worth` is for visitors who haven't signed in: type a YouTube @handle (or channel link) and see the channel's real numbers, labelled **Live data**, and an estimate for one brand Short and one brand integration in a long video. It's linked from the landing page only while nobody is signed in; a signed-in creator who opens it goes to Money (their own price), anyone else to their dashboard.
+A creator's own channel is read when they link it (Connections) or sign in with YouTube. There is no public lookup of other people's channels: anyone could price anyone's channel by typing its handle, so that was removed, and `/worth` now goes to [creator search](#finding-creators-and-brands).
 
 - **Priced on views, never subscribers**: the median views of the channel's recent settled videos × the niche's rate per 1,000 views, through the same Fair-Price engine. Shorts and long videos are priced separately because their views aren't comparable. Videos from the last 3 days aren't counted yet: the newest 50 uploads are read first, and up to 200 (4 pages) when a channel posts so often that too few are older, as TV networks do. Each format is priced on its newest 30 settled videos; live streams and premieres are left out.
-- **AI market review** (when AI is on): the model reads the channel's titles and numbers and moves each price by -30% to +40%, with reasons; when nobody picked a niche and YouTube's topics don't match one, it names the niche from the titles. The page says so. See [AI across the app](#ai-across-the-app).
+- **AI market review** (when AI is on): once linked, the creator's price gets the review described in [AI across the app](#ai-across-the-app).
 - With fewer than 3 settled videos of a format, it says there isn't enough data instead of pricing. Public data has no engagement, audience or trust signals, so there are no adjustments and the range is wider; it stays labelled **Estimate**.
 - The API has no "is a Short" flag: up to 60 seconds counts as a Short, or up to 3 minutes when tagged #shorts.
-- **Quota**: only 1-unit calls (`channels.list` by handle or id, `playlistItems.list`, `videos.list`); never `search.list` (100 units). Every response is cached in the database for 12 hours, and the public lookup is rate-limited per IP (20 an hour).
+- **Quota**: only 1-unit calls (`channels.list` by handle or id, `playlistItems.list`, `videos.list`); never `search.list` (100 units). Every response is cached in the database for 12 hours, and linking is rate-limited per creator (20 an hour).
 - Clear messages for an unknown handle, a used-up daily quota, a channel that hides its subscriber count, and YouTube being unreachable.
 - In the Studio, **Connections** links the creator's own channel: the summary goes to `creators.channels.youtube` (`creators.platforms` was already the list of platforms a creator says they use), each video to `posts` and one `metric_snapshots` row per day, all with `source: "youtube_api"` and `fetched_at`. Unlinking deletes them. A channel linked by handle is public data, so it's marked "Ownership not verified" until YouTube Analytics is connected, and one channel can't be linked to two profiles.
 
@@ -305,14 +305,13 @@ With `AI_MODEL` and a key (`ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY` for Open
 | Where | What the AI does | What it can't do |
 |---|---|---|
 | **Fair price** (`ai/price_review.py`) | Reviews each creator's formula price from their real numbers and post titles (what the content is, the language market, likes and comments per 1,000 views, steadiness) and adds an **AI market review** step with its reasons. Stored per creator and applied everywhere their price shows (Money, rates, media kit, offers, brand search) until their numbers change; refreshed in the background, or on demand from Money (**Review now**) | Move the price more than -30% to +40%; quote numbers that aren't in the facts. The gradient-boosted cross-check stays on the formula alone |
-| **Know your page** | The same review for any channel, on the spot, plus the niche and main language from the titles | Override a niche the visitor picked |
 | **The week's 3 moves** (`ai/moves.py`) | Rewords each move's title and reason for this creator, in English and Hindi, once per weekly plan, in the background | Choose the moves, change what they ask or their numbers (the engine decides those); reword a move already acted on |
 | **The AI assistant window** (`ai/assistant.py`) | A conversation for creators and brands that answers from the account's data and does tasks with the tools, in the user's language | Quote rupee amounts that aren't the account's; send, publish or pause without the user's Confirm |
 | **Pitches and the coach** (`ai/regional.py` `WRITE_IN`) | Writes in 10 languages: English, Hindi, Hinglish, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, numbers in 0-9 | Without AI: English or Hindi templates, and the answer says which language it's in |
 | **Language and captions** | Reads a channel's main language from its titles (script and word rules first, refined by the model) for the YouTube dashboard and price review; tags captions with language, niche, tone and brand safety | |
 | **Media kit, branding, topic ideas, assistant actions** | Copy and routing as described in their sections | |
 
-## Weekly report and "Know your page"
+## Weekly report
 
 The top of the Creator Studio home is a **Weekly report**: the 7 days ending today against the 7 before, as a light card on the dark Studio. Code: `backend/app/services/weekly_report.py`, `frontend/src/features/creator/WeeklyReport.tsx`; tests: `backend/tests/test_weekly_report.py`.
 
@@ -324,7 +323,13 @@ The top of the Creator Studio home is a **Weekly report**: the 7 days ending tod
   - **Followers**: the change between Instagram or YouTube snapshots (`metric_snapshots`), only when there's one in both weeks.
 - Each tile shows last week's figure with an up, down or same marker, and its data label (Sample data, Self-reported, Live data). In English and हिंदी. The loading state is the same size as the loaded card, so the page doesn't jump.
 
-**Know your page** (`/worth`) is for visitors before they sign in: it's emphasised in the landing page's floating nav (`frontend/src/components/shared/WorthLink.tsx`, a signature-gradient pill with a soft glow that breathes, opacity only and still with reduced motion) and the landing's YouTube button, and both disappear once someone is signed in. Inside the Studio a creator's price is on Money, reviewed by the AI when it's on; opening `/worth` while signed in goes there.
+## Finding creators and brands
+
+The landing page's floating bar has **Creators** and **Brands**. Each opens a search box and the busiest 6 niches (or brand categories), with every other one behind "more". The bottom of the landing page is **Join DealMeet AI**: Register as a creator, Register as a brand.
+
+- **Creators** (`/creators`, `GET /api/directory/creators`, `backend/app/services/public_search.py`): only creators who are discoverable and keep a public page; never the anonymised reference profile. Ranked by how many of the search's words match the creator's own: name and handle (an exact @handle comes first), then their tags (sub-niches, skills), the niche and its content keywords ("dosa" finds food), city and language, then bio. Each card says what matched and opens the creator's public page (`/c/<handle>`). Cards show only what that page already shows at a glance: no exact numbers, reach, rates or audience; a follower band only when the creator shares stats publicly.
+- **Brands** (`/brands`): the same matching on a brand's name and category, plus the creators it works with, so a creator typing what they make ("dosa", "anime") finds brands that hire creators like them, and where it sells. Categories show busiest first.
+- **Visitors see the best few** (6 creators, 9 brands), enforced by the server. A "N more" card and, after a few searches, a **Want to know more?** prompt offers Sign up and Log in (as a brand when looking at creators, as a creator when looking at brands). Signed-in members see every page.
 
 ## Creator profile, completeness and brand-readiness
 
@@ -671,7 +676,7 @@ The e2e journeys:
 - Saving a rate next to its estimate, saving a Hindi media kit version and showing it on the public page.
 - Asking the coach: the numbers used with their sources, then making a plan.
 - Editing the profile: completeness rises and the edit survives a reload.
-- The public "Know your page" page saying plainly when YouTube data isn't connected.
+- Searching creators by niche and keywords as a visitor, and the sign-in prompt for more.
 - The sign-in gate, and an email sign-up that sets up a brand, survives a reload and signs out.
 - Onboarding.
 - The weekly learning loop.

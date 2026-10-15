@@ -37,25 +37,6 @@ export interface YouTubeChannel {
   analytics_connected?: boolean;
 }
 
-export interface WorthReport {
-  channel: YouTubeChannel;
-  videos: YouTubeVideo[];
-  niche: string;
-  niche_label: string;
-  niche_guessed: boolean;
-  /** Who picked the niche: the visitor, YouTube's topics, the AI reading the titles, or a default. */
-  niche_source: "you" | "topics" | "ai" | "default";
-  /** Main language of the titles: read by rules, refined by the AI when it's on. */
-  language: string | null;
-  language_label: string | null;
-  language_source: "titles" | "ai";
-  prices: { shorts: FormatPrice; long: FormatPrice };
-  notes: string[];
-  ai_review: { adjust_pct: number; reasons: string[]; confidence: "low" | "medium" | "high" } | null;
-  source: "youtube_api";
-  fetched_at: string;
-}
-
 export interface PlatformStatus {
   platform: "instagram" | "youtube";
   label: string;

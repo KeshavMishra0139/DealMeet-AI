@@ -1,8 +1,9 @@
-"""Real YouTube data through the Data API (faked here), the public Worth lookup and linking."""
+"""Real YouTube data through the Data API (faked here): reading a channel, and linking it."""
 from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
+from fastapi import HTTPException
 
 from app import config
 from app.services import youtube_public as yt
@@ -77,10 +78,20 @@ def youtube(monkeypatch, db):
     config.get_settings.cache_clear()
 
 
-def test_public_preview_prices_shorts_and_long_videos_on_median_views(client, youtube):
-    r = client.post("/api/youtube/preview", json={"handle": "@testkitchen"})
-    assert r.status_code == 200, r.text
-    d = r.json()
+def _error(handle: str) -> HTTPException:
+    with pytest.raises(HTTPException) as e:
+        yt.channel_report(handle)
+    return e.value
+
+
+def test_there_is_no_public_lookup_of_other_peoples_channels(client):
+    # Anyone typing any handle to see what it earns was removed: a channel is read only
+    # when its creator links it from their own signed-in profile.
+    assert client.post("/api/youtube/preview", json={"handle": "@testkitchen"}).status_code in (404, 405)
+
+
+def test_a_channel_is_priced_on_median_views_of_shorts_and_long_videos(youtube):
+    d = yt.channel_report("@testkitchen")
     assert d["source"] == "youtube_api" and d["fetched_at"]
     assert d["channel"]["subscribers"] == 21_300 and d["niche"] == "food"
     shorts, long = d["prices"]["shorts"], d["prices"]["long"]
@@ -94,18 +105,11 @@ def test_public_preview_prices_shorts_and_long_videos_on_median_views(client, yo
     assert "search" not in youtube.calls  # 100-unit search.list is never used
 
 
-def test_lookups_are_cached_for_12_hours(client, youtube):
-    client.post("/api/youtube/preview", json={"handle": "@testkitchen"})
+def test_lookups_are_cached_for_12_hours(youtube):
+    yt.channel_report("@testkitchen")
     n = len(youtube.calls)
-    client.post("/api/youtube/preview", json={"handle": "@testkitchen"})
+    yt.channel_report("@testkitchen")
     assert len(youtube.calls) == n
-
-
-def test_public_lookups_are_rate_limited_per_ip(client, youtube):
-    from app.routers.youtube import PREVIEW_PER_HOUR
-
-    codes = [client.post("/api/youtube/preview", json={"handle": "@testkitchen"}).status_code for _ in range(PREVIEW_PER_HOUR + 1)]
-    assert codes[-1] == 429 and set(codes[:-1]) == {200}
 
 
 @pytest.mark.parametrize(
@@ -117,27 +121,27 @@ def test_public_lookups_are_rate_limited_per_ip(client, youtube):
         (None, "not a handle!", 422, "YouTube handle"),
     ],
 )
-def test_failures_have_clear_messages(client, youtube, setup, handle, status, text):
+def test_failures_have_clear_messages(youtube, setup, handle, status, text):
     youtube.fail = setup
-    r = client.post("/api/youtube/preview", json={"handle": handle})
-    assert r.status_code == status and text in r.json()["detail"]
+    e = _error(handle)
+    assert e.status_code == status and text in e.detail
 
 
-def test_hidden_subscribers_and_too_few_videos(client, youtube):
+def test_hidden_subscribers_and_too_few_videos(youtube):
     youtube.hidden = True
     youtube.videos = youtube.videos[:2]
-    d = client.post("/api/youtube/preview", json={"handle": "@testkitchen"}).json()
+    d = yt.channel_report("@testkitchen")
     assert d["channel"]["subscribers"] is None and any("hides its subscriber count" in n for n in d["notes"])
     assert d["prices"]["shorts"]["enough_data"] is False and "Not enough recent Shorts" in d["prices"]["shorts"]["reason"]
     assert "estimate" not in d["prices"]["shorts"]
 
 
-def test_not_configured_says_so(client, db, monkeypatch):
+def test_not_configured_says_so(db, monkeypatch):
     monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
     config.get_settings.cache_clear()
     db.yt_cache.delete_many({})
-    r = client.post("/api/youtube/preview", json={"handle": "@testkitchen"})
-    assert r.status_code == 503 and "YOUTUBE_API_KEY" in r.json()["detail"]
+    e = _error("@testkitchen")
+    assert e.status_code == 503 and "YOUTUBE_API_KEY" in e.detail
 
 
 def test_channel_urls_work_as_input():

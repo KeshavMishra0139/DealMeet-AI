@@ -28,10 +28,10 @@ PUBLIC = {
     ("GET", "/api/public/{handle}"),
     ("POST", "/api/public/{handle}/book"),
     ("POST", "/api/payments/razorpay/webhook"),  # proves itself with Razorpay's signature
-    ("POST", "/api/youtube/preview"),  # public, rate-limited per IP
     ("GET", "/api/connect/instagram/consent"),
     ("GET", "/api/connect/instagram/callback"),  # proves itself with the signed, single-use state
     ("GET", "/api/directory/brands"),  # the public brand directory
+    ("GET", "/api/directory/creators"),  # public creator search: public pages only, a few for visitors
     ("GET", "/api/directory/facets"),
     ("GET", "/api/directory/brands/{slug}"),
     ("POST", "/api/directory/brands/{slug}/removal-request"),  # anyone may ask; rate-limited per IP
