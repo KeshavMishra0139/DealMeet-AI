@@ -152,7 +152,7 @@ export default function Brands() {
               />
             </div>
             <p className={cn("mb-2 mt-6 text-xs font-medium text-muted", searching && "sr-only")}>Or browse a category</p>
-            <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className={searching ? "-mt-3" : "justify-center"} />
+            <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className={searching ? "mt-3" : "justify-center"} />
           </section>
           {searching && (
             <div className="mx-auto max-w-3xl">
@@ -175,7 +175,7 @@ export default function Brands() {
                   <Switch checked={open} onCheckedChange={(v) => (setOpen(v), reset())} aria-label="Only brands with open campaigns" /> Open campaigns
                 </label>
               </div>
-              {d?.niche_hint && (
+              {d?.niche_hint && d.total > 0 && (
                 <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-fg-2">
                   <Sparkles className="size-3.5 text-accent" aria-hidden /> Including brands that work with {d.niche_hint.label.toLowerCase()} creators
                 </p>

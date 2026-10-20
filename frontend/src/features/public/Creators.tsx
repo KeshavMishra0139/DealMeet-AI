@@ -181,7 +181,7 @@ export default function Creators() {
               />
             </div>
             <p className={cn("mb-2 mt-6 text-xs font-medium text-muted", searching && "sr-only")}>Or browse one or more niches</p>
-            <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", searching ? "-mt-3" : "justify-center")}>
+            <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", searching ? "mt-3" : "justify-center")}>
               <ChipPicker options={nicheOptions} value={niches} onPick={pickNiche} noun="niche" className={searching ? undefined : "justify-center"} />
               {niches.length > 0 && (
                 <button type="button" onClick={() => setNiches([])} className="text-xs font-medium text-muted hover:text-fg">
@@ -292,7 +292,7 @@ function CreatorRow({ c, best }: { c: CreatorCard; best?: boolean }) {
 
 function ChannelRow({ y }: { y: YouTubeCard }) {
   const media = y.thumbnail ? (
-    <img src={y.thumbnail} alt="" width={64} height={64} loading="lazy" referrerPolicy="no-referrer" className="size-16 rounded-full object-cover" />
+    <ChannelPicture src={y.thumbnail} />
   ) : (
     <span className="grid size-16 place-items-center rounded-full bg-surface-2" aria-hidden>
       <Youtube className="size-7 text-[#ff0033]" />
@@ -321,5 +321,28 @@ function ChannelRow({ y }: { y: YouTubeCard }) {
         )}
       </span>
     </ResultRow>
+  );
+}
+
+/** The channel's picture from YouTube, or the YouTube mark if it can't load. */
+function ChannelPicture({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <span className="grid size-16 place-items-center rounded-full bg-surface-2" aria-hidden>
+        <Youtube className="size-7 text-[#ff0033]" />
+      </span>
+    );
+  return (
+    <img
+      src={src}
+      alt=""
+      width={64}
+      height={64}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className="size-16 rounded-full bg-surface-2 object-cover"
+    />
   );
 }
