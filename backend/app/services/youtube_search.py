@@ -105,7 +105,19 @@ def search(q: str, niches: list[str], ip: str | None, limit: int) -> dict:
         if not q.strip():
             # Browsing a niche: the biggest channels first.
             cards.sort(key=lambda c: -(c["subscribers"] or 0))
+        _remember(cards)
         return {"items": cards[:limit], "note": None}
     except HTTPException as e:
         log.info("YouTube search unavailable: %s", e.detail)
         return {"items": [], "note": e.detail}
+
+
+def _remember(cards: list[dict]) -> None:
+    """Channel names found by searches, so the search box can suggest them as people type."""
+    db = get_db()
+    for c in cards:
+        db.yt_channel_names.replace_one(
+            {"_id": c["channel_id"]},
+            {"_id": c["channel_id"], "title": c["title"], "handle": c["handle"], "subscribers": c["subscribers"] or 0},
+            upsert=True,
+        )

@@ -222,6 +222,7 @@ await step("Brands: search the directory, save a Dream Brand, see it in the Stud
   await reset();
   await page.goto(`${BASE}/brands?as=cr_a`);
   await page.getByLabel("Search brands").fill("senpai");
+  await page.keyboard.press("Escape"); // close the suggestions over the results
   await page.getByRole("link", { name: /Senpai Supply Co\./ }).click();
   await page.getByRole("heading", { name: "Senpai Supply Co." }).waitFor();
   await page.getByText(/creators? with connected accounts want to work with this brand/).waitFor();
@@ -541,6 +542,7 @@ await step("Creators: a visitor picks a niche from the landing bar, sees why eac
   await tip.waitFor();
   if ((await bar.inputValue()) !== "quick bre") throw new Error(`Typing was interrupted: "${await bar.inputValue()}"`);
   await bar.fill("tamil breakfast");
+  await bar.press("Escape"); // close the suggestions over the results
   const best = p.getByRole("link", { name: /Creator B/ }).first();
   await best.getByText("Best match").waitFor();
   await best.getByText(/Tamil home cooking, Quick breakfast/).waitFor();

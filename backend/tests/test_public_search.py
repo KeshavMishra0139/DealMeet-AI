@@ -156,14 +156,7 @@ def test_nobody_is_listed_until_someone_searches(client, login):
     assert not _creators(client, niche="food", web="false")["idle"]
 
 
-@pytest.fixture()
-def no_web(monkeypatch):
-    from app.services import suggest_web
-
-    monkeypatch.setattr(suggest_web, "phrases", lambda q, kind="creators": [])
-
-
-def test_suggestions_as_you_type(client, db, no_web):
+def test_suggestions_as_you_type(client, db):
     ps._VOCAB.clear()
     s = client.get("/api/directory/suggest", params={"q": "quic"}).json()["items"]
     assert s[0] == {"text": "Quick breakfast", "kind": "tag", "query": "Quick breakfast"}
@@ -182,43 +175,24 @@ def test_suggestions_as_you_type(client, db, no_web):
     assert client.get("/api/directory/suggest", params={"q": "x", "kind": "other"}).status_code == 422
 
 
-def test_typed_words_can_be_half_finished(client, no_web):
+def test_typed_words_can_be_half_finished(client):
     ps._VOCAB.clear()
     texts = [x["text"] for x in client.get("/api/directory/suggest", params={"q": "tamil bre"}).json()["items"]]
     assert "Tamil home cooking" not in texts  # "bre" isn't in it
     assert [x["text"] for x in client.get("/api/directory/suggest", params={"q": "quick bre"}).json()["items"]][0] == "Quick breakfast"
 
 
-def test_suggestions_are_what_people_search_for_like_youtube(client, db, monkeypatch):
-    from app.services import suggest_web
-
-    calls = []
-
-    class R:
-        def __init__(self, body):
-            self.content = body.encode()
-
-        def raise_for_status(self):
-            pass
-
-    def fake_get(url, params, timeout, headers):
-        calls.append(params)
-        return R('["tamil bre",["tamil breakfast recipes","tamil breakfast ideas","tamil bread"],[],{}]')
-
-    db.suggest_cache.delete_many({})
+def test_suggestions_are_names_and_creator_keywords_never_web_phrases(client, db, yt_search):
+    db.yt_channel_names.delete_many({})
     ps._VOCAB.clear()
-    monkeypatch.setattr(suggest_web.httpx, "get", fake_get)
-    items = client.get("/api/directory/suggest", params={"q": "Tamil bre"}).json()["items"]
-    assert [x["text"] for x in items if x["kind"] == "search"] == ["tamil breakfast recipes", "tamil breakfast ideas", "tamil bread"]
-    assert calls[0]["ds"] == "yt" and calls[0]["q"] == "tamil bre"  # YouTube's own suggestions
-    client.get("/api/directory/suggest", params={"q": "tamil bre"})
-    assert len(calls) == 1  # cached for a day
-    client.get("/api/directory/suggest", params={"q": "snack", "kind": "brands"})
-    assert "ds" not in calls[-1]  # brands: general suggestions
-
-    def broken(*a, **k):
-        raise suggest_web.httpx.ConnectError("blocked")
-
-    monkeypatch.setattr(suggest_web.httpx, "get", broken)
-    items = client.get("/api/directory/suggest", params={"q": "quick"}).json()["items"]
-    assert items and items[0]["text"] == "Quick breakfast"  # ours still come
+    # Nothing general: no "full movie" kind of phrase can appear, only names and keywords here.
+    assert all(x["kind"] != "search" for x in client.get("/api/directory/suggest", params={"q": "v"}).json()["items"])
+    # A YouTube channel that a creator search found is suggested by name, bigger channels first.
+    _creators(client, q="vivek cooks")
+    ps._VOCAB.clear()
+    items = client.get("/api/directory/suggest", params={"q": "viv"}).json()["items"]
+    assert items[0] == {"text": "Vivek Cooks", "kind": "channel", "query": "@vivekcooks"}
+    # Names come before topics.
+    ps._VOCAB.clear()
+    kinds = [x["kind"] for x in client.get("/api/directory/suggest", params={"q": "a"}).json()["items"]]
+    assert kinds[0] == "creator"

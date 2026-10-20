@@ -227,14 +227,14 @@ export const SEARCHES_BEFORE_PROMPT = 4;
 
 export interface Suggestion {
   text: string;
-  /** "search": a phrase people search for (YouTube's suggestions); the rest are DealMeet's. */
-  kind: "search" | "creator" | "tag" | "niche" | "city" | "language" | "brand" | "category";
+  /** "channel": a YouTube channel a creator search found; the rest are on DealMeet. */
+  kind: "creator" | "channel" | "tag" | "niche" | "city" | "language" | "brand" | "category";
   query: string;
 }
 
 const KIND_LABEL: Record<Suggestion["kind"], string> = {
-  search: "",
   creator: "On DealMeet",
+  channel: "YouTube",
   tag: "Topic",
   niche: "Niche",
   city: "City",
@@ -313,6 +313,13 @@ export function SearchBox({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            // Closes the list (even before its suggestions arrive) and keeps the text:
+            // a search box's own Escape would clear it.
+            e.preventDefault();
+            setOpen(false);
+            return;
+          }
           if (!show) return;
           if (e.key === "ArrowDown") {
             e.preventDefault();
@@ -320,8 +327,6 @@ export function SearchBox({
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActive((i) => (i <= 0 ? items.length - 1 : i - 1));
-          } else if (e.key === "Escape") {
-            setOpen(false);
           }
         }}
         placeholder={placeholder}
@@ -368,7 +373,7 @@ export function SearchBox({
               <Search className="size-4 shrink-0 text-muted" aria-hidden />
               <span className="min-w-0 flex-1 truncate">
                 <Highlight text={x.text} q={value.trim().replace(/^@/, "")} />
-                {x.kind === "creator" && <span className="ml-2 text-xs text-muted">{x.query}</span>}
+                {(x.kind === "creator" || x.kind === "channel") && x.query !== x.text && <span className="ml-2 text-xs text-muted">{x.query}</span>}
               </span>
               <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted">{KIND_LABEL[x.kind]}</span>
             </li>

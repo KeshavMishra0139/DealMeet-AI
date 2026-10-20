@@ -251,6 +251,9 @@ def _vocab(kind: str) -> list[dict]:
                 add(lang, "language")
         for n, v in NICHES.items():
             add(v["label"], "niche", v["label"])
+        # YouTube channels that creator searches have found (services/youtube_search.py).
+        for ch in db.yt_channel_names.find({}, {"title": 1, "handle": 1, "subscribers": 1}).sort("subscribers", -1).limit(5000):
+            add(ch.get("title"), "channel", ch.get("handle") or ch.get("title"), int(ch.get("subscribers") or 0))
     else:
         from .directory import VISIBLE as BRANDS_VISIBLE
 
@@ -279,33 +282,29 @@ def _matches(q: str, text: str, handle: str = "") -> int:
 
 
 def suggest(q: str, kind: str = "creators") -> list[dict]:
-    """Suggestions like YouTube's: the phrases people search for (services/suggest_web.py),
-    with DealMeet's own matches (a creator, a niche, a topic) mixed in near the top."""
-    from . import suggest_web
-
+    """Names and keywords that belong on DealMeet, as someone types: creators (on DealMeet, and
+    YouTube channels searches have found), niches and topics; or brands and categories.
+    Never general web phrases. Whole-text matches first; bigger creators first among names."""
     q = re.sub(r"\s+", " ", q).strip().lower().lstrip("@")
     if not q:
         return []
     starts, inside = [], []
     for v in _vocab(kind):
-        handle = v["query"].lower().lstrip("@") if v["kind"] == "creator" else ""
+        handle = v["query"].lower().lstrip("@") if v["kind"] in ("creator", "channel") else ""
         m = _matches(q, v["text"], handle)
         if m == 2:
             starts.append(v)
         elif m == 1:
             inside.append(v)
-    order = {"niche": 0, "tag": 1, "category": 1, "creator": 2, "brand": 2, "city": 3, "language": 4}
+    # Names first: that's what people look for here.
+    order = {"creator": 0, "brand": 0, "channel": 1, "niche": 2, "category": 2, "tag": 3, "city": 4, "language": 5}
 
     def rank(v: dict):
-        return (order.get(v["kind"], 5), -v["weight"], len(v["text"]))
+        return (order.get(v["kind"], 6), -v["weight"], len(v["text"]))
 
-    ours = [{k: v[k] for k in ("text", "kind", "query")} for v in sorted(starts, key=rank) + sorted(inside, key=rank)]
-    web = [{"text": p, "kind": "search", "query": p} for p in suggest_web.phrases(q, kind)]
-    # Up to 3 of ours first (people and niches here), then what people search for, then the rest of ours.
     out, seen = [], set()
-    for item in ours[:3] + web + ours[3:]:
-        key = item["text"].lower()
-        if key not in seen:
-            seen.add(key)
-            out.append(item)
+    for v in sorted(starts, key=rank) + sorted(inside, key=rank):
+        if v["text"].lower() not in seen:
+            seen.add(v["text"].lower())
+            out.append({k: v[k] for k in ("text", "kind", "query")})
     return out[:SUGGESTIONS]
