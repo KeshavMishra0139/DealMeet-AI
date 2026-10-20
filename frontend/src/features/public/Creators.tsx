@@ -136,16 +136,6 @@ export default function Creators() {
   const d = searching ? r.data : undefined;
   const more = d ? d.total - d.items.length : 0;
   const nicheOptions = (allNiches.data ?? []).map((n) => ({ id: n.id, label: n.label }));
-  const box = (big: boolean) => (
-    <SearchBox
-      value={q}
-      onChange={setQ}
-      onSubmit={() => setNow(q.trim())}
-      placeholder="Search creators: a name, @handle, topic, city or language"
-      label="Search creators"
-      big={big}
-    />
-  );
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
@@ -168,28 +158,41 @@ export default function Creators() {
         </header>
 
         <main id="main">
-          {!searching ? (
-            // Nobody is listed until someone searches.
-            <section className="mx-auto mt-[12vh] max-w-2xl text-center">
-              <h1 className="font-display text-[32px] font-semibold tracking-tight sm:text-[44px]">Search creators</h1>
-              <p className="mt-2 text-[15px] text-fg-2">Creators on DealMeet first, then matching channels on YouTube.</p>
-              <div className="mt-7">{box(true)}</div>
-              <p className="mb-2 mt-6 text-xs font-medium text-muted">Or browse one or more niches</p>
-              <ChipPicker options={nicheOptions} value={niches} onPick={pickNiche} noun="niche" className="justify-center" />
-            </section>
-          ) : (
-            <>
+          {/* One search bar that stays put while the page changes around it, so typing is
+              never interrupted when results arrive. Nobody is listed until someone searches. */}
+          <section className={cn("mx-auto", searching ? "mt-6 max-w-3xl" : "mt-[12vh] max-w-2xl text-center")}>
+            {searching ? (
               <h1 className="sr-only">Creator search</h1>
-              <div className="mt-6 max-w-3xl">{box(false)}</div>
-              <div className="mt-3 flex max-w-3xl flex-wrap items-center gap-x-2 gap-y-1">
-                <ChipPicker options={nicheOptions} value={niches} onPick={pickNiche} noun="niche" />
-                {niches.length > 0 && (
-                  <button type="button" onClick={() => setNiches([])} className="text-xs font-medium text-muted hover:text-fg">
-                    Clear niches
-                  </button>
-                )}
+            ) : (
+              <div>
+                <h1 className="font-display text-[32px] font-semibold tracking-tight sm:text-[44px]">Search creators</h1>
+                <p className="mt-2 text-[15px] text-fg-2">Creators on DealMeet first, then matching channels on YouTube.</p>
               </div>
+            )}
+            <div className={searching ? "" : "mt-7"}>
+              <SearchBox
+                value={q}
+                onChange={setQ}
+                onSubmit={(t) => setNow(t)}
+                placeholder="Search creators: a name, @handle, topic, city or language"
+                label="Search creators"
+                suggestFor="creators"
+                big={!searching}
+              />
+            </div>
+            <p className={cn("mb-2 mt-6 text-xs font-medium text-muted", searching && "sr-only")}>Or browse one or more niches</p>
+            <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", searching ? "-mt-3" : "justify-center")}>
+              <ChipPicker options={nicheOptions} value={niches} onPick={pickNiche} noun="niche" className={searching ? undefined : "justify-center"} />
+              {niches.length > 0 && (
+                <button type="button" onClick={() => setNiches([])} className="text-xs font-medium text-muted hover:text-fg">
+                  Clear niches
+                </button>
+              )}
+            </div>
+          </section>
 
+          {searching && (
+            <div className="mx-auto max-w-3xl">
               {d?.niche_hint && !niche && (
                 <button
                   type="button"
@@ -201,9 +204,9 @@ export default function Creators() {
               )}
 
               {r.isError && <ErrorState error={r.error} onRetry={() => r.refetch()} />}
-              {!d && !r.isError && <RowBones rows={4} className="mt-6 max-w-3xl" />}
+              {!d && !r.isError && <RowBones rows={4} className="mt-6" />}
               {d && (
-                <section aria-label="Results" className={cn("mt-5 max-w-3xl transition-opacity", r.isFetching && "opacity-60")}>
+                <section aria-label="Results" className={cn("mt-5 transition-opacity", r.isFetching && "opacity-60")}>
                   <p className="px-2 text-sm text-muted sm:px-3" aria-live="polite">
                     {summary(d, query, niches.length)}
                   </p>
@@ -235,7 +238,7 @@ export default function Creators() {
                   )}
                 </section>
               )}
-            </>
+            </div>
           )}
         </main>
       </div>

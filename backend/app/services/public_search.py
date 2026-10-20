@@ -216,3 +216,96 @@ def creators(q: str = "", niche: str | None = None, signed_in: bool = False, ip:
         "youtube": youtube,
         "idle": False,
     }
+
+
+# ------------------------------------------------------------------ suggestions as you type
+_VOCAB: dict[str, tuple[float, list[dict]]] = {}
+VOCAB_SECONDS = 60
+SUGGESTIONS = 8
+
+
+def _vocab(kind: str) -> list[dict]:
+    """Words worth suggesting, built from public data and kept for a minute."""
+    import time
+
+    hit = _VOCAB.get(kind)
+    if hit and hit[0] > time.time() - VOCAB_SECONDS:
+        return hit[1]
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(text: str | None, kind_: str, query: str | None = None, weight: int = 0):
+        text = (text or "").strip()
+        if text and (text.lower(), kind_) not in seen:
+            seen.add((text.lower(), kind_))
+            out.append({"text": text, "kind": kind_, "query": query or text, "weight": weight})
+
+    db = get_db()
+    if kind == "creators":
+        for c in db.creators.find(VISIBLE, {"name": 1, "handle": 1, "followers": 1, "sub_niches": 1, "skills": 1, "city": 1, "languages": 1}):
+            add(c["name"], "creator", f"@{c['handle']}", int(c.get("followers") or 0))
+            for t in [*(c.get("sub_niches") or []), *(c.get("skills") or [])]:
+                add(t, "tag")
+            add(c.get("city"), "city")
+            for lang in _lang_labels(c.get("languages")):
+                add(lang, "language")
+        for n, v in NICHES.items():
+            add(v["label"], "niche", v["label"])
+    else:
+        from .directory import VISIBLE as BRANDS_VISIBLE
+
+        for b in db.brands.find(BRANDS_VISIBLE, {"name": 1, "category": 1, "target.cities": 1}):
+            add(b["name"], "brand")
+            add(b.get("category"), "category")
+            for city in (b.get("target") or {}).get("cities") or []:
+                add(city, "city")
+        for n, v in NICHES.items():
+            add(f"{v['label']} creators", "niche", v["label"])
+    _VOCAB[kind] = (time.time(), out)
+    return out
+
+
+def _matches(q: str, text: str, handle: str = "") -> int:
+    """2: the text starts with what's typed; 1: every typed word starts a word in it
+    (the last one may be half typed); 0: no match."""
+    t = text.lower()
+    if t.startswith(q) or (handle and handle.startswith(q)):
+        return 2
+    qw = re.findall(r"[^\W_]+", q)
+    tw = re.findall(r"[^\W_]+", t) + re.findall(r"[^\W_]+", handle)
+    if qw and all(any(w.startswith(x) for w in tw) for x in qw):
+        return 1
+    return 1 if len(q) >= 3 and handle and q in handle else 0
+
+
+def suggest(q: str, kind: str = "creators") -> list[dict]:
+    """Suggestions like YouTube's: the phrases people search for (services/suggest_web.py),
+    with DealMeet's own matches (a creator, a niche, a topic) mixed in near the top."""
+    from . import suggest_web
+
+    q = re.sub(r"\s+", " ", q).strip().lower().lstrip("@")
+    if not q:
+        return []
+    starts, inside = [], []
+    for v in _vocab(kind):
+        handle = v["query"].lower().lstrip("@") if v["kind"] == "creator" else ""
+        m = _matches(q, v["text"], handle)
+        if m == 2:
+            starts.append(v)
+        elif m == 1:
+            inside.append(v)
+    order = {"niche": 0, "tag": 1, "category": 1, "creator": 2, "brand": 2, "city": 3, "language": 4}
+
+    def rank(v: dict):
+        return (order.get(v["kind"], 5), -v["weight"], len(v["text"]))
+
+    ours = [{k: v[k] for k in ("text", "kind", "query")} for v in sorted(starts, key=rank) + sorted(inside, key=rank)]
+    web = [{"text": p, "kind": "search", "query": p} for p in suggest_web.phrases(q, kind)]
+    # Up to 3 of ours first (people and niches here), then what people search for, then the rest of ours.
+    out, seen = [], set()
+    for item in ours[:3] + web + ours[3:]:
+        key = item["text"].lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out[:SUGGESTIONS]

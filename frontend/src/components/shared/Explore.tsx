@@ -225,39 +225,110 @@ export const SEARCHES_BEFORE_PROMPT = 4;
 
 /* ---------- search-engine pieces shared by /creators and /brands ---------- */
 
-/** A wide, rounded search bar with its button attached, like a web search engine's. */
+export interface Suggestion {
+  text: string;
+  /** "search": a phrase people search for (YouTube's suggestions); the rest are DealMeet's. */
+  kind: "search" | "creator" | "tag" | "niche" | "city" | "language" | "brand" | "category";
+  query: string;
+}
+
+const KIND_LABEL: Record<Suggestion["kind"], string> = {
+  search: "",
+  creator: "On DealMeet",
+  tag: "Topic",
+  niche: "Niche",
+  city: "City",
+  language: "Language",
+  brand: "Brand",
+  category: "Category",
+};
+
+/**
+ * A wide, rounded search bar with its button attached, like a web search engine's, that
+ * suggests matching words as you type (arrow keys to move, Enter to pick). Typing is never
+ * interrupted: results refresh beside it while you keep typing.
+ */
 export function SearchBox({
   value,
   onChange,
   onSubmit,
   placeholder,
   label,
+  suggestFor,
   big = false,
 }: {
   value: string;
   onChange: (v: string) => void;
-  onSubmit: () => void;
+  /** Search now, with this text (a picked suggestion, or what's typed). */
+  onSubmit: (text: string) => void;
   placeholder: string;
   label: string;
+  suggestFor: ExploreKind;
   big?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const typed = useSettled(value.trim(), 120);
+  const s = useQuery({
+    queryKey: ["suggest", suggestFor, typed],
+    queryFn: () => api<{ items: Suggestion[] }>(`/directory/suggest?${new URLSearchParams({ q: typed, kind: suggestFor })}`, { role: null }),
+    enabled: typed.length >= 1,
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+  });
+  const items = value.trim() ? (s.data?.items ?? []).filter((x) => x.text.toLowerCase() !== value.trim().toLowerCase() || x.query !== x.text) : [];
+  const show = open && items.length > 0;
+  useEffect(() => setActive(-1), [typed]);
+  const pick = (x: Suggestion) => {
+    onChange(x.query);
+    setOpen(false);
+    onSubmit(x.query);
+  };
+  const listId = `suggest-${suggestFor}`;
   return (
     <form
       role="search"
-      className="flex w-full items-stretch"
+      className="relative flex w-full items-stretch"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit();
+        if (show && active >= 0) pick(items[active]);
+        else {
+          setOpen(false);
+          onSubmit(value.trim());
+        }
       }}
     >
       <input
         type="search"
+        role="combobox"
+        aria-expanded={show}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={show && active >= 0 ? `${listId}-${active}` : undefined}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={(e) => {
+          if (!show) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((i) => (i + 1) % items.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((i) => (i <= 0 ? items.length - 1 : i - 1));
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
         placeholder={placeholder}
         aria-label={label}
         maxLength={80}
         autoFocus={big}
+        autoComplete="off"
         className={cn(
           "min-w-0 flex-1 rounded-l-full border border-r-0 border-line-strong bg-[var(--surface-solid)] px-5 text-fg outline-none transition-colors placeholder:text-muted focus:border-accent",
           big ? "h-14 text-base" : "h-11 text-[15px]",
@@ -273,7 +344,51 @@ export function SearchBox({
       >
         <Search className="size-5" aria-hidden />
       </button>
+      {show && (
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label="Suggestions"
+          className="absolute inset-x-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-line-strong bg-[var(--surface-solid)] py-1.5 text-left shadow-[0_18px_50px_-12px_rgb(0_0_0/0.45)]"
+        >
+          {items.map((x, i) => (
+            <li
+              key={`${x.kind}:${x.text}`}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              // mousedown, not click: it runs before the input's blur closes the list.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(x);
+              }}
+              onMouseEnter={() => setActive(i)}
+              className={cn("flex cursor-pointer items-center gap-3 px-5 py-2 text-[15px]", i === active && "bg-surface-2")}
+            >
+              <Search className="size-4 shrink-0 text-muted" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">
+                <Highlight text={x.text} q={value.trim().replace(/^@/, "")} />
+                {x.kind === "creator" && <span className="ml-2 text-xs text-muted">{x.query}</span>}
+              </span>
+              <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted">{KIND_LABEL[x.kind]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </form>
+  );
+}
+
+/** The typed part in normal weight, the rest bold, as search engines show suggestions. */
+function Highlight({ text, q }: { text: string; q: string }) {
+  const i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (i < 0) return <span className="font-medium">{text}</span>;
+  return (
+    <span>
+      <span className="font-semibold">{text.slice(0, i)}</span>
+      <span className="text-fg-2">{text.slice(i, i + q.length)}</span>
+      <span className="font-semibold">{text.slice(i + q.length)}</span>
+    </span>
   );
 }
 

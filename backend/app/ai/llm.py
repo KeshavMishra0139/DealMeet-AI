@@ -169,14 +169,41 @@ HINTS = {
     404: "The model wasn't found: copy the exact AI_MODEL id from openrouter.ai/models.",
     429: "Rate limited by the provider: wait a minute.",
 }
+NO_OUTPUT_HINTS = {
+    "length": "The reply was cut off at its token limit; it usually passes on a shorter question.",
+    "content_filter": "The provider's safety filter blocked the reply.",
+    "empty": "The model returned an empty reply; check AI_MODEL is a chat model.",
+}
 
 
-def _failed(task: str, reason: str, status: int | None = None) -> None:
+def _provider_message(resp: httpx.Response) -> str | None:
+    """The provider's own explanation of a refused call (OpenRouter puts it in error.message),
+    trimmed. It names the problem precisely ("requires more credits", "not a valid model ID")."""
+    try:
+        err = resp.json().get("error") or {}
+        msg = err.get("message") if isinstance(err, dict) else str(err)
+    except ValueError:
+        msg = resp.text
+    msg = re.sub(r"\s+", " ", str(msg or "")).strip()
+    # Never echo anything key-like back.
+    msg = re.sub(r"sk-[A-Za-z0-9_-]{8,}", "[key]", msg)
+    return msg[:240] or None
+
+
+def _failed(task: str, reason: str, status: int | None = None, detail: str | None = None, hint: str | None = None) -> None:
     global _last_error
     from ..config import now_iso
 
-    _last_error = {"at": now_iso(), "ts": time.time(), "task": task, "reason": reason,
-                   "hint": HINTS.get(status or 0) or ("The provider had a problem; it usually passes." if status and status >= 500 else None)}
+    _last_error = {"at": now_iso(), "ts": time.time(), "task": task, "reason": reason, "detail": detail,
+                   "hint": hint or HINTS.get(status or 0) or ("The provider had a problem; it usually passes." if status and status >= 500 else None)}
+
+
+def _validation_detail(e: Exception) -> str:
+    """Which field was wrong, never the content."""
+    if isinstance(e, ValidationError) and e.errors():
+        first = e.errors()[0]
+        return f"{'.'.join(str(x) for x in first.get('loc', ())) or 'reply'}: {first.get('type')}"
+    return type(e).__name__
 
 
 def last_error() -> dict | None:
@@ -195,18 +222,18 @@ def _call_model(task: str, system: str, messages: list[dict], schema: type[T], m
             return _openrouter(system, messages, schema, max_tokens)
         except _NoOutput as e:
             log.info("AI %s: no usable output from OpenRouter (%s); using template", task, e)
-            _failed(task, f"No usable reply from OpenRouter ({e})")
+            _failed(task, f"No usable reply from OpenRouter ({e})", hint=NO_OUTPUT_HINTS.get(str(e)))
         except httpx.HTTPStatusError as e:
             # 401: wrong key; 402: no credits on the OpenRouter account; 429: rate limited.
             code = e.response.status_code
             log.warning("AI %s: OpenRouter error %s; using template", task, code)
-            _failed(task, f"OpenRouter error {code}", code)
-        except httpx.HTTPError:
+            _failed(task, f"OpenRouter error {code}", code, detail=_provider_message(e.response))
+        except httpx.HTTPError as e:
             log.warning("AI %s: OpenRouter unreachable; using template", task)
-            _failed(task, "OpenRouter unreachable (network or timeout)")
+            _failed(task, "OpenRouter unreachable (network or timeout)", detail=type(e).__name__)
         except (ValidationError, ValueError) as e:
             log.warning("AI %s: invalid output from OpenRouter (%s); using template", task, type(e).__name__)
-            _failed(task, f"The model's reply wasn't valid JSON for {schema.__name__} ({type(e).__name__})")
+            _failed(task, f"The model's reply wasn't valid JSON for {schema.__name__} ({type(e).__name__})", detail=_validation_detail(e))
         except Exception as e:  # never let a page break on an AI call
             log.warning("AI %s: unexpected OpenRouter error (%s); using template", task, type(e).__name__)
             _failed(task, f"Unexpected error ({type(e).__name__})")
@@ -235,10 +262,10 @@ def _call_model(task: str, system: str, messages: list[dict], schema: type[T], m
         _failed(task, "The API was unreachable (network or timeout)")
     except anthropic.APIStatusError as e:
         log.warning("AI %s: API error %s; using template", task, e.status_code)
-        _failed(task, f"API error {e.status_code}", e.status_code)
+        _failed(task, f"API error {e.status_code}", e.status_code, detail=_provider_message(e.response))
     except (ValidationError, ValueError) as e:
         log.warning("AI %s: invalid output (%s); using template", task, e)
-        _failed(task, f"The model's reply didn't fit {schema.__name__} ({type(e).__name__})")
+        _failed(task, f"The model's reply didn't fit {schema.__name__} ({type(e).__name__})", detail=_validation_detail(e))
     except Exception as e:  # never let a page break on an AI call
         log.warning("AI %s: unexpected error (%s); using template", task, type(e).__name__)
         _failed(task, f"Unexpected error ({type(e).__name__})")

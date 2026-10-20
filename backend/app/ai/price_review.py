@@ -15,12 +15,13 @@ background when they change.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from collections import Counter
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..config import get_settings, now_iso
 from ..db import get_db
@@ -41,6 +42,34 @@ class PriceReview(BaseModel):
     language: str = Field(description="Main language of the titles: one of " + ", ".join(LANGS))
     confidence: Literal["low", "medium", "high"]
     reasons: list[str] = Field(description="2 or 3 short reasons, at most 25 words each. Quote only numbers that appear in the facts.")
+
+
+    @field_validator("adjust_pct", mode="before")
+    @classmethod
+    def _pct(cls, v):
+        # "+20%", "20", 12.5 -> a whole number.
+        if isinstance(v, str):
+            m = re.search(r"[-+]?\d+(?:\.\d+)?", v)
+            v = float(m.group()) if m else 0
+        return int(round(float(v or 0)))
+
+    @field_validator("niche", "language", mode="before")
+    @classmethod
+    def _text(cls, v):
+        return "" if v is None else str(v).strip()
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _confidence(cls, v):
+        v = str(v or "low").strip().lower()
+        return v if v in ("low", "medium", "high") else "low"
+
+    @field_validator("reasons", mode="before")
+    @classmethod
+    def _reasons(cls, v):
+        if isinstance(v, str):
+            return [v]
+        return [str(x) for x in (v or []) if x]
 
 
 def _none() -> PriceReview:

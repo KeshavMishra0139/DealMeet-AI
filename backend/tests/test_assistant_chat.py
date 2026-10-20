@@ -169,3 +169,29 @@ def test_the_last_ai_failure_and_its_fix_show_on_health(monkeypatch, db, client)
     assert llm.converse("assistant_chat", "system", [{"role": "user", "content": "Hi"}], ChatTurn) == (None, "failed")
     err = client.get("/api/health").json()["modes"]["ai_last_error"]
     assert err["reason"] == "OpenRouter error 402" and "credits" in err["hint"] and err["task"] == "assistant_chat"
+    assert err["detail"] == "Insufficient credits"  # the provider's own words
+
+
+def test_health_names_a_wrong_model_and_a_cut_off_reply_without_leaking_keys(monkeypatch, db, client):
+    import httpx
+
+    settings = replace(get_settings(), ai_api_key=None, openrouter_api_key="or-key", ai_model="anthropic/not-a-model")
+    monkeypatch.setattr(llm, "get_settings", lambda: settings)
+    replies = iter([
+        httpx.Response(400, json={"error": {"message": "anthropic/not-a-model is not a valid model ID (key sk-or-v1-abcdefghijk)"}}),
+        httpx.Response(200, json={"choices": [{"message": {"content": "{\"reply\": \"Hel"}, "finish_reason": "length"}]}),
+    ])
+    monkeypatch.setattr(llm.httpx, "post", lambda url, **k: _with_request(next(replies), url))
+    llm.converse("assistant_chat", "system", [{"role": "user", "content": "Hi"}], ChatTurn)
+    err = client.get("/api/health").json()["modes"]["ai_last_error"]
+    assert "not a valid model ID" in err["detail"] and "sk-or" not in err["detail"] and "[key]" in err["detail"]
+    llm.converse("assistant_chat", "system", [{"role": "user", "content": "Hi"}], ChatTurn)
+    err = client.get("/api/health").json()["modes"]["ai_last_error"]
+    assert err["reason"] == "No usable reply from OpenRouter (length)" and "token limit" in err["hint"]
+
+
+def _with_request(resp, url):
+    import httpx
+
+    resp.request = httpx.Request("POST", url)
+    return resp

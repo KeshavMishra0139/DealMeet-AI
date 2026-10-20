@@ -21,7 +21,7 @@ import re
 import secrets
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..config import now_iso
 from ..db import get_db
@@ -44,11 +44,41 @@ class ChatAction(BaseModel):
     tool: str = Field(description="One tool name from the list")
     args_json: str = Field(default="{}", description='The tool\'s arguments as a JSON object, for example {"brand_id": "br_x"}. Use "{}" when it takes none.')
 
+    @model_validator(mode="before")
+    @classmethod
+    def _lenient(cls, v):
+        # Models often send the arguments as an object, or under "args"/"arguments".
+        if isinstance(v, dict):
+            v = dict(v)
+            args = v.pop("args", None) if "args_json" not in v else v.get("args_json")
+            args = v.pop("arguments", args)
+            if args is None:
+                args = "{}"
+            v["args_json"] = args if isinstance(args, str) else json.dumps(args)
+        return v
+
 
 class ChatTurn(BaseModel):
     reply: str = Field(description="Your message to the user. Plain text in short paragraphs; **bold** and lines starting with '- ' for lists are fine.")
     action: ChatAction | None = Field(default=None, description="A tool to use for this reply, only when the user asked for that task; otherwise null")
     suggestions: list[str] = Field(default=[], description="Up to 3 short messages the user might send next, in their language")
+
+    @field_validator("suggestions", mode="before")
+    @classmethod
+    def _suggestions(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return [str(x) for x in v if x]
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _action(cls, v):
+        # "none", "", {} or a missing tool all mean no action.
+        if not v or (isinstance(v, str)) or (isinstance(v, dict) and not v.get("tool")):
+            return None
+        return v
 
 
 STARTERS = {

@@ -530,7 +530,17 @@ await step("Creators: a visitor picks a niche from the landing bar, sees why eac
   await p.goto(`${BASE}/creators`);
   await p.getByRole("heading", { name: "Search creators" }).waitFor();
   if (await p.getByRole("link", { name: /Creator B/ }).count()) throw new Error("Creators listed before a search");
-  await p.getByLabel("Search creators").fill("tamil breakfast");
+  // Typing with pauses: results arrive beside the bar and the cursor stays in it.
+  const bar = p.getByRole("combobox", { name: "Search creators" });
+  await bar.pressSequentially("qui", { delay: 60 });
+  await p.waitForTimeout(1200); // long enough for a search to run
+  if (!(await bar.evaluate((el) => el === document.activeElement))) throw new Error("The search bar lost focus when results arrived");
+  await bar.pressSequentially("ck bre", { delay: 60 });
+  // Suggestions as you type: a matching tag, picked with the keyboard.
+  const tip = p.getByRole("listbox", { name: "Suggestions" }).getByRole("option", { name: /Quick breakfast/ });
+  await tip.waitFor();
+  if ((await bar.inputValue()) !== "quick bre") throw new Error(`Typing was interrupted: "${await bar.inputValue()}"`);
+  await bar.fill("tamil breakfast");
   const best = p.getByRole("link", { name: /Creator B/ }).first();
   await best.getByText("Best match").waitFor();
   await best.getByText(/Tamil home cooking, Quick breakfast/).waitFor();

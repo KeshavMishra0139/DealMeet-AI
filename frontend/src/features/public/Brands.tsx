@@ -108,16 +108,6 @@ export default function Brands() {
   const d = searching ? r.data : undefined;
   const more = d ? d.total - d.items.length : 0;
   const cats = (facets.data?.categories ?? []).map((c) => ({ id: c, label: c }));
-  const box = (big: boolean) => (
-    <SearchBox
-      value={q}
-      onChange={setQ}
-      onSubmit={() => setNow(q.trim())}
-      placeholder="Search brands: a name, what they make, or what you make"
-      label="Search brands"
-      big={big}
-    />
-  );
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
@@ -139,21 +129,34 @@ export default function Brands() {
           </div>
         </header>
         <main id="main">
-          {!searching ? (
-            // No brand is listed until someone searches.
-            <section className="mx-auto mt-[12vh] max-w-2xl text-center">
-              <h1 className="font-display text-[32px] font-semibold tracking-tight sm:text-[44px]">Search brands</h1>
-              <p className="mt-2 text-[15px] text-fg-2">Type what they make, or the kind of content you make, to find brands that work with creators like you.</p>
-              <div className="mt-7">{box(true)}</div>
-              <p className="mb-2 mt-6 text-xs font-medium text-muted">Or browse a category</p>
-              <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className="justify-center" />
-            </section>
-          ) : (
-            <>
+          {/* One search bar that stays put while the page changes around it, so typing is
+              never interrupted when results arrive. No brand is listed until someone searches. */}
+          <section className={cn("mx-auto", searching ? "mt-6 max-w-3xl" : "mt-[12vh] max-w-2xl text-center")}>
+            {searching ? (
               <h1 className="sr-only">Brand search</h1>
-              <div className="mt-6 max-w-3xl">{box(false)}</div>
-              <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className="mt-3 max-w-3xl" />
-              <div className="mt-3 flex max-w-3xl flex-wrap items-center gap-2">
+            ) : (
+              <div>
+                <h1 className="font-display text-[32px] font-semibold tracking-tight sm:text-[44px]">Search brands</h1>
+                <p className="mt-2 text-[15px] text-fg-2">Type what they make, or the kind of content you make, to find brands that work with creators like you.</p>
+              </div>
+            )}
+            <div className={searching ? "" : "mt-7"}>
+              <SearchBox
+                value={q}
+                onChange={setQ}
+                onSubmit={(t) => setNow(t)}
+                placeholder="Search brands: a name, what they make, or what you make"
+                label="Search brands"
+                suggestFor="brands"
+                big={!searching}
+              />
+            </div>
+            <p className={cn("mb-2 mt-6 text-xs font-medium text-muted", searching && "sr-only")}>Or browse a category</p>
+            <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className={searching ? "-mt-3" : "justify-center"} />
+          </section>
+          {searching && (
+            <div className="mx-auto max-w-3xl">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Select aria-label="City" value={city} onChange={(e) => (setCity(e.target.value), reset())} className="h-9 w-auto min-w-[140px] text-[13px]">
                   <option value="">Any city</option>
                   {facets.data?.cities.map((c) => (
@@ -178,7 +181,7 @@ export default function Brands() {
                 </p>
               )}
               {r.isError && <ErrorState error={r.error} onRetry={() => r.refetch()} />}
-              {!d && !r.isError && <RowBones rows={4} className="mt-6 max-w-3xl" />}
+              {!d && !r.isError && <RowBones rows={4} className="mt-6" />}
               {d && (
                 <section aria-label="Results" className={cn("mt-5 max-w-3xl transition-opacity", r.isFetching && "opacity-60")}>
                   <p className="px-2 text-sm text-muted sm:px-3" aria-live="polite">
@@ -210,7 +213,7 @@ export default function Brands() {
                   )}
                 </section>
               )}
-            </>
+            </div>
           )}
         </main>
       </div>

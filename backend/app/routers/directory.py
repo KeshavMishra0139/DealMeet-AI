@@ -28,6 +28,14 @@ def search_brands(
     return dr.search(q, category, city, language, open, page, signed_in=user is not None)
 
 
+@router.get("/directory/suggest")
+def suggest(request: Request, q: str = Query("", max_length=80), kind: str = Query("creators", pattern="^(creators|brands)$")):
+    """Public. Suggestions as someone types: names, tags, niches, cities, languages
+    (creators) or brand names and categories (brands), from public data only."""
+    ratelimit.enforce(f"suggest:{ratelimit.client_ip(request)}", 1200, 3600, "Too many requests from here. Try again in a bit.")
+    return {"items": ps.suggest(q, kind)}
+
+
 @router.get("/directory/creators")
 def search_creators(
     request: Request,

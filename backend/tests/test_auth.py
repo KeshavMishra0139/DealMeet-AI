@@ -31,7 +31,8 @@ PUBLIC = {
     ("GET", "/api/connect/instagram/consent"),
     ("GET", "/api/connect/instagram/callback"),  # proves itself with the signed, single-use state
     ("GET", "/api/directory/brands"),  # the public brand directory
-    ("GET", "/api/directory/creators"),  # public creator search: public pages only, a few for visitors
+    ("GET", "/api/directory/creators"),
+    ("GET", "/api/directory/suggest"),  # suggestions as you type, public data only  # public creator search: public pages only, a few for visitors
     ("GET", "/api/directory/facets"),
     ("GET", "/api/directory/brands/{slug}"),
     ("POST", "/api/directory/brands/{slug}/removal-request"),  # anyone may ask; rate-limited per IP
