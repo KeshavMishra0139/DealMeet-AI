@@ -4,7 +4,8 @@ creators' Dream Brands.
 Search uses Atlas Search ($search) when the app runs on MongoDB Atlas with an index
 configured, and keyword matching otherwise (mongomock has no $search): the search's words
 against each brand's name, category, the creators it hires, where it sells and its
-description. Signed-out visitors see the first few brands; the rest is for members. Unclaimed brands are added by admins only, show just their public name,
+description. Nothing is listed until someone searches or picks a filter. Signed-out
+visitors see the first few brands; the rest is for members. Unclaimed brands are added by admins only, show just their public name,
 category and public handles, and say plainly that they aren't on DealMeet AI.
 """
 from __future__ import annotations
@@ -94,6 +95,9 @@ def _atlas_ids(q: str, limit: int) -> list[str]:
 
 def search(q: str = "", category: str | None = None, city: str | None = None, language: str | None = None, open_only: bool = False, page: int = 1, signed_in: bool = True) -> dict:
     db = get_db()
+    if not q.strip() and not (category or city or language or open_only):
+        # Like a search engine: no brand is listed until someone searches or picks a filter.
+        return {"items": [], "total": 0, "page": 1, "page_size": 0, "search": "all", "note": None, "locked": False, "niche_hint": None, "idle": True}
     filters: list[dict] = [VISIBLE]
     if category:
         filters.append({"category": {"$regex": f"^{re.escape(category)}$", "$options": "i"}})
@@ -141,7 +145,7 @@ def search(q: str = "", category: str | None = None, city: str | None = None, la
     if pointed:
         hint = {"id": pointed[0], "label": NICHES[pointed[0]]["label"]}
     return {"items": items, "total": total, "page": page, "page_size": size, "search": mode, "note": note,
-            "locked": not signed_in and total > size, "niche_hint": hint}
+            "locked": not signed_in and total > size, "niche_hint": hint, "idle": False}
 
 
 def _keyword_score(b: dict, q: str, matched: dict[str, list[str]]) -> int:

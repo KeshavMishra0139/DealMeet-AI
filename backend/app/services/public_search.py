@@ -9,9 +9,12 @@ publicly. Never exact numbers, reach, rates or audience data. Creators who aren'
 discoverable, who turned their public page off, or who are the anonymised reference
 profile never appear.
 
-Results are ranked by how many of the search's words match the creator's own words: name
-and handle first, then their tags (sub-niches and skills), their niche and its keywords,
-city and language, then bio. Each card says which of its words matched.
+Results are ranked by how many of the search's words match the creator's own words: name,
+handle and linked channel names first (small typos allowed), then their tags (sub-niches and
+skills), their niche and its keywords, city and language, then bio; ties go to the bigger
+creator. Each card says which of its words matched. Browsing one or more niches with no
+words lists each niche's top creators. An empty search lists nobody. Public YouTube channels that match come after
+DealMeet's own creators (services/youtube_search.py).
 
 Signed-out visitors get the best few matches and are asked to sign in for the rest; the
 server enforces that, not the page.
@@ -19,6 +22,7 @@ server enforces that, not the page.
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 
 from fastapi import HTTPException
 
@@ -26,18 +30,26 @@ from ..ai.brand_setup import BRAND_WORDS
 from ..ai.regional import NICHE_WORDS
 from ..db import get_db
 from ..seed.catalog import LANGS, NICHES
+from . import youtube_search
 from .media_kit import public_scopes
 from .views import audience_stage
 
 VISITOR_LIMIT = 6
 MEMBER_LIMIT = 24
+YT_VISITOR_LIMIT = 4
+YT_MEMBER_LIMIT = 12
+MAX_NICHES = 5
+# Niches most searched for in India first, when no creators set the order yet.
+POPULAR = ["food", "comedy", "tech", "fitness", "beauty", "gaming", "education", "finance", "fashion", "travel",
+           "parenting", "anime_edits"]
 STOP = {"the", "and", "for", "with", "who", "in", "of", "on", "a", "an", "to", "me", "my", "i", "creator", "creators",
         "brand", "brands", "content", "channel", "page", "videos", "video", "reels", "find", "best", "top", "near"}
 
 VISIBLE = {"discoverable": {"$ne": False}, "public_page": {"$ne": False}, "is_reference": {"$ne": True},
            "handle": {"$nin": [None, ""]}}
 FIELDS = {"name": 1, "handle": 1, "avatar_hue": 1, "niche": 1, "languages": 1, "city": 1, "followers": 1, "bio": 1,
-          "sub_niches": 1, "skills": 1, "expertise": 1, "public_scopes": 1, "consent_defaults": 1}
+          "sub_niches": 1, "skills": 1, "expertise": 1, "public_scopes": 1, "consent_defaults": 1,
+          "channels.youtube.title": 1, "channels.youtube.handle": 1, "channels.instagram.username": 1}
 
 
 def words(text: str | None) -> list[str]:
@@ -58,6 +70,11 @@ def _hit(w: str, bag: set[str]) -> bool:
     """A query word matches a word, the start of a longer one ("cook" finds "cooking"), or
     a longer form of one ("cooking" finds "cook")."""
     return w in bag or (len(w) >= 3 and any(b.startswith(w) or (len(b) >= 4 and w.startswith(b)) for b in bag))
+
+
+def _close(w: str, bag: set[str]) -> bool:
+    """A small typo in a name ("vivke" for "vivek"); only for words of 5+ letters."""
+    return len(w) >= 5 and any(abs(len(b) - len(w)) <= 2 and SequenceMatcher(None, w, b).ratio() >= 0.8 for b in bag)
 
 
 def niche_words(niche: str) -> set[str]:
@@ -82,7 +99,10 @@ def _lang_labels(codes: list[str] | None) -> list[str]:
 
 def _score(c: dict, qw: list[str], phrase: str) -> tuple[int, list[str]]:
     score, matched = 0, []
+    ch = c.get("channels") or {}
     name_bag = set(words(c.get("name"))) | set(words(c.get("handle")))
+    name_bag |= set(words((ch.get("youtube") or {}).get("title"))) | set(words((ch.get("youtube") or {}).get("handle")))
+    name_bag |= set(words((ch.get("instagram") or {}).get("username")))
     tags = [t for t in [*(c.get("sub_niches") or []), *(c.get("skills") or []), c.get("expertise")] if t]
     bio = set(words(c.get("bio")))
     langs = _lang_labels(c.get("languages"))
@@ -116,6 +136,9 @@ def _score(c: dict, qw: list[str], phrase: str) -> tuple[int, list[str]]:
         if _hit(w, bio):
             score += 2
             matched.append("their bio")
+            continue
+        if _close(w, name_bag):
+            score += 2  # a near spelling of their name: last, after every exact match
     return score, list(dict.fromkeys(matched))
 
 
@@ -140,16 +163,28 @@ def niche_counts() -> list[dict]:
     counts: dict[str, int] = {}
     for c in get_db().creators.find(VISIBLE, {"niche": 1}):
         counts[c.get("niche")] = counts.get(c.get("niche"), 0) + 1
+    order = {n: i for i, n in enumerate(POPULAR)}
     return sorted(({"id": n, "label": v["label"], "count": counts.get(n, 0)} for n, v in NICHES.items()),
-                  key=lambda x: (-x["count"], x["label"]))
+                  key=lambda x: (-x["count"], order.get(x["id"], 99), x["label"]))
 
 
-def creators(q: str = "", niche: str | None = None, signed_in: bool = False) -> dict:
-    if niche and niche not in NICHES:
+def parse_niches(niche: str | None) -> list[str]:
+    """One or more niche ids, comma-separated."""
+    picked = list(dict.fromkeys(x.strip() for x in (niche or "").split(",") if x.strip()))
+    if len(picked) > MAX_NICHES or any(n not in NICHES for n in picked):
         raise HTTPException(422, "Unknown niche.")
+    return picked
+
+
+def creators(q: str = "", niche: str | None = None, signed_in: bool = False, ip: str | None = None, web: bool = True) -> dict:
+    picked = parse_niches(niche)
     q = re.sub(r"\s+", " ", q).strip()
+    if not q and not picked:
+        # Like a search engine: nobody is listed until someone searches.
+        return {"items": [], "total": 0, "limit": 0, "locked": False, "niche_hint": None, "niches": niche_counts(),
+                "youtube": {"items": [], "note": None}, "idle": True}
     qw, phrase = query_words(q), q.lower()
-    find = {**VISIBLE, **({"niche": niche} if niche else {})}
+    find = {**VISIBLE, **({"niche": {"$in": picked}} if picked else {})}
     ranked = []
     for c in get_db().creators.find(find, FIELDS):
         if q:
@@ -159,13 +194,18 @@ def creators(q: str = "", niche: str | None = None, signed_in: bool = False) -> 
         else:
             score, matched = 0, []
         ranked.append((score, c, matched))
-    ranked.sort(key=lambda x: (-x[0], x[1]["name"].lower()))
+    # Best match first; then the bigger creator, as a search engine would.
+    ranked.sort(key=lambda x: (-x[0], -int(x[1].get("followers") or 0), x[1]["name"].lower()))
     limit = MEMBER_LIMIT if signed_in else VISITOR_LIMIT
     hint = None
-    if qw and not niche:
+    if qw and not picked:
         pointed = niches_for(qw)
         if pointed:
             hint = {"id": pointed[0], "label": NICHES[pointed[0]]["label"]}
+    youtube = (
+        youtube_search.search(q, picked, ip, YT_MEMBER_LIMIT if signed_in else YT_VISITOR_LIMIT)
+        if web and (q or picked) else {"items": [], "note": None}
+    )
     return {
         "items": [_card(c, m) for _, c, m in ranked[:limit]],
         "total": len(ranked),
@@ -173,4 +213,6 @@ def creators(q: str = "", niche: str | None = None, signed_in: bool = False) -> 
         "locked": not signed_in and len(ranked) > limit,
         "niche_hint": hint,
         "niches": niche_counts(),
+        "youtube": youtube,
+        "idle": False,
     }

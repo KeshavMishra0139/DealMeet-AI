@@ -221,7 +221,7 @@ await step("Shortlist: save two matches with a note, compare them, then send a d
 await step("Brands: search the directory, save a Dream Brand, see it in the Studio; unclaimed pages say they aren't on DealMeet", async () => {
   await reset();
   await page.goto(`${BASE}/brands?as=cr_a`);
-  await page.getByLabel("Search").fill("senpai");
+  await page.getByLabel("Search brands").fill("senpai");
   await page.getByRole("link", { name: /Senpai Supply Co\./ }).click();
   await page.getByRole("heading", { name: "Senpai Supply Co." }).waitFor();
   await page.getByText(/creators? with connected accounts want to work with this brand/).waitFor();
@@ -515,14 +515,21 @@ await step("Creators: a visitor picks a niche from the landing bar, sees why eac
   await pop.getByRole("button", { name: /6 more niches/ }).click();
   await pop.getByRole("button", { name: "Travel" }).waitFor();
   await pop.getByRole("button", { name: "Food and cooking" }).click();
+  await pop.getByRole("button", { name: "Search" }).click();
   await p.waitForURL(/\/creators\?niche=food/);
+  // More than one niche at a time: each niche's top creators.
+  await p.getByRole("group", { name: "Pick a niche" }).getByRole("button", { name: "Gaming" }).click();
+  await p.waitForURL(/niche=food%2Cgaming|niche=food,gaming/);
+  await p.getByText(/creators on DealMeet in these niches/).waitFor();
   await p.getByRole("button", { name: /more creators/ }).click();
   const join = p.getByRole("dialog", { name: "Want to know more?" });
   await join.getByRole("link", { name: "Sign up as a brand" }).waitFor();
   await join.getByRole("link", { name: "Log in" }).waitFor();
   await p.keyboard.press("Escape");
-  // Their own words: tags first, and the card says what matched.
+  // Their own words: tags first, and the card says what matched. Nobody is listed before a search.
   await p.goto(`${BASE}/creators`);
+  await p.getByRole("heading", { name: "Search creators" }).waitFor();
+  if (await p.getByRole("link", { name: /Creator B/ }).count()) throw new Error("Creators listed before a search");
   await p.getByLabel("Search creators").fill("tamil breakfast");
   const best = p.getByRole("link", { name: /Creator B/ }).first();
   await best.getByText("Best match").waitFor();
@@ -542,7 +549,11 @@ await step("Brands: what a creator makes finds brands that work with creators li
   await p.goto(`${BASE}/brands?q=dosa`);
   await p.getByText(/Including brands that work with food and cooking creators/).waitFor();
   await p.getByText(/Works with food and cooking creators/).first().waitFor();
+  // Nothing is listed until someone searches.
   await p.goto(`${BASE}/brands`);
+  await p.getByRole("heading", { name: "Search brands" }).waitFor();
+  if (await p.getByRole("link", { name: /Senpai Supply/ }).count()) throw new Error("Brands listed before a search");
+  await p.getByLabel("Search brands").fill("hindi");
   await p.getByRole("button", { name: /more brands/ }).click();
   await p.getByRole("dialog", { name: "Want to know more?" }).getByRole("link", { name: "Sign up as a creator" }).waitFor();
   await ctx.close();

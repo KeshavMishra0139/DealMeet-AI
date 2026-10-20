@@ -21,7 +21,8 @@ def test_search_by_name_category_language_and_open_campaigns(client, login, db):
     open_ids = {b["id"] for b in _search(client, open="true")["items"]}
     assert open_ids and open_ids <= live
     member = login("cr_b")
-    every = {b["id"] for p in (1, 2) for b in member.get("/api/directory/brands", params={"page": p}).json()["items"]}
+    every = {b["id"] for lang in ("hi", "ta", "en") for b in member.get("/api/directory/brands", params={"language": lang}).json()["items"]}
+    assert every
     assert not any(i.startswith("xx_") for i in every)  # spam examples never show
 
 

@@ -1,8 +1,9 @@
 """Public YouTube channel data through the YouTube Data API v3, with an API key (no login).
 
-Quota: only 1-unit calls are used (channels.list, playlistItems.list, videos.list).
-search.list (100 units) is never called. Every response is cached in the database
-for 12 hours, so repeat lookups and the public page cost no quota.
+Quota: reading a channel uses only 1-unit calls (channels.list, playlistItems.list,
+videos.list). search.list (100 units) is used only by creator search
+(services/youtube_search.py), under a daily budget. Every response is cached in the
+database for 12 hours, so repeat lookups cost no quota.
 
 A channel linked by its handle is public data: it doesn't prove the creator owns
 the channel. Ownership is confirmed only by connecting YouTube Analytics (OAuth).
@@ -81,11 +82,20 @@ def parse_query(q: str) -> dict:
     return {"forHandle": "@" + m.group(1)}
 
 
+def _key(endpoint: str, params: dict) -> str:
+    return f"{endpoint}?{urlencode(sorted(params.items()))}"
+
+
+def is_cached(endpoint: str, params: dict) -> bool:
+    hit = get_db().yt_cache.find_one({"_id": _key(endpoint, params)}, {"fetched_at": 1})
+    return bool(hit and hit["fetched_at"] > time.time() - CACHE_SECONDS)
+
+
 def _call(endpoint: str, params: dict) -> tuple[dict, float]:
     """One API call, served from the 12-hour cache when possible. The key never
     enters the cache key, the database or the logs."""
     db = get_db()
-    key = f"{endpoint}?{urlencode(sorted(params.items()))}"
+    key = _key(endpoint, params)
     hit = db.yt_cache.find_one({"_id": key})
     if hit and hit["fetched_at"] > time.time() - CACHE_SECONDS:
         return hit["data"], hit["fetched_at"]

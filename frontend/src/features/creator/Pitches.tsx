@@ -142,7 +142,7 @@ function NewPitch({
   const dream = useQuery({ queryKey: ["dream", creatorId], queryFn: () => api<{ items: BrandCard[] }>(`/creators/${creatorId}/dream-brands`), enabled: !!creatorId });
   const found = useQuery({
     queryKey: ["directory", "pitch", query],
-    queryFn: () => api<{ items: BrandCard[] }>(`/directory/brands?q=${encodeURIComponent(query)}`, { role: null }),
+    queryFn: () => api<{ items: BrandCard[] }>(`/directory/brands?q=${encodeURIComponent(query)}`, { role: "creator" }),
     enabled: query.trim().length >= 2,
     placeholderData: keepPreviousData,
   });

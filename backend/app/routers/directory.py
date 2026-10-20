@@ -32,14 +32,16 @@ def search_brands(
 def search_creators(
     request: Request,
     q: str = Query("", max_length=80),
-    niche: str | None = Query(None, max_length=40),
+    niche: str | None = Query(None, max_length=200, description="One or more niche ids, comma-separated"),
+    web: bool = Query(True, description="Also search public YouTube channels"),
     user: dict | None = Depends(au.optional_user),
 ):
-    """Public. Creators who keep a public page, matched on their own words. Visitors get the
-    best few; members get more."""
+    """Public. Creators who keep a public page, matched on their own words, then public
+    YouTube channels that match. Visitors get the best few; members get more."""
+    ip = ratelimit.client_ip(request)
     if user is None:
-        ratelimit.enforce(f"csearch:{ratelimit.client_ip(request)}", 120, 3600, "That's a lot of searches from here. Sign in, or try again in an hour.")
-    return ps.creators(q, niche, signed_in=user is not None)
+        ratelimit.enforce(f"csearch:{ip}", 120, 3600, "That's a lot of searches from here. Sign in, or try again in an hour.")
+    return ps.creators(q, niche, signed_in=user is not None, ip=ip, web=web)
 
 
 @router.get("/directory/facets")

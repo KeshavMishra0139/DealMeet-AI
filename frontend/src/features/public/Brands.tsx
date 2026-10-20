@@ -1,14 +1,15 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Building2, Lock, Megaphone, Search, Sparkles } from "lucide-react";
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { BadgeCheck, Building2, Megaphone, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
-import { ChipPicker, countSearch, JoinPrompt, SEARCHES_BEFORE_PROMPT, useCategories, useViewerRole } from "@/components/shared/Explore";
+import { ChipPicker, countSearch, JoinPrompt, MoreRow, ResultRow, SEARCHES_BEFORE_PROMPT, SearchBox, useCategories, useSettled, useViewerRole } from "@/components/shared/Explore";
+import { RowBones } from "@/components/shared/Skeletons";
 import { SourceBadge } from "@/components/shared/SourceBadge";
 import { Wordmark } from "@/components/shared/Wordmark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Select, Skeleton, Switch } from "@/components/ui/form";
+import { Select, Switch } from "@/components/ui/form";
 import { useSignedInHome } from "@/lib/session";
 import { api } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
@@ -44,17 +45,23 @@ interface Results {
   niche_hint?: { id: string; label: string } | null;
 }
 
-/** The public brand directory. */
+/** Brand search, like a search engine: nothing is listed until someone searches or picks a
+ * category, then one ranked list. What a creator makes ("dosa") also finds brands that work
+ * with creators like them. */
 export default function Brands() {
   useTheme("creator");
-  const [urlParams] = useSearchParams();
+  const [urlParams, setUrlParams] = useSearchParams();
   const [q, setQ] = useState(urlParams.get("q") ?? "");
-  const [category, setCategory] = useState(urlParams.get("category") ?? "");
+  const category = urlParams.get("category") ?? "";
   const [city, setCity] = useState("");
   const [language, setLanguage] = useState("");
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const query = useDeferredValue(q);
+  const settled = useSettled(q.trim(), 350);
+  const [now, setNow] = useState<string | null>(null);
+  const query = now ?? settled;
+  useEffect(() => setNow(null), [settled]);
+  const searching = !!query || !!category || !!city || !!language || open;
   const params = new URLSearchParams({ q: query, page: String(page) });
   if (category) params.set("category", category);
   if (city) params.set("city", city);
@@ -67,13 +74,29 @@ export default function Brands() {
     queryKey: ["directory", params.toString(), role],
     queryFn: () => api<Results>(`/directory/brands?${params}`, { role }),
     placeholderData: keepPreviousData,
+    enabled: searching,
   });
   const reset = () => setPage(1);
+  const setCategory = (c: string) => {
+    const next = new URLSearchParams(urlParams);
+    if (c) next.set("category", c);
+    else next.delete("category");
+    setUrlParams(next, { replace: true });
+    reset();
+  };
+  // Keep the address in step, so a search can be shared or reloaded.
+  useEffect(() => {
+    const next = new URLSearchParams(urlParams);
+    if (query) next.set("q", query);
+    else next.delete("q");
+    if (next.toString() !== urlParams.toString()) setUrlParams(next, { replace: true });
+    setPage(1);
+  }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prompt, setPrompt] = useState(false);
   // Visitors who keep searching are asked, once, whether they'd like to join.
   const asked = useRef(false);
   useEffect(() => {
-    if (role || !query.trim() || asked.current) return;
+    if (role || !query || asked.current) return;
     const t = setTimeout(() => {
       if (countSearch("brands") >= SEARCHES_BEFORE_PROMPT) {
         asked.current = true;
@@ -82,7 +105,19 @@ export default function Brands() {
     }, 1200);
     return () => clearTimeout(t);
   }, [query, role]);
-  const more = r.data ? r.data.total - r.data.items.length : 0;
+  const d = searching ? r.data : undefined;
+  const more = d ? d.total - d.items.length : 0;
+  const cats = (facets.data?.categories ?? []).map((c) => ({ id: c, label: c }));
+  const box = (big: boolean) => (
+    <SearchBox
+      value={q}
+      onChange={setQ}
+      onSubmit={() => setNow(q.trim())}
+      placeholder="Search brands: a name, what they make, or what you make"
+      label="Search brands"
+      big={big}
+    />
+  );
 
   return (
     <div className="theme-creator grain relative min-h-dvh">
@@ -103,107 +138,132 @@ export default function Brands() {
             </Button>
           </div>
         </header>
-        <main id="main" className="mt-8">
-          <h1 className="font-display text-[28px] font-semibold tracking-tight sm:text-[34px]">Brands</h1>
-          <p className="mt-1 text-[15px] text-fg-2">
-            Find brands to work with: search what they make, or the kind of content you make, and see brands that work with creators like you.
-          </p>
-
-          <form role="search" className="card-surface mt-6 grid gap-3 rounded-[var(--radius-card)] p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]" onSubmit={(e) => e.preventDefault()}>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <Label htmlFor="bd-q">Search</Label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-                <Input id="bd-q" value={q} onChange={(e) => (setQ(e.target.value), reset())} placeholder="Try 'snacks', 'skincare' or what you make: 'dosa'" maxLength={80} className="pl-9" />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="bd-city">City</Label>
-              <Select id="bd-city" value={city} onChange={(e) => (setCity(e.target.value), reset())}>
-                <option value="">Any</option>
-                {facets.data?.cities.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="bd-lang">Language</Label>
-              <Select id="bd-lang" value={language} onChange={(e) => (setLanguage(e.target.value), reset())}>
-                <option value="">Any</option>
-                {facets.data?.languages.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <label className="flex items-center gap-2 self-end pb-2.5 text-sm">
-              <Switch checked={open} onCheckedChange={(v) => (setOpen(v), reset())} aria-label="Only brands with open campaigns" /> Open campaigns
-            </label>
-            <ChipPicker
-              options={(facets.data?.categories ?? []).map((c) => ({ id: c, label: c }))}
-              value={category || null}
-              onPick={(c) => (setCategory(c ?? ""), reset())}
-              noun="category"
-              className="sm:col-span-2 lg:col-span-4"
-            />
-          </form>
-          {r.data?.niche_hint && (
-            <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-fg-2">
-              <Sparkles className="size-3.5 text-accent" aria-hidden /> Including brands that work with {r.data.niche_hint.label.toLowerCase()} creators
-            </p>
-          )}
-
-          {r.isError && <ErrorState error={r.error} onRetry={() => r.refetch()} />}
-          {!r.data && !r.isError && <Skeleton className="mt-6 h-96 rounded-xl" />}
-          {r.data && (
-            <section aria-label="Results" className={cn("mt-6 transition-opacity", r.isFetching && "opacity-60")}>
-              <p className="mb-3 text-sm text-fg-2" aria-live="polite">
-                {r.data.total} brand{r.data.total === 1 ? "" : "s"}
-                {r.data.search === "atlas" && " · ranked by Atlas Search"}
-                {r.data.note && <span className="block text-xs text-muted">{r.data.note}</span>}
-              </p>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {r.data.items.map((b) => (
-                  <li key={b.id}>
-                    <BrandTile b={b} />
-                  </li>
-                ))}
-                {r.data.locked && (
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => setPrompt(true)}
-                      className="flex h-full min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong p-4 text-center transition-colors hover:border-accent/60"
-                    >
-                      <Lock className="size-5 text-accent" aria-hidden />
-                      <span className="font-medium">
-                        {more} more brand{more === 1 ? "" : "s"}
-                      </span>
-                      <span className="text-xs text-muted">Want to know more? Log in or sign up</span>
-                    </button>
-                  </li>
-                )}
-              </ul>
-              {!r.data.locked && r.data.total > r.data.page_size && (
-                <nav aria-label="Pages" className="mt-4 flex items-center justify-center gap-2">
-                  <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-                    Previous
-                  </Button>
-                  <span className="num text-sm text-fg-2">
-                    Page {page} of {Math.ceil(r.data.total / r.data.page_size)}
-                  </span>
-                  <Button size="sm" variant="outline" disabled={page * r.data.page_size >= r.data.total} onClick={() => setPage((p) => p + 1)}>
-                    Next
-                  </Button>
-                </nav>
-              )}
+        <main id="main">
+          {!searching ? (
+            // No brand is listed until someone searches.
+            <section className="mx-auto mt-[12vh] max-w-2xl text-center">
+              <h1 className="font-display text-[32px] font-semibold tracking-tight sm:text-[44px]">Search brands</h1>
+              <p className="mt-2 text-[15px] text-fg-2">Type what they make, or the kind of content you make, to find brands that work with creators like you.</p>
+              <div className="mt-7">{box(true)}</div>
+              <p className="mb-2 mt-6 text-xs font-medium text-muted">Or browse a category</p>
+              <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className="justify-center" />
             </section>
+          ) : (
+            <>
+              <h1 className="sr-only">Brand search</h1>
+              <div className="mt-6 max-w-3xl">{box(false)}</div>
+              <ChipPicker options={cats} value={category || null} onPick={(c) => setCategory(c ?? "")} noun="category" className="mt-3 max-w-3xl" />
+              <div className="mt-3 flex max-w-3xl flex-wrap items-center gap-2">
+                <Select aria-label="City" value={city} onChange={(e) => (setCity(e.target.value), reset())} className="h-9 w-auto min-w-[140px] text-[13px]">
+                  <option value="">Any city</option>
+                  {facets.data?.cities.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </Select>
+                <Select aria-label="Language" value={language} onChange={(e) => (setLanguage(e.target.value), reset())} className="h-9 w-auto min-w-[140px] text-[13px]">
+                  <option value="">Any language</option>
+                  {facets.data?.languages.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </Select>
+                <label className="flex items-center gap-2 text-[13px]">
+                  <Switch checked={open} onCheckedChange={(v) => (setOpen(v), reset())} aria-label="Only brands with open campaigns" /> Open campaigns
+                </label>
+              </div>
+              {d?.niche_hint && (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-fg-2">
+                  <Sparkles className="size-3.5 text-accent" aria-hidden /> Including brands that work with {d.niche_hint.label.toLowerCase()} creators
+                </p>
+              )}
+              {r.isError && <ErrorState error={r.error} onRetry={() => r.refetch()} />}
+              {!d && !r.isError && <RowBones rows={4} className="mt-6 max-w-3xl" />}
+              {d && (
+                <section aria-label="Results" className={cn("mt-5 max-w-3xl transition-opacity", r.isFetching && "opacity-60")}>
+                  <p className="px-2 text-sm text-muted sm:px-3" aria-live="polite">
+                    {d.total === 0
+                      ? "No brands match that yet. Try what they make, or a category."
+                      : `${d.total} brand${d.total === 1 ? "" : "s"}${query ? ` for "${query}"` : ""}, best matches first`}
+                    {d.note && <span className="block text-xs">{d.note}</span>}
+                  </p>
+                  <ul className="mt-1 divide-y divide-line">
+                    {d.items.map((b) => (
+                      <li key={b.id}>
+                        <BrandRow b={b} />
+                      </li>
+                    ))}
+                  </ul>
+                  {d.locked && <MoreRow text={`${more} more brand${more === 1 ? "" : "s"}`} onClick={() => setPrompt(true)} />}
+                  {!d.locked && d.total > d.page_size && (
+                    <nav aria-label="Pages" className="mt-4 flex items-center justify-center gap-2">
+                      <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                        Previous
+                      </Button>
+                      <span className="num text-sm text-fg-2">
+                        Page {page} of {Math.ceil(d.total / d.page_size)}
+                      </span>
+                      <Button size="sm" variant="outline" disabled={page * d.page_size >= d.total} onClick={() => setPage((p) => p + 1)}>
+                        Next
+                      </Button>
+                    </nav>
+                  )}
+                </section>
+              )}
+            </>
           )}
         </main>
       </div>
-      <JoinPrompt kind="brands" open={prompt} onOpenChange={setPrompt} more={r.data?.locked ? more : undefined} />
+      <JoinPrompt kind="brands" open={prompt} onOpenChange={setPrompt} more={d?.locked ? more : undefined} />
     </div>
+  );
+}
+
+function BrandRow({ b }: { b: BrandCard }) {
+  const media = b.claimed ? (
+    <Avatar name={b.name} hue={b.hue ?? 260} size={64} className="rounded-2xl" />
+  ) : (
+    <span className="grid size-16 place-items-center rounded-2xl border border-dashed border-line-strong text-muted" aria-hidden>
+      <Building2 className="size-7" />
+    </span>
+  );
+  const meta = [b.category, b.cities?.length ? b.cities.join(", ") : null, b.languages?.length ? b.languages.join(", ") : null].filter(Boolean).join(" · ");
+  return (
+    <ResultRow
+      to={`/brands/${b.slug}`}
+      media={media}
+      title={
+        <>
+          <span className="truncate">{b.name}</span>
+          {b.verified && <BadgeCheck className="size-4 shrink-0 text-accent" aria-label="Verified" />}
+        </>
+      }
+      meta={meta}
+    >
+      {b.matched && b.matched.length > 0 && (
+        <span className="block">
+          <span className="text-muted">Matches: </span>
+          {b.matched.join(", ")}
+        </span>
+      )}
+      <span className="flex flex-wrap items-center gap-1.5">
+        {b.claimed ? (
+          b.open_campaigns > 0 ? (
+            <Badge size="sm" variant="success">
+              <Megaphone aria-hidden /> {b.open_campaigns} open
+            </Badge>
+          ) : (
+            <Badge size="sm">No open campaigns</Badge>
+          )
+        ) : (
+          <Badge size="sm" variant="outline">
+            Unclaimed
+          </Badge>
+        )}
+        <SourceBadge source={b.source} />
+      </span>
+      {!b.claimed && <span className="block text-[11px] text-muted">{b.note}</span>}
+    </ResultRow>
   );
 }
 

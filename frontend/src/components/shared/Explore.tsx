@@ -2,8 +2,8 @@
 // few niches (or categories), every one a tap away under "more". Plus the prompt visitors see
 // when they want more than the first few results.
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, LogIn, Search, UserPlus } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ArrowRight, ChevronDown, ExternalLink, Lock, LogIn, Search, UserPlus } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
@@ -17,6 +17,16 @@ export interface NicheCount {
   id: string;
   label: string;
   count: number;
+}
+
+/** A value that settles a moment after the last change, so typing doesn't search every key. */
+export function useSettled<T>(value: T, ms = 400): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return settled;
 }
 
 /** How many niches or categories show before "more". */
@@ -55,25 +65,28 @@ export function ChipPicker({
   className,
 }: {
   options: { id: string; label: string }[];
-  value?: string | null;
-  onPick: (id: string | null) => void;
+  /** The picked option, or several when more than one can be picked. */
+  value?: string | string[] | null;
+  /** Called with the option tapped and whether it's now picked. */
+  onPick: (id: string | null, on?: boolean) => void;
   noun: string;
   className?: string;
 }) {
   const [all, setAll] = useState(false);
-  // A picked option stays visible even when it's one of the "more".
-  const shown = all ? options : options.filter((o, i) => i < FEW || o.id === value);
+  const picked = new Set(Array.isArray(value) ? value : value ? [value] : []);
+  // Picked options stay visible even when they're among the "more".
+  const shown = all ? options : options.filter((o, i) => i < FEW || picked.has(o.id));
   const hidden = options.length - shown.length;
   return (
     <div className={cn("flex flex-wrap gap-1.5", className)} role="group" aria-label={`Pick a ${noun}`}>
       {shown.map((o) => {
-        const on = o.id === value;
+        const on = picked.has(o.id);
         return (
           <button
             key={o.id}
             type="button"
             aria-pressed={on}
-            onClick={() => onPick(on ? null : o.id)}
+            onClick={() => (Array.isArray(value) ? onPick(o.id, !on) : onPick(on ? null : o.id, !on))}
             className={cn(
               "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
               on ? "border-accent bg-accent text-white" : "border-line-strong bg-surface hover:border-accent/60 hover:text-fg",
@@ -107,6 +120,7 @@ const COPY = {
 export function ExplorePopover({ kind, children }: { kind: ExploreKind; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
   const navigate = useNavigate();
   const niches = useNiches();
   const cats = useCategories();
@@ -129,17 +143,32 @@ export function ExplorePopover({ kind, children }: { kind: ExploreKind; children
           className="relative mt-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (q.trim()) go({ q: q.trim() });
+            if (q.trim() || picked.length) go({ ...(q.trim() ? { q: q.trim() } : {}), ...(picked.length ? { niche: picked.join(",") } : {}) });
           }}
         >
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={c.placeholder} aria-label={`Search ${kind}`} maxLength={80} className="pl-9" autoFocus />
         </form>
-        <p className="mb-2 mt-4 text-xs font-medium text-muted">{kind === "creators" ? "Or pick a niche" : "Or pick a category"}</p>
-        <ChipPicker options={options} noun={c.noun} onPick={(id) => id && go({ [c.pick]: id })} />
-        <button type="button" onClick={() => go({})} className="mt-4 text-[13px] font-medium text-accent hover:underline">
-          See all {kind} →
-        </button>
+        <p className="mb-2 mt-4 text-xs font-medium text-muted">{kind === "creators" ? "Or pick one or more niches" : "Or pick a category"}</p>
+        {kind === "creators" ? (
+          <ChipPicker options={options} noun={c.noun} value={picked} onPick={(id, on) => id && setPicked((p) => (on ? [...p, id] : p.filter((x) => x !== id)))} />
+        ) : (
+          <ChipPicker options={options} noun={c.noun} onPick={(id) => id && go({ [c.pick]: id })} />
+        )}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button type="button" onClick={() => go({})} className="text-[13px] font-medium text-accent hover:underline">
+            See all {kind} →
+          </button>
+          {kind === "creators" && (q.trim() || picked.length > 0) && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => go({ ...(q.trim() ? { q: q.trim() } : {}), ...(picked.length ? { niche: picked.join(",") } : {}) })}
+            >
+              <Search aria-hidden /> Search
+            </Button>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -193,3 +222,117 @@ export function countSearch(kind: ExploreKind): number {
   }
 }
 export const SEARCHES_BEFORE_PROMPT = 4;
+
+/* ---------- search-engine pieces shared by /creators and /brands ---------- */
+
+/** A wide, rounded search bar with its button attached, like a web search engine's. */
+export function SearchBox({
+  value,
+  onChange,
+  onSubmit,
+  placeholder,
+  label,
+  big = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  placeholder: string;
+  label: string;
+  big?: boolean;
+}) {
+  return (
+    <form
+      role="search"
+      className="flex w-full items-stretch"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        maxLength={80}
+        autoFocus={big}
+        className={cn(
+          "min-w-0 flex-1 rounded-l-full border border-r-0 border-line-strong bg-[var(--surface-solid)] px-5 text-fg outline-none transition-colors placeholder:text-muted focus:border-accent",
+          big ? "h-14 text-base" : "h-11 text-[15px]",
+        )}
+      />
+      <button
+        type="submit"
+        aria-label="Search"
+        className={cn(
+          "grid shrink-0 place-items-center rounded-r-full border border-line-strong bg-surface-2 text-fg transition-colors hover:bg-surface-3",
+          big ? "h-14 w-16" : "h-11 w-14",
+        )}
+      >
+        <Search className="size-5" aria-hidden />
+      </button>
+    </form>
+  );
+}
+
+/** One search result: a picture on the left, then title, a meta line and details. */
+export function ResultRow({
+  to,
+  href,
+  media,
+  title,
+  meta,
+  children,
+  label,
+}: {
+  to?: string;
+  href?: string;
+  media: ReactNode;
+  title: ReactNode;
+  meta: ReactNode;
+  children?: ReactNode;
+  label?: string;
+}) {
+  const body = (
+    <>
+      <span className="shrink-0">{media}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-[17px] font-medium leading-snug group-hover:text-accent">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted">{meta}</span>
+        {children && <span className="mt-2 block space-y-1.5 text-[13px] text-fg-2">{children}</span>}
+      </span>
+      {href ? <ExternalLink className="mt-1 size-4 shrink-0 text-muted" aria-hidden /> : <ArrowRight className="mt-1 size-4 shrink-0 text-muted" aria-hidden />}
+    </>
+  );
+  const cls = "group flex items-start gap-4 rounded-2xl px-2 py-4 transition-colors hover:bg-surface-2/60 sm:px-3";
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} aria-label={label}>
+      {body}
+    </a>
+  ) : (
+    <Link to={to ?? "#"} className={cls}>
+      {body}
+    </Link>
+  );
+}
+
+/** The row at the end of a visitor's results: more is there for members. */
+export function MoreRow({ text, onClick }: { text: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-2 flex w-full items-center gap-4 rounded-2xl border border-dashed border-line-strong px-4 py-4 text-left transition-colors hover:border-accent/60"
+    >
+      <span className="grid size-12 shrink-0 place-items-center rounded-full bg-accent-soft">
+        <Lock className="size-5 text-accent" aria-hidden />
+      </span>
+      <span>
+        <span className="block font-medium">{text}</span>
+        <span className="block text-xs text-muted">Want to know more? Log in or sign up</span>
+      </span>
+    </button>
+  );
+}
