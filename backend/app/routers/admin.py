@@ -6,12 +6,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, StringConstraints
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field, StringConstraints
 
 from ..db import get_db
 from ..services import admin as adm
 from ..services import auth as au
+from ..services import brand_data as bd
 from ..services import directory as dr
 
 
@@ -93,6 +94,34 @@ class AdminUnclaimedIn(dr.UnclaimedIn):
 def add_unclaimed(body: AdminUnclaimedIn, admin: dict = Depends(require_admin)):
     """List a brand that isn't on DealMeet AI: public name, category and public handles only."""
     return dr.add_unclaimed(body, admin, body.reason)
+
+
+class ImportIn(BaseModel):
+    csv: str = Field(min_length=1, max_length=200_000)
+    dry_run: bool = True
+    reason: Reason | None = None
+
+
+@router.post("/brands/import")
+def import_brands(body: ImportIn, admin: dict = Depends(require_admin)):
+    """List many brands at once from a CSV of public facts (services/brand_data.py).
+    A dry run checks every row and saves nothing."""
+    if not body.dry_run and not body.reason:
+        raise HTTPException(422, "Give a reason for the import. It's saved in the audit log.")
+    return bd.run_import(body.csv, admin, body.reason or "", body.dry_run)
+
+
+@router.get("/brand-invites")
+def brand_invites(min_saves: int = Query(default=bd.INVITE_MIN_SAVES, ge=1, le=1000)):
+    """Unclaimed brands that creators with connected accounts saved, and whether each can be invited now."""
+    return bd.invite_candidates(min_saves)
+
+
+@router.post("/brand-invites/{brand_id}")
+def send_brand_invite(brand_id: str, body: ReasonIn, request: Request, admin: dict = Depends(require_admin)):
+    """Emails the brand's public contact address once: who's interested, a claim link and
+    an unsubscribe link. At most once every 30 days per brand."""
+    return bd.send_invite(brand_id, admin, body.reason, str(request.base_url))
 
 
 @router.get("/claims")

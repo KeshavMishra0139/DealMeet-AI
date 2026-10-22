@@ -103,6 +103,15 @@ class Settings:
     tee_trust_root: str | None = None  # PEM text, or a path to the PEM file
     tee_measurements: str | None = None  # JSON: {"0": "<PCR0 hex>", "1": "...", "2": "..."}
     tee_max_age_s: int = 300
+    # Outgoing email over SMTP (services/email.py): any provider with an SMTP endpoint.
+    # Without a host and sender, nothing is sent and callers say email isn't set up.
+    smtp_host: str | None = None
+    smtp_port: int = 587  # 587: STARTTLS; 465: TLS from the start
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    email_from: str | None = None  # e.g. "DealMeet AI <hello@yourdomain.com>"
+    # Upgrade to TLS on ports other than 465. Only a local mail catcher (Mailpit) needs it off.
+    smtp_starttls: bool = True
 
     @property
     def ai_provider(self) -> str | None:
@@ -163,6 +172,12 @@ def get_settings() -> Settings:
         tee_trust_root=_env("TEE_TRUST_ROOT"),
         tee_measurements=_env("TEE_MEASUREMENTS"),
         tee_max_age_s=int(_env("TEE_ATTESTATION_MAX_AGE_S", "300") or 300),
+        smtp_host=_env("SMTP_HOST"),
+        smtp_port=int(_env("SMTP_PORT", "587") or 587),
+        smtp_user=_env("SMTP_USER"),
+        smtp_password=_env("SMTP_PASSWORD"),
+        email_from=_env("EMAIL_FROM"),
+        smtp_starttls=(_env("SMTP_STARTTLS", "1") or "1").strip().lower() in ("1", "true", "yes", "on"),
     )
 
 

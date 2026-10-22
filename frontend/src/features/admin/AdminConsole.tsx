@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, AlertTriangle, Building2, Flag, LogOut, Megaphone, ScrollText, ShieldAlert, Users } from "lucide-react";
+import { Activity, AlertTriangle, Building2, FileUp, Flag, LogOut, Mail, Megaphone, ScrollText, ShieldAlert, Users } from "lucide-react";
 import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -720,6 +720,12 @@ function BrandPagesTab() {
           </div>
         </form>
       </Panel>
+      <div className="lg:col-span-2">
+        <ImportPanel />
+      </div>
+      <div className="lg:col-span-2">
+        <InvitesPanel />
+      </div>
       {adding && (
         <ReasonDialog
           title={`Add ${form.name}`}
@@ -831,5 +837,202 @@ function AuditTab() {
         </ol>
       )}
     </div>
+  );
+}
+
+
+// ------------------------------------------------------------------ brand data: import and invites
+const IMPORT_COLUMNS = "name,category,website,instagram,youtube,contact_email,city,source_url";
+const IMPORT_EXAMPLE = `${IMPORT_COLUMNS}\nKumkum Tea,Beverages,https://kumkumtea.in,@kumkumtea,@KumkumTeaIN,partners@kumkumtea.in,Pune,https://kumkumtea.in/about\n`;
+
+interface ImportRow {
+  row: number;
+  name: string | null;
+  status: "ready" | "added" | "duplicate" | "removed" | "error";
+  detail?: string;
+  slug?: string;
+}
+interface ImportResult {
+  dry_run: boolean;
+  import_id: string | null;
+  counts: Partial<Record<ImportRow["status"], number>>;
+  rows: ImportRow[];
+}
+
+const STATUS_LABEL: Record<ImportRow["status"], string> = { ready: "Ready", added: "Added", duplicate: "Already listed", removed: "Removed earlier", error: "Fix this row" };
+const STATUS_TONE: Record<ImportRow["status"], "success" | "neutral" | "warn" | "danger"> = { ready: "success", added: "success", duplicate: "neutral", removed: "warn", error: "danger" };
+
+/** Many unclaimed brands at once, from public facts: checked first, saved only on confirm. */
+function ImportPanel() {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const check = useMutation({
+    mutationFn: () => adminApi<ImportResult>("/admin/brands/import", { csv: text, dry_run: true }),
+    onSuccess: setResult,
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const ready = result?.dry_run ? (result.counts.ready ?? 0) : 0;
+  return (
+    <Panel title="Import brands from a CSV" icon={<FileUp className="size-4 text-accent" aria-hidden />}>
+      <p className="text-sm text-muted">
+        Public facts only, each row with the page it came from (source_url). Pages show name, category and handles; the website, city and contact address stay
+        private. A contact email must be at the brand's own website domain. Up to 500 rows; nothing is saved until you confirm.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-surface-2">
+          <FileUp className="size-4" aria-hidden /> Choose a .csv file
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (f) {
+                setText(await f.text());
+                setResult(null);
+              }
+            }}
+          />
+        </label>
+        <a
+          href={`data:text/csv;charset=utf-8,${encodeURIComponent(IMPORT_EXAMPLE)}`}
+          download="brands-template.csv"
+          className="text-sm font-medium text-accent hover:underline"
+        >
+          Download the template
+        </a>
+      </div>
+      <Label htmlFor="import-csv" className="mt-3 block">
+        Or paste the CSV
+      </Label>
+      <Textarea
+        id="import-csv"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setResult(null);
+        }}
+        className="min-h-32 font-mono text-xs"
+        placeholder={IMPORT_COLUMNS}
+        spellCheck={false}
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => check.mutate()} loading={check.isPending} disabled={!text.trim()}>
+          Check file
+        </Button>
+        {result?.dry_run && ready > 0 && (
+          <Button variant="primary" onClick={() => setConfirming(true)}>
+            Import {ready} brand{ready === 1 ? "" : "s"}
+          </Button>
+        )}
+      </div>
+      {result && (
+        <div className="mt-4">
+          <p className="flex flex-wrap gap-2 text-sm" aria-live="polite">
+            {(Object.keys(result.counts) as ImportRow["status"][]).map((k) => (
+              <Badge key={k} size="sm" variant={STATUS_TONE[k]}>
+                {result.counts[k]} {STATUS_LABEL[k].toLowerCase()}
+              </Badge>
+            ))}
+          </p>
+          <div className="mt-2 max-h-80 overflow-auto rounded-xl border border-line">
+            <table className="w-full text-left text-[13px]">
+              <thead className="sticky top-0 bg-surface-2 text-xs text-muted">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-medium">Row</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Brand</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Result</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {result.rows.map((r) => (
+                  <tr key={r.row}>
+                    <td className="num px-3 py-2 text-muted">{r.row}</td>
+                    <td className="px-3 py-2">{r.slug ? <Link to={`/brands/${r.slug}`} className="text-accent hover:underline">{r.name}</Link> : (r.name ?? "—")}</td>
+                    <td className="px-3 py-2">
+                      <Badge size="sm" variant={STATUS_TONE[r.status]}>
+                        {STATUS_LABEL[r.status]}
+                      </Badge>
+                      {r.detail && <span className="ml-2 text-xs text-fg-2">{r.detail}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <ReasonDialog
+          title={`Import ${ready} brand${ready === 1 ? "" : "s"}`}
+          description="They're listed as unclaimed, with public basics only, until each brand claims its page. Rows with problems or duplicates are skipped."
+          confirm="Import"
+          onClose={() => setConfirming(false)}
+          run={async (reason) => setResult(await adminApi<ImportResult>("/admin/brands/import", { csv: text, dry_run: false, reason }))}
+        />
+      )}
+    </Panel>
+  );
+}
+
+interface InviteRow {
+  id: string;
+  name: string;
+  slug: string;
+  saves: number;
+  contact_email: string | null;
+  last_invite: string | null;
+  blocked: string | null;
+}
+
+/** Unclaimed brands creators want: tell them once, by email, with a claim link. */
+function InvitesPanel() {
+  const q = useQuery({ queryKey: ["admin", "brand-invites"], queryFn: () => adminApi<{ items: InviteRow[]; min_saves: number; email: boolean }>("/admin/brand-invites") });
+  const [inviting, setInviting] = useState<InviteRow | null>(null);
+  return (
+    <Panel title="Invite brands creators want" icon={<Mail className="size-4 text-accent" aria-hidden />}>
+      <p className="text-sm text-muted">
+        Unclaimed brands saved by creators with connected accounts. An invite tells the brand's public contact address how many want to work with them, with a
+        claim link and an unsubscribe link. At most once every 30 days per brand.
+      </p>
+      {q.data && !q.data.email && (
+        <p role="note" className="mt-3 rounded-xl border border-warn/40 bg-warn-soft p-3 text-sm">
+          Email isn't set up on this server (SMTP_HOST and EMAIL_FROM), so invites can't be sent yet.
+        </p>
+      )}
+      {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+      {q.data && q.data.items.length === 0 && (
+        <p className="mt-3 text-sm text-muted">No unclaimed brand has {q.data.min_saves} or more saves from creators with connected accounts yet.</p>
+      )}
+      <ul className="mt-3 space-y-2">
+        {q.data?.items.map((b) => (
+          <li key={b.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line p-3">
+            <div className="min-w-0 flex-1">
+              <Link to={`/brands/${b.slug}`} className="font-medium hover:text-accent">
+                {b.name}
+              </Link>
+              <p className="text-xs text-muted">
+                <span className="num">{b.saves}</span> saves · {b.contact_email ?? "no public contact address"}
+                {b.last_invite && ` · invited ${when(b.last_invite)}`}
+              </p>
+              {b.blocked && <p className="mt-0.5 text-xs text-fg-2">{b.blocked}</p>}
+            </div>
+            <Button size="sm" variant="outline" disabled={!!b.blocked || !q.data?.email} onClick={() => setInviting(b)}>
+              <Mail aria-hidden /> Send invite
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {inviting && (
+        <ReasonDialog
+          title={`Invite ${inviting.name}`}
+          description={`Emails ${inviting.contact_email}: ${inviting.saves} creators with connected accounts saved them, with a link to claim the page.`}
+          confirm="Send invite"
+          onClose={() => setInviting(null)}
+          run={(reason) => adminApi(`/admin/brand-invites/${inviting.id}`, { reason })}
+        />
+      )}
+    </Panel>
   );
 }

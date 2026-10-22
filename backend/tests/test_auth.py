@@ -28,6 +28,8 @@ PUBLIC = {
     ("GET", "/api/public/{handle}"),
     ("POST", "/api/public/{handle}/book"),
     ("POST", "/api/payments/razorpay/webhook"),  # proves itself with Razorpay's signature
+    ("GET", "/api/email/unsubscribe"),  # a confirmation page; the signed link is the proof
+    ("POST", "/api/email/unsubscribe"),  # opts out the address in the signed link, nothing else
     ("GET", "/api/connect/instagram/consent"),
     ("GET", "/api/connect/instagram/callback"),  # proves itself with the signed, single-use state
     ("GET", "/api/directory/brands"),  # the public brand directory

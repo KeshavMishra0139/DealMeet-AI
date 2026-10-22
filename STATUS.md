@@ -13,10 +13,10 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 
 | Check | Command | Result |
 | --- | --- | --- |
-| API tests | `make test` | 459 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
-| Copy rules on UI strings | `make test` | 5,922 strings, no promises |
+| API tests | `make test` | 550 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
+| Copy rules on UI strings | `make test` | 6,922 strings, no promises |
 | Type check | `make test` | clean |
-| Demo journeys in a browser | `make e2e` | 30 of 30 pass |
+| Demo journeys in a browser | `make e2e` | 29 of 29 pass |
 | Real accounts, demo mode off, 390 px and 1280 px | `make accounts` | 16 of 16 pass |
 | Screens at 390 px and 1440 px with axe-core, copy rules, console errors, sideways scroll | `make shots` | 98 screenshots, 0 need attention |
 | CI | `.github/workflows/test.yml` | runs `make test`, then `make e2e` and `make accounts`, on every push; passing on GitHub |
@@ -140,6 +140,11 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | --- | --- | --- |
 | Search with escaped input and a fallback, unclaimed pages, claims, removal requests, Dream Brands | Tested | `test_directory.py`; directory journey |
 | Atlas Search index | Unverified | `backend/atlas/brands_search.json`; needs an Atlas cluster |
+| CSV import of unclaimed brands: dry run, row errors, duplicates by name, website or handle, removed brands never re-added, private fields kept off pages | Tested | `test_brand_data.py`; checked in a browser at 1440 px, axe clean |
+| Claim with an email at the brand's own domain: free mail and shared hosts refused, hashed 6-digit code, 15-minute expiry, 5 tries | Tested | `test_brand_data.py` with a fake SMTP server; checked in a browser at 390 px against a local SMTP catcher, axe clean |
+| Invites to unclaimed brands creators want, once per 30 days, with a confirm-then-unsubscribe page and one-click unsubscribe | Tested | `test_brand_data.py` with a fake SMTP server |
+| Sending through a real SMTP provider | Unverified | Needs `SMTP_HOST` and a sending domain with SPF and DKIM |
+| YouTube numbers on brand pages, refreshed after 7 days, hidden after 30 | Unverified | `test_brand_data.py` with a fake YouTube API; needs `YOUTUBE_API_KEY` |
 
 ## 14. Fan Proof, AI Pitch Builder and Brand Fan Inbox
 

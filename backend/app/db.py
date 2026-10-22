@@ -60,6 +60,8 @@ COLLECTIONS = [
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
 # accounts (and their sessions) and never touches the audit log.
 ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit"]
+# Kept through demo resets too: an address that opted out stays opted out.
+EMAIL_COLLECTIONS = ["email_log", "email_optouts", "app_secrets", "claim_codes"]
 
 
 class DatabaseNotConfigured(RuntimeError):
@@ -144,6 +146,12 @@ def ensure_indexes(db) -> None:
     db.sessions.create_index("user_id")
     db.login_failures.create_index([("email", 1), ("at", 1)])
     db.login_codes.create_index("expires")
+    db.email_log.create_index([("to", 1), ("ts", -1)])
+    db.claim_codes.create_index("expires")
+    # Brand data (services/brand_data.py): duplicate checks on import, invites.
+    db.brands.create_index("website_host")
+    db.brands.create_index("public_handles.instagram")
+    db.brands.create_index("public_handles.youtube")
     db.audit.create_index([("ts", -1)])
     db.audit.create_index("user_id")
     db.creators.create_index("handle", unique=True, partialFilterExpression={"handle": text})

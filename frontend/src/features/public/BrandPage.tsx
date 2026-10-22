@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Building2, ExternalLink, Flag, Globe, Heart, KeyRound, Megaphone, Send, Users } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Building2, ExternalLink, Flag, Globe, Heart, KeyRound, MailCheck, Megaphone, Send, Users, Youtube } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, ErrorState } from "@/components/shared/Bits";
 import { ReportButton } from "@/components/shared/ReportButton";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { FieldHint, Input, Label, Skeleton, Switch, Textarea } from "@/components/ui/form";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
 import { api, post } from "@/lib/api";
-import { deliverable, shortDate } from "@/lib/format";
+import { count, deliverable, shortDate } from "@/lib/format";
 import { hasDemoSession, useSession, type Role } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import type { BrandCard } from "./Brands";
@@ -24,7 +24,20 @@ interface Page extends BrandCard {
   website?: string | null;
   campaigns?: { id: string; title: string; type: string; deadline: string | null; budget: string | null; deliverables: { kind: string; count: number }[] }[];
   dream: { connected: number; others: number; names?: { id: string; name: string; handle: string }[] };
-  viewer: { role?: "creator" | "brand"; creator_id?: string; saved?: boolean; show_name?: boolean; can_claim?: boolean; claim?: string | null };
+  /** The official channel's public numbers (YouTube Data API), at most 30 days old. */
+  youtube?: { title: string | null; subscribers: number | null; total_views: number; video_count: number; source: string; fetched_at: string } | null;
+  /** Claimed by proving an email at this domain. */
+  domain_verified?: string | null;
+  viewer: {
+    role?: "creator" | "brand";
+    creator_id?: string;
+    saved?: boolean;
+    show_name?: boolean;
+    can_claim?: boolean;
+    claim?: string | null;
+    /** The brand's own website domain: claim at once with an email there. */
+    verify_domain?: string | null;
+  };
 }
 
 /** A brand's page: open campaigns, or for an unclaimed brand only its public basics. */
@@ -79,6 +92,11 @@ export default function BrandPage() {
                   </h1>
                   <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
                     {p.category} {!p.claimed && <Badge size="sm" variant="outline">Unclaimed</Badge>} <SourceBadge source={p.source} />
+                    {p.domain_verified && (
+                      <Badge size="sm" variant="success">
+                        <MailCheck aria-hidden /> Verified email at {p.domain_verified}
+                      </Badge>
+                    )}
                   </p>
                 </div>
                 {p.viewer.role === "creator" && p.viewer.creator_id && (
@@ -108,6 +126,15 @@ export default function BrandPage() {
                 {p.public_handles?.instagram && <Badge size="sm">Instagram {p.public_handles.instagram}</Badge>}
                 {p.public_handles?.youtube && <Badge size="sm">YouTube {p.public_handles.youtube}</Badge>}
               </div>
+              {p.youtube && (
+                <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-fg-2">
+                  <Youtube className="size-4 text-[#ff0033]" aria-hidden />
+                  {p.youtube.subscribers != null && <span className="num">{count(p.youtube.subscribers)} subscribers</span>}
+                  <span className="num">{count(p.youtube.video_count)} videos</span>
+                  <span className="num">{count(p.youtube.total_views)} views</span>
+                  <SourceBadge source={p.youtube.source} fetchedAt={p.youtube.fetched_at} />
+                </p>
+              )}
 
               <section aria-labelledby="dream" className="mt-6 rounded-xl bg-surface-2 p-4">
                 <h2 id="dream" className="flex items-center gap-1.5 text-sm font-semibold">
@@ -218,6 +245,8 @@ function ClaimButton({ page }: { page: Page }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const domain = page.viewer.verify_domain;
+  const [byAdmin, setByAdmin] = useState(!domain);
   const claim = useMutation({
     mutationFn: () => api<{ status: string }>(`/directory/brands/${page.slug}/claim`, { method: "POST", json: { message }, role: "brand" }),
     onSuccess: () => {
@@ -235,25 +264,104 @@ function ClaimButton({ page }: { page: Page }) {
         <KeyRound aria-hidden /> Claim this page
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent title={`Claim ${page.name}`} description="Tell us how you're connected to this brand. An admin approves claims; nothing changes until then.">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              claim.mutate();
-            }}
-          >
-            <Label htmlFor="claim-msg">How you're connected</Label>
-            <Textarea id="claim-msg" value={message} onChange={(e) => setMessage(e.target.value)} minLength={10} maxLength={600} required />
-            <FieldHint>For example, your role and a work email on the brand's domain.</FieldHint>
-            <div className="mt-4 flex justify-end">
-              <Button type="submit" variant="primary" loading={claim.isPending} disabled={message.trim().length < 10}>
-                Send claim
-              </Button>
-            </div>
-          </form>
+        <DialogContent
+          title={`Claim ${page.name}`}
+          description={
+            byAdmin
+              ? "Tell us how you're connected to this brand. An admin approves claims; nothing changes until then."
+              : `Prove you work at ${page.name} with an email at ${domain}, and the page is yours straight away.`
+          }
+        >
+          {!byAdmin && domain ? (
+            <DomainClaim page={page} domain={domain} onDone={() => setOpen(false)} />
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                claim.mutate();
+              }}
+            >
+              <Label htmlFor="claim-msg">How you're connected</Label>
+              <Textarea id="claim-msg" value={message} onChange={(e) => setMessage(e.target.value)} minLength={10} maxLength={600} required />
+              <FieldHint>For example, your role and a work email on the brand's domain.</FieldHint>
+              <div className="mt-4 flex justify-end">
+                <Button type="submit" variant="primary" loading={claim.isPending} disabled={message.trim().length < 10}>
+                  Send claim
+                </Button>
+              </div>
+            </form>
+          )}
+          {domain && (
+            <button type="button" onClick={() => setByAdmin(!byAdmin)} className="mt-4 text-xs font-medium text-accent hover:underline">
+              {byAdmin ? `I have an email at ${domain}` : `No email at ${domain}? Send a claim for an admin to check`}
+            </button>
+          )}
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** A code to an email at the brand's own domain; the right code hands the page over. */
+function DomainClaim({ page, domain, onDone }: { page: Page; domain: string; onDone: () => void }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const send = useMutation({
+    mutationFn: () => api<{ to: string }>(`/directory/brands/${page.slug}/claim/code`, { method: "POST", json: { email }, role: "brand" }),
+    onSuccess: (r) => setSentTo(r.to),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const verify = useMutation({
+    mutationFn: () => api<{ status: string }>(`/directory/brands/${page.slug}/claim/verify`, { method: "POST", json: { code }, role: "brand" }),
+    onSuccess: async () => {
+      onDone();
+      await qc.invalidateQueries({ queryKey: ["session"] });
+      await qc.invalidateQueries({ queryKey: ["brand-page"] });
+      toast.success(`You manage ${page.name} now`, { description: "Add your details and post your first campaign." });
+      navigate("/brand/profile");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  if (!sentTo)
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send.mutate();
+        }}
+      >
+        <Label htmlFor="claim-email">Your work email at {domain}</Label>
+        <Input id="claim-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} required />
+        <FieldHint>We email a 6-digit code to it. Free addresses like Gmail don't count.</FieldHint>
+        <div className="mt-4 flex justify-end">
+          <Button type="submit" variant="primary" loading={send.isPending} disabled={!email.trim().toLowerCase().endsWith(domain)}>
+            Email me a code
+          </Button>
+        </div>
+      </form>
+    );
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        verify.mutate();
+      }}
+    >
+      <Label htmlFor="claim-code">Code sent to {sentTo}</Label>
+      <Input id="claim-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} maxLength={6} required />
+      <FieldHint>It works for 15 minutes.</FieldHint>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={() => send.mutate()} loading={send.isPending}>
+          Send a new code
+        </Button>
+        <Button type="submit" variant="primary" loading={verify.isPending} disabled={code.length !== 6}>
+          Verify and claim
+        </Button>
+      </div>
+    </form>
   );
 }
 

@@ -10,8 +10,12 @@ category and public handles, and say plainly that they aren't on DealMeet AI.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import re
+import secrets
+import time
 import uuid
 
 from fastapi import HTTPException
@@ -22,6 +26,7 @@ from ..config import get_settings, now_iso
 from ..db import db_mode, get_db
 from ..seed.catalog import LANGS, NICHES
 from . import auth as au
+from . import brand_data, mailer
 from . import fan_proof
 from . import public_search as ps
 from .brand_profile import unique_slug
@@ -315,15 +320,23 @@ def page(slug: str, user: dict | None) -> dict:
     claimed = b.get("claimed", True)
     live = [x for x in db.listings.find({"owner_id": b["_id"], "status": {"$in": ["live", "open"]}})] if claimed else []
     d = {**card(b, len(live)), "dream": dream_counts(b["_id"], with_names=owner), "owner": owner}
+    d["youtube"] = brand_data.youtube_for_page(b)
     if claimed:
         d.update({"description": b.get("description") or "", "website": b.get("website"), "campaigns": [_campaign_summary(x) for x in live]})
+        d["domain_verified"] = (b.get("verification") or {}).get("domain")
     viewer: dict = {}
     if user and user.get("creator_id"):
         s = db.wishlists.find_one({"_id": f"wl_{user['creator_id']}_{b['_id']}"})
         viewer = {"role": "creator", "creator_id": user["creator_id"], "saved": bool(s), "show_name": bool(s and s.get("show_name"))}
     elif user and user.get("role") == "brand" and not claimed:
         c = db.claim_requests.find_one({"brand_id": b["_id"], "user_id": user["_id"]})
-        viewer = {"role": "brand", "can_claim": not _has_brand(user), "claim": c["status"] if c else None}
+        viewer = {
+            "role": "brand",
+            "can_claim": not _has_brand(user),
+            "claim": c["status"] if c else None,
+            # Claim straight away by proving an email at the brand's own website domain.
+            "verify_domain": brand_data.domain_claim_host(b) if mailer.configured() else None,
+        }
     d["viewer"] = viewer
     return d
 
@@ -364,20 +377,107 @@ def decide_claim(claim_id: str, approve: bool, admin: dict, reason: str) -> dict
         raise HTTPException(404, "Claim not found")
     if c["status"] != "pending":
         raise HTTPException(409, f"This claim was already {c['status']}.")
-    b = db.brands.find_one({"_id": c["brand_id"]})
     if approve:
-        u = db.users.find_one({"_id": c["user_id"]})
-        if not b or b.get("claimed", True):
-            raise HTTPException(409, "This page is already managed by a brand.")
-        if not u or u.get("role") != "brand" or _has_brand(u):
-            raise HTTPException(409, "That account can't take this page (it already manages a brand, or isn't a brand account).")
-        db.brands.update_one({"_id": b["_id"]}, {"$set": {"claimed": True, "claimed_at": now_iso(), "owner_user_id": u["_id"],
-                                                          "target": b.get("target") or {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []}}})
-        au.link_profile(u, b["_id"])
-        db.claim_requests.update_many({"brand_id": b["_id"], "status": "pending", "_id": {"$ne": claim_id}}, {"$set": {"status": "rejected", "decided_at": now_iso()}})
+        _hand_over(c, admin["_id"])
     db.claim_requests.update_one({"_id": claim_id}, {"$set": {"status": "approved" if approve else "rejected", "decided_at": now_iso(), "decided_by": admin["_id"], "decision_reason": reason}})
     au.audit("brand_claim_" + ("approved" if approve else "rejected"), admin["_id"], "admin", brand_id=c["brand_id"], claim_id=claim_id, reason=reason)
     return db.claim_requests.find_one({"_id": claim_id}, {"user_email": 0})
+
+
+def _hand_over(c: dict, decided_by: str) -> None:
+    """Gives the claimed page to the claim's account, and turns down other pending claims.
+    The same step whether an admin approved it or the claimer proved a domain email."""
+    db = get_db()
+    b = db.brands.find_one({"_id": c["brand_id"]})
+    u = db.users.find_one({"_id": c["user_id"]})
+    if not b or b.get("claimed", True):
+        raise HTTPException(409, "This page is already managed by a brand.")
+    if not u or u.get("role") != "brand" or _has_brand(u):
+        raise HTTPException(409, "That account can't take this page (it already manages a brand, or isn't a brand account).")
+    db.brands.update_one({"_id": b["_id"]}, {"$set": {"claimed": True, "claimed_at": now_iso(), "owner_user_id": u["_id"],
+                                                      "target": b.get("target") or {"ages": [], "gender": "any", "regions": [], "cities": [], "languages": []}}})
+    au.link_profile(u, b["_id"])
+    db.claim_requests.update_many({"brand_id": b["_id"], "status": "pending", "_id": {"$ne": c["_id"]}},
+                                  {"$set": {"status": "rejected", "decided_at": now_iso(), "decided_by": decided_by}})
+
+
+# ------------------------------------------------------------------ claim by domain email
+CODE_TTL = 15 * 60
+CODE_ATTEMPTS = 5
+
+
+def _code_hash(code_id: str, code: str) -> str:
+    return hashlib.sha256(f"{code_id}:{code}".encode()).hexdigest()
+
+
+def _claimable(slug: str, user: dict) -> tuple[dict, str]:
+    """The unclaimed page and the domain to prove, or a clear refusal."""
+    au.require_role(user, "brand")
+    b = get_db().brands.find_one({"$and": [{"slug": slug.lower()}, VISIBLE]})
+    if not b:
+        raise HTTPException(404, "Brand not found")
+    if b.get("claimed", True):
+        raise HTTPException(409, "This page is already managed by its brand.")
+    if _has_brand(user):
+        raise HTTPException(409, "This account already manages a brand. Claim with the account that should own this page.")
+    host = brand_data.domain_claim_host(b)
+    if not host:
+        raise HTTPException(409, "This page has no website of its own to check an email against. Send a claim instead; an admin checks it.")
+    return b, host
+
+
+def send_claim_code(slug: str, user: dict, email: str) -> dict:
+    """Emails a 6-digit code to an address at the brand's website domain."""
+    b, host = _claimable(slug, user)
+    if not brand_data.email_matches_site(email, host):
+        raise HTTPException(422, f"Use an email at {host}, the brand's own website.")
+    if not mailer.configured():
+        raise mailer.EmailNotConfigured()
+    code = f"{secrets.randbelow(10**6):06d}"
+    code_id = f"cc_{b['_id']}_{user['_id']}"
+    addr = mailer.normalise(email)
+    mailer.send(
+        addr,
+        f"Your code to claim {b['name']} on DealMeet AI",
+        f"Your code to claim {b['name']} on DealMeet AI is {code}.\n\nIt works for 15 minutes. If you didn't ask for it, you can ignore this email: nothing changes.\n\nDealMeet AI\n",
+        kind="claim_code",
+    )
+    get_db().claim_codes.replace_one(
+        {"_id": code_id},
+        {"_id": code_id, "brand_id": b["_id"], "user_id": user["_id"], "email": addr, "code_hash": _code_hash(code_id, code),
+         "expires": time.time() + CODE_TTL, "attempts": 0},
+        upsert=True,
+    )
+    au.audit("brand_claim_code_sent", user["_id"], "brand", brand_id=b["_id"], domain=host)
+    local, _, domain = addr.partition("@")
+    return {"sent": True, "to": f"{local[:2]}…@{domain}"}
+
+
+def confirm_claim_code(slug: str, user: dict, code: str) -> dict:
+    """A right code hands the page over straight away: proof of an inbox at the brand's
+    own domain stands in for an admin's check."""
+    b, host = _claimable(slug, user)
+    db = get_db()
+    code_id = f"cc_{b['_id']}_{user['_id']}"
+    doc = db.claim_codes.find_one({"_id": code_id})
+    if not doc or doc["expires"] < time.time():
+        raise HTTPException(400, "That code expired. Ask for a new one.")
+    if doc["attempts"] >= CODE_ATTEMPTS:
+        raise HTTPException(429, "Too many wrong codes. Ask for a new one.")
+    if not hmac.compare_digest(doc["code_hash"], _code_hash(code_id, code.strip())):
+        db.claim_codes.update_one({"_id": code_id}, {"$inc": {"attempts": 1}})
+        raise HTTPException(400, "That code isn't right. Check the email and try again.")
+    db.claim_codes.delete_one({"_id": code_id})
+    cid = f"cl_{b['_id']}_{user['_id']}"
+    reason = f"Proved an email at {host}"
+    claim = {"_id": cid, "brand_id": b["_id"], "brand_name": b["name"], "user_id": user["_id"], "user_name": user.get("name"),
+             "user_email": user.get("email"), "message": reason, "status": "pending", "at": now_iso(), "verified_email": doc["email"]}
+    db.claim_requests.replace_one({"_id": cid}, claim, upsert=True)
+    _hand_over(claim, "domain_email")
+    db.claim_requests.update_one({"_id": cid}, {"$set": {"status": "approved", "decided_at": now_iso(), "decided_by": "domain_email", "decision_reason": reason}})
+    db.brands.update_one({"_id": b["_id"]}, {"$set": {"verification": {"method": "domain_email", "domain": host, "at": now_iso()}}})
+    au.audit("brand_claim_approved", user["_id"], "brand", brand_id=b["_id"], claim_id=cid, via="domain_email", domain=host)
+    return {"status": "approved", "brand_id": b["_id"], "slug": b["slug"]}
 
 
 def request_removal(slug: str, reason: str, contact: str | None) -> dict:

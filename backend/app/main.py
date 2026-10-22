@@ -116,7 +116,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 # token: a cross-site form can't add a custom header, so a session cookie alone is never
 # enough to change anything (CSRF). Provider webhooks prove themselves with a signature.
 CSRF_HEADER = "x-requested-with"
-CSRF_EXEMPT = ("/api/payments/razorpay/webhook",)
+# The unsubscribe link proves itself with its signature (and mail apps' one-click POST
+# can't send a custom header).
+CSRF_EXEMPT = ("/api/payments/razorpay/webhook", "/api/email/unsubscribe")
 
 
 @app.middleware("http")

@@ -73,6 +73,27 @@ def claim(slug: str, body: ClaimIn, user: dict = Depends(au.current_user)):
     return dr.request_claim(slug, user, body.message.strip())
 
 
+class ClaimCodeIn(BaseModel):
+    email: str = Field(min_length=5, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@router.post("/directory/brands/{slug}/claim/code")
+def claim_code(slug: str, body: ClaimCodeIn, user: dict = Depends(au.current_user)):
+    """Emails a code to an address at the brand's own website domain."""
+    ratelimit.enforce(f"claimcode:{user['_id']}", 5, 3600, "Too many codes asked for. Try again in an hour.")
+    return dr.send_claim_code(slug, user, body.email)
+
+
+class ClaimVerifyIn(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
+
+
+@router.post("/directory/brands/{slug}/claim/verify")
+def claim_verify(slug: str, body: ClaimVerifyIn, user: dict = Depends(au.current_user)):
+    """The right code hands the page over without waiting for an admin."""
+    return dr.confirm_claim_code(slug, user, body.code)
+
+
 class RemovalIn(BaseModel):
     reason: str = Field(min_length=10, max_length=600)
     contact: str | None = Field(default=None, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
