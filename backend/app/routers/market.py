@@ -13,6 +13,7 @@ from ..engines.opportunities import matched
 from ..services import cache
 from ..services import campaigns as camp
 from ..services import consent as cs
+from ..services import limits
 from ..services import social
 from ..services.auth import own_creator
 from ..services.creator_ctx import load_creator
@@ -90,8 +91,8 @@ class CollabIn(BaseModel):
 @router.post("/collabs")
 def post_collab(creator_id: str, body: CollabIn):
     c = load_creator(creator_id)
-    if get_db().listings.count_documents({"owner_id": creator_id}) >= 20:
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
+    limits.demo_cap(get_db().listings.count_documents({"owner_id": creator_id}), 20)
+    limits.daily(f"collab:{creator_id}", 20, "posted 20 collabs")
     lid = f"lst_cc_{uuid.uuid4().hex[:8]}"
     get_db().listings.insert_one(
         {

@@ -12,6 +12,7 @@ from ..db import get_db
 from ..engines.fair_price import fair_price
 from ..services import auth as au
 from ..services import branding, creator_page, ratelimit
+from ..services import limits
 from ..services import media_kit as mk
 from ..services.creator_ctx import load_creator
 
@@ -155,11 +156,10 @@ def book(handle: str, body: BookIn, user: dict | None = Depends(au.optional_user
         raise HTTPException(403, "Sign in with a brand account to book a creator.")
     if not user and not get_settings().demo_mode:
         raise HTTPException(401, "Sign in with a brand account to book a creator.")
-    if (
-        db.deals.count_documents({"creator_id": c["_id"], "channel": "link_in_bio"}) >= 30
-        or db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50
-    ):
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
+    limits.demo_cap(db.deals.count_documents({"creator_id": c["_id"], "channel": "link_in_bio"}), 30)
+    limits.demo_cap(db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}), 50)
+    if user:
+        limits.daily(f"booking:{user['_id']}", 20, "sent 20 bookings")
     guest = False
     if user and user.get("brand_id") and db.brands.count_documents({"_id": user["brand_id"]}):
         bid = user["brand_id"]

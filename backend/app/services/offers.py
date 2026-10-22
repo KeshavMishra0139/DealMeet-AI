@@ -16,6 +16,7 @@ from . import auth as au
 from . import campaigns as camp
 from . import consent as cs
 from . import contracts
+from . import limits
 
 CLOSED_STAGES = ("paid", "declined", "cancelled", "expired")
 
@@ -36,8 +37,8 @@ def create_offer(brand: dict, creator: dict, listing: dict | None, amount: int, 
         camp.require_live(listing, "taking offers")
         if open_offer(brand["_id"], creator["_id"], listing["_id"]):
             raise HTTPException(409, f"You already have an open offer to {creator['name']} for this campaign.")
-    if db.deals.count_documents({"brand_id": brand["_id"]}) >= 50:
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
+    limits.demo_cap(db.deals.count_documents({"brand_id": brand["_id"]}), 50)
+    limits.daily(f"offer:{brand['_id']}", 100, "sent 100 offers")
     terms = {k: listing.get(k) for k in ("deliverables", "usage_rights_days", "exclusivity_days")} if listing else {"deliverables": [{"kind": "reel", "count": 1}]}
     fp = fair_price(creator, brand, terms, with_model=False)
     did = f"dl_{uuid.uuid4().hex[:10]}"

@@ -24,6 +24,7 @@ from ..services import collectives
 from ..services import consent as cs
 from ..services import creator_search
 from ..services import fan_proof, offers, payments, tee
+from ..services import limits
 from ..services.deals import auto_release_due, sweep
 from ..services.views import audience_stage
 
@@ -263,8 +264,8 @@ def _campaign_view(x: dict, user: dict) -> dict:
 def create_campaign(brand_id: str, body: CampaignIn, user: dict = Depends(au.own_brand)):
     """Creates a draft. Creators don't see it until it's published."""
     _brand(brand_id)
-    if get_db().listings.count_documents({"owner_id": brand_id}) >= 20:
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
+    limits.demo_cap(get_db().listings.count_documents({"owner_id": brand_id}), 20)
+    limits.daily(f"campaign:{brand_id}", 30, "started 30 campaigns")
     lid = f"lst_{brand_id[3:]}_{uuid.uuid4().hex[:6]}"
     base = {
         "_id": lid,
@@ -596,8 +597,7 @@ def create_brand(body: BrandIn, user: dict = Depends(au.current_user)):
     db = get_db()
     if user.get("brand_id") and db.brands.count_documents({"_id": user["brand_id"]}):
         raise HTTPException(409, "This account already has a brand profile.")
-    if db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}) >= 50:
-        raise HTTPException(429, "This shared demo is full. It resets soon; please try again later.")
+    limits.demo_cap(db.brands.count_documents({"_id": {"$regex": "^br_(new|guest)_"}}), 50)
     bid = f"br_new_{uuid.uuid4().hex[:6]}"
     regions = sorted({CITIES[c][1] for c in body.cities if c in CITIES}) or ["North", "South", "East", "West", "Central", "Northeast"]
     db.brands.insert_one(
