@@ -14,6 +14,8 @@ Logs are kept for a year, then removed:
   CERT-In directions (April 2022) ask service providers to keep such logs for at least
   180 days.
 - the email log (who was emailed what kind of message; never the body).
+- data deletion confirmations (code, date, outcome; nothing that identifies the person),
+  so the status page Meta links to keeps working for a year.
 
 Kept on purpose, with the reason:
 
@@ -38,6 +40,7 @@ SIGNED_OUT_SESSION_DAYS = 30
 LOGIN_FAILURE_DAYS = 1
 AUDIT_DAYS = 365
 EMAIL_LOG_DAYS = 365
+DELETION_RECORD_DAYS = 365
 EVERY_S = 6 * 3600
 
 
@@ -56,6 +59,7 @@ def sweep(now: float | None = None) -> dict[str, int]:
         "login_failures": {"at": {"$lt": now - LOGIN_FAILURE_DAYS * DAY}},
         "audit": {"ts": {"$lt": now - AUDIT_DAYS * DAY}},
         "email_log": {"ts": {"$lt": now - EMAIL_LOG_DAYS * DAY}},
+        "data_deletions": {"ts": {"$lt": now - DELETION_RECORD_DAYS * DAY}},
     }
     removed = {}
     for name, q in rules.items():

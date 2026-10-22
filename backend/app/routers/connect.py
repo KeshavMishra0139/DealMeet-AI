@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from ..config import get_settings
@@ -121,6 +121,23 @@ def disconnect(user: dict = Depends(au.current_user)):
     ig.disconnect(user, creator_id)
     au.audit("disconnect_instagram", user["_id"], user["role"])
     return instagram_data(creator_id, user)
+
+
+# Meta calls these two (App Dashboard → Instagram → API setup with Instagram login): they
+# prove themselves with the signed_request, so they need no session and no app header.
+@router.post("/connect/instagram/deauthorize")
+def instagram_deauthorize(signed_request: str = Form(max_length=4096)):
+    """Someone removed DealMeet from their Instagram apps: the token and their Instagram data go."""
+    ig.deauthorized(str(ig.parse_signed_request(signed_request)["user_id"]))
+    return {"ok": True}
+
+
+@router.post("/connect/instagram/data-deletion")
+def instagram_data_deletion(request: Request, signed_request: str = Form(max_length=4096)):
+    """A data deletion request: everything from Instagram is deleted now. Meta shows the
+    person the confirmation code and the status page."""
+    code = ig.deletion_requested(str(ig.parse_signed_request(signed_request)["user_id"]))
+    return {"url": f"{_frontend(request)}/api/data-deletion?code={code}", "confirmation_code": code}
 
 
 @router.get("/creators/{creator_id}/instagram")

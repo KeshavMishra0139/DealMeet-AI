@@ -33,6 +33,9 @@ PUBLIC = {
     ("POST", "/api/payments/razorpay/webhook"),  # proves itself with Razorpay's signature
     ("GET", "/api/email/unsubscribe"),  # a confirmation page; the signed link is the proof
     ("POST", "/api/email/unsubscribe"),  # opts out the address in the signed link, nothing else
+    ("POST", "/api/connect/instagram/deauthorize"),  # Meta's callback; proves itself with a signed_request
+    ("POST", "/api/connect/instagram/data-deletion"),  # Meta's callback; proves itself with a signed_request
+    ("GET", "/api/data-deletion"),  # a deletion request's status, by its random confirmation code
     ("GET", "/api/connect/instagram/consent"),
     ("GET", "/api/connect/instagram/callback"),  # proves itself with the signed, single-use state
     ("GET", "/api/directory/brands"),  # the public brand directory

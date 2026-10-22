@@ -252,3 +252,72 @@ def test_deal_post_is_checked_against_the_connected_account(client, login, insta
     v = b.post(f"/api/deals/{deal}/action", json={"action": "submit_post", "url": "https://www.instagram.com/reel/NOTMINE/"}).json()
     assert {c["label"]: c["status"] for c in v["post_check"]["checks"]}["Posted on the creator's connected account"] == "failed"
     assert any(a["id"] == "approve" for a in thalam.get(f"/api/deals/{deal}").json()["actions"])
+
+
+# ------------------------------------------------------------------ Meta's callbacks
+def _signed(payload: dict, secret: str = "secret456") -> str:
+    import base64
+    import hashlib
+    import hmac
+    import json
+
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+    sig = base64.urlsafe_b64encode(hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest()).decode().rstrip("=")
+    return f"{sig}.{body}"
+
+
+def _meta():
+    # Meta posts a form, with no session and no app header.
+    return TestClient(app)
+
+
+def test_meta_callbacks_check_the_signature(instagram, db):
+    meta = _meta()
+    forged = _signed({"algorithm": "HMAC-SHA256", "user_id": "17841400000000001"}, secret="not-the-secret")
+    assert meta.post("/api/connect/instagram/deauthorize", data={"signed_request": forged}).status_code == 403
+    assert meta.post("/api/connect/instagram/data-deletion", data={"signed_request": "garbage"}).status_code == 400
+    no_user = _signed({"algorithm": "HMAC-SHA256"})
+    assert meta.post("/api/connect/instagram/data-deletion", data={"signed_request": no_user}).status_code == 400
+    assert meta.post("/api/connect/instagram/data-deletion").status_code == 422
+
+
+def test_deauthorize_removes_the_token_and_instagram_data(client, login, instagram, db):
+    b = login("cr_b")
+    _callback(client, _start(b))
+    ig_id = db.connections.find_one({"creator_id": "cr_b", "platform": "instagram"})["ig_user_id"]
+    r = _meta().post("/api/connect/instagram/deauthorize", data={"signed_request": _signed({"algorithm": "HMAC-SHA256", "user_id": ig_id, "issued_at": 1})})
+    assert r.status_code == 200
+    assert db.connections.count_documents({"platform": "instagram"}) == 0
+    assert db.posts.count_documents({"creator_id": "cr_b", "platform": "instagram"}) == 0
+    assert db.creators.find_one({"_id": "cr_b"})["insights_connected"]["instagram"] is False
+    assert db.audit.find_one({"action": "instagram_deauthorized", "user_id": b.user["id"]})
+
+
+def test_data_deletion_deletes_unlinks_and_gives_a_status_page(client, login, instagram, db):
+    b = login("cr_b")
+    _callback(client, _start(b))
+    ig_id = db.connections.find_one({"creator_id": "cr_b", "platform": "instagram"})["ig_user_id"]
+    db.users.update_one({"_id": b.user["id"]}, {"$set": {"instagram_uid": ig_id}})
+    r = _meta().post("/api/connect/instagram/data-deletion", data={"signed_request": _signed({"algorithm": "HMAC-SHA256", "user_id": ig_id})})
+    assert r.status_code == 200
+    body = r.json()
+    code = body["confirmation_code"]
+    assert body["url"] == f"https://jodidar.test/api/data-deletion?code={code}"
+    assert db.connections.count_documents({"platform": "instagram"}) == 0
+    assert "instagram_uid" not in db.users.find_one({"_id": b.user["id"]})
+    rec = db.data_deletions.find_one({"_id": code})
+    assert rec["status"] == "completed" and rec["found"] is True and ig_id not in str(rec)
+    page = client.get("/api/data-deletion", params={"code": code})
+    assert page.status_code == 200 and "Your Instagram data was deleted" in page.text and code in page.text
+    assert client.get("/api/data-deletion", params={"code": "nope"}).status_code == 404
+
+
+def test_data_deletion_for_an_unknown_account_still_confirms(instagram, db):
+    r = _meta().post("/api/connect/instagram/data-deletion", data={"signed_request": _signed({"algorithm": "HMAC-SHA256", "user_id": "999"})})
+    assert r.status_code == 200
+    assert db.data_deletions.find_one({"_id": r.json()["confirmation_code"]})["found"] is False
+
+
+def test_meta_callbacks_say_when_instagram_isnt_set_up(db):
+    r = _meta().post("/api/connect/instagram/deauthorize", data={"signed_request": _signed({"algorithm": "HMAC-SHA256", "user_id": "1"})})
+    assert r.status_code == 503

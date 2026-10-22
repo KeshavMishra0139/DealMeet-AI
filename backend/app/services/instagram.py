@@ -16,11 +16,18 @@
   and all of it.
 - Connected reels replace the profile's sample reels, so the fair price runs on the
   creator's real views, saves and shares. The price stays an estimate.
+- Meta's callbacks (required for App Review): when someone removes the app in Instagram
+  (deauthorize), the token and the Instagram data go, as with Disconnect. A data
+  deletion request also unlinks the Instagram sign-in, and answers with a confirmation
+  code and a public status page (`/api/data-deletion?code=`). Both prove they come from
+  Meta with a signed_request signed with IG_APP_SECRET.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
+import json
 import logging
 import re
 import secrets
@@ -638,3 +645,74 @@ def check_post(deal: dict) -> dict | None:
         checks.append({"label": "The caption mentions the brand", "status": "passed" if mentioned else "failed", "detail": None if mentioned else f"No mention of {brand.get('name', 'the brand')} in the caption."})
     checks.append({"label": "Paid-partnership label added", "status": "not_checked", "detail": "Instagram's API doesn't show this label. The brand checks it on the post."})
     return {"source": SOURCE, "checked_at": checked, "checks": checks}
+
+
+# ------------------------------------------------------------------ Meta's callbacks
+def parse_signed_request(signed_request: str) -> dict:
+    """The payload of a Meta signed_request, after checking its HMAC-SHA256 signature
+    with the app secret. 400 if it's malformed, 403 if the signature is wrong."""
+    secret = get_settings().ig_app_secret
+    if not secret:
+        raise HTTPException(503, "Instagram isn't set up on this server.")
+
+    def b64(part: str) -> bytes:
+        return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
+
+    try:
+        sig_part, payload_part = signed_request.split(".", 1)
+        sig, payload = b64(sig_part), json.loads(b64(payload_part))
+    except (ValueError, TypeError):
+        raise HTTPException(400, "That signed_request isn't valid.") from None
+    if not isinstance(payload, dict) or str(payload.get("algorithm", "")).upper() != "HMAC-SHA256" or not payload.get("user_id"):
+        raise HTTPException(400, "That signed_request isn't valid.")
+    expected = hmac.new(secret.encode(), payload_part.encode(), hashlib.sha256).digest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(403, "That signed_request's signature doesn't match.")
+    return payload
+
+
+def _remove_instagram(ig_user_id: str, unlink: bool) -> dict | None:
+    """Deletes the token and the Instagram data for whichever account this Instagram
+    account belongs to; `unlink` also removes it as a way to sign in."""
+    user = account_for(ig_user_id)
+    db = get_db()
+    if user:
+        if user.get("creator_id"):
+            disconnect(user, user["creator_id"])
+        if unlink:
+            db.users.update_one({"_id": user["_id"]}, {"$unset": {"instagram_uid": ""}})
+    # Any connection left without a creator profile (never onboarded).
+    db.connections.delete_many({"platform": "instagram", "ig_user_id": ig_user_id})
+    return user
+
+
+def deauthorized(ig_user_id: str) -> None:
+    """Someone removed DealMeet from their Instagram account's apps."""
+    from . import auth as au
+
+    user = _remove_instagram(ig_user_id, unlink=False)
+    au.audit("instagram_deauthorized", user["_id"] if user else None, user.get("role") if user else None)
+
+
+def deletion_requested(ig_user_id: str) -> str:
+    """Deletes everything stored from Instagram for this account, and the sign-in link.
+    Returns the confirmation code for the status page. Nothing that identifies the
+    Instagram account is kept with the code."""
+    from . import auth as au
+
+    user = _remove_instagram(ig_user_id, unlink=True)
+    code = secrets.token_hex(8)
+    get_db().data_deletions.insert_one(
+        {
+            "_id": code,
+            "platform": "instagram",
+            "status": "completed",
+            "found": bool(user),
+            # With Instagram as the only way in, the DealMeet account can't be signed in to any more.
+            "orphaned": bool(user and not (user.get("password_hash") or user.get("firebase_uid"))),
+            "at": now_iso(),
+            "ts": time.time(),
+        }
+    )
+    au.audit("instagram_data_deleted", user["_id"] if user else None, user.get("role") if user else None, confirmation=code)
+    return code

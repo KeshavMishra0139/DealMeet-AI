@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 
 from ..ai import llm
 from ..config import get_settings, now_iso, today
-from ..db import db_mode, ping
+from ..db import db_mode, get_db, ping
 from ..services import mailer, payments, social_signin, tee
 from ..services.social import PROVIDERS
 from ..seed.catalog import CITIES, FORMATS, city_group, INCOME_TYPES, LANGS, NICHES, STAGES
@@ -76,6 +76,22 @@ def _page(title: str, body: str, form: str = "") -> str:
         "padding:10px 18px;background:#0a1b33;color:#fff;cursor:pointer}</style></head>"
         f"<body><main><h1>{escape(title)}</h1><p>{escape(body)}</p>{form}</main></body></html>"
     )
+
+
+@router.get("/data-deletion", response_class=HTMLResponse)
+def data_deletion_status(code: str = Query(default="", max_length=40)):
+    """The status page for a data deletion request (Meta links people here with their code)."""
+    doc = get_db().data_deletions.find_one({"_id": code}) if code else None
+    if not doc:
+        return HTMLResponse(_page("No deletion request with that code", "Check the code, or reply to us from the email linked to your account."), status_code=404)
+    what = "Your Instagram data was deleted" if doc.get("found") else "We had no Instagram data for that account"
+    body = (
+        f"Request {code}, {doc['at'][:10]}: {what.lower()}. That's the connection and its token, posts, insights and audience "
+        "numbers, and Instagram as a way to sign in. Deals keep the results of their post checks, which both sides rely on."
+    )
+    if doc.get("orphaned"):
+        body += " Instagram was the only way into your DealMeet account, so it can't be signed in to now. Contact us to delete it or to add another way in."
+    return HTMLResponse(_page(what, body))
 
 
 @router.get("/email/unsubscribe", response_class=HTMLResponse)

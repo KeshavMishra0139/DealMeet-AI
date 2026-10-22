@@ -123,8 +123,13 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 # enough to change anything (CSRF). Provider webhooks prove themselves with a signature.
 CSRF_HEADER = "x-requested-with"
 # The unsubscribe link proves itself with its signature (and mail apps' one-click POST
-# can't send a custom header).
-CSRF_EXEMPT = ("/api/payments/razorpay/webhook", "/api/email/unsubscribe")
+# can't send a custom header); so do Meta's Instagram callbacks (signed_request).
+CSRF_EXEMPT = (
+    "/api/payments/razorpay/webhook",
+    "/api/email/unsubscribe",
+    "/api/connect/instagram/deauthorize",
+    "/api/connect/instagram/data-deletion",
+)
 
 
 @app.middleware("http")

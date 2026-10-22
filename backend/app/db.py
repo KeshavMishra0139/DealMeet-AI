@@ -59,7 +59,7 @@ COLLECTIONS = [
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
 # accounts (and their sessions) and never touches the audit log.
-ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit", "password_resets", "email_verifications"]
+ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit", "password_resets", "email_verifications", "data_deletions"]
 # Kept through demo resets too: an address that opted out stays opted out.
 EMAIL_COLLECTIONS = ["email_log", "email_optouts", "app_secrets", "claim_codes"]
 
