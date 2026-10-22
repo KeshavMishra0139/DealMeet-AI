@@ -206,7 +206,7 @@ function CardShell({ title, why, children, className }: { title: string; why?: R
   return (
     <section className={cn("card-surface flex flex-col rounded-[var(--radius-card)] p-5", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{title}</h2>
+        <h2 className="text-xs font-medium text-muted">{title}</h2>
         {why}
       </div>
       {children}

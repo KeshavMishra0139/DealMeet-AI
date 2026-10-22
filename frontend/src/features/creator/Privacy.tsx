@@ -65,7 +65,7 @@ export default function Privacy() {
               aria-label="Discoverable to brands and pages"
             />
           </label>
-          <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">What brands see by default</p>
+          <p className="mb-2 mt-5 text-xs font-semibold text-muted">What brands see by default</p>
           <ScopePicker
             value={p.defaults as Scopes}
             disabled={!p.discoverable}

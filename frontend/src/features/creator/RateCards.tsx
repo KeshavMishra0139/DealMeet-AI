@@ -144,14 +144,14 @@ export function RateCards({ creatorId }: { creatorId: string }) {
               </div>
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">Your rate</dt>
+                  <dt className="text-xs font-medium text-muted">Your rate</dt>
                   <dd className="num mt-0.5 font-display text-xl font-semibold">{inr(c.amount)}</dd>
                   <dd className="mt-1">
                     <SourceBadge source="manual" />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">Estimated range</dt>
+                  <dt className="text-xs font-medium text-muted">Estimated range</dt>
                   {c.estimate_now.range ? (
                     <>
                       <dd className="num mt-0.5 font-display text-xl font-semibold text-fg-2">{inrRange(c.estimate_now.range.low, c.estimate_now.range.high)}</dd>
@@ -265,7 +265,7 @@ export function RateCards({ creatorId }: { creatorId: string }) {
           {e && (
             <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">Estimated range · {e.deliverables}</p>
+                <p className="text-xs font-medium text-muted">Estimated range · {e.deliverables}</p>
                 {e.range ? (
                   <>
                     <p className="num mt-1 font-display text-3xl font-semibold">{inrRange(e.range.low, e.range.high)}</p>
@@ -282,7 +282,7 @@ export function RateCards({ creatorId }: { creatorId: string }) {
               </div>
               {e.metrics.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Numbers used</p>
+                  <p className="text-xs font-semibold text-muted">Numbers used</p>
                   <ul className="mt-1.5 divide-y divide-line rounded-2xl border border-line">
                     {e.metrics.map((m) => (
                       <li key={m.key} className="px-3 py-2 text-[13px]">
@@ -299,7 +299,7 @@ export function RateCards({ creatorId }: { creatorId: string }) {
               )}
               {e.missing.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Missing, not guessed</p>
+                  <p className="text-xs font-semibold text-muted">Missing, not guessed</p>
                   <ul className="mt-1.5 space-y-1.5">
                     {e.missing.map((m) => (
                       <li key={m.key} className="text-[13px]">
@@ -314,7 +314,7 @@ export function RateCards({ creatorId }: { creatorId: string }) {
               )}
               {e.assumptions.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Assumptions</p>
+                  <p className="text-xs font-semibold text-muted">Assumptions</p>
                   <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] text-fg-2">
                     {e.assumptions.map((a) => (
                       <li key={a}>{a}</li>

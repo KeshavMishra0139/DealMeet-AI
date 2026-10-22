@@ -375,7 +375,7 @@ export function SearchBox({
                 <Highlight text={x.text} q={value.trim().replace(/^@/, "")} />
                 {(x.kind === "creator" || x.kind === "channel") && x.query !== x.text && <span className="ml-2 text-xs text-muted">{x.query}</span>}
               </span>
-              <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted">{KIND_LABEL[x.kind]}</span>
+              <span className="shrink-0 text-[11px] text-muted">{KIND_LABEL[x.kind]}</span>
             </li>
           ))}
         </ul>

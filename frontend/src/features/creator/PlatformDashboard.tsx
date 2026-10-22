@@ -124,7 +124,7 @@ function PlatformView({ d }: { d: Dashboard }) {
       <div className="grid gap-3 lg:grid-cols-2">
         {d.insights.length > 0 && (
           <section className="card-surface rounded-[var(--radius-card)] p-5">
-            <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <h3 className="flex items-center gap-2 text-xs font-medium text-muted">
               <Lightbulb className="size-4" aria-hidden /> {t("platform.insights")}
             </h3>
             <ul className="mt-3 space-y-2 text-sm text-fg-2">
@@ -185,7 +185,7 @@ function Formats({ formats }: { formats: Dashboard["formats"] }) {
   const max = Math.max(...formats.map((f) => f.median_views), 1);
   return (
     <div>
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{t("platform.formats")}</h3>
+      <h3 className="text-xs font-medium text-muted">{t("platform.formats")}</h3>
       <ul className="mt-3 space-y-3">
         {formats.map((f) => (
           <li key={f.key}>
@@ -218,7 +218,7 @@ function Audience({ d, className }: { d: Dashboard; className?: string }) {
   if (a.top_cities?.length) rows.push([t("platform.cities"), a.top_cities.map((c) => `${c.city} ${c.share}%`).join(", ")]);
   return (
     <div className={className}>
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <h3 className="text-xs font-medium text-muted">
         {d.platform === "youtube" ? t("platform.analytics", { n: a.period_days ?? 28 }) : t("platform.igAudience")}
       </h3>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">

@@ -3,10 +3,16 @@
 /* ------------------------------------------------------------------------
    DealMeet AI design tokens
    One brand, three moods: .theme-site (light public pages, the landing),
-   .theme-creator (dark aurora, mobile-first) and .theme-brand (light, calm,
-   desktop-first). Light pages sit on #f9fafb. Components only use semantic
-   tokens, so the same component reads correctly in each.
+   .theme-creator (true neutral dark, mobile-first) and .theme-brand (light,
+   neutral, desktop-first). Light pages sit on #f9fafb. Components only use
+   semantic tokens, so the same component reads correctly in each.
    Text colours are checked for WCAG AA against their surfaces.
+
+   The two app themes are working screens: flat opaque surfaces separated by a
+   1px line or a tone step (no resting shadows, no glass, no glow), one brand hue
+   (the logo's magenta) for data, links and focus, and a flat near-white or
+   near-black primary button. The signature gradient stays on the logo and the
+   public pages; in the apps --signature is flat and --grad-text is plain ink.
    ------------------------------------------------------------------------ */
 
 @theme {
@@ -81,40 +87,44 @@
   --color-ring: var(--ring);
 }
 
-/* Creator Studio: deep indigo aurora. */
+/* Creator Studio: true neutral dark. */
 .theme-creator {
   color-scheme: dark;
-  --bg: #0b0a1a;
-  --surface: rgb(255 255 255 / 0.045);
-  --surface-solid: #141326;
-  --surface-2: rgb(255 255 255 / 0.075);
-  --surface-3: rgb(255 255 255 / 0.12);
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.17);
-  --fg: #f5f3ff;
-  --fg-2: #d9d4f2;
-  --muted: #a8a1cb;
-  --accent: #c4b5fd;
-  --accent-strong: #a78bfa;
-  --accent-soft: rgb(167 139 250 / 0.15);
-  --accent-fg: #0b0a1a;
+  --bg: #0c0c0e;
+  --surface: #151518;
+  --surface-solid: #151518;
+  --surface-2: #1d1d21;
+  --surface-3: #27272c;
+  --line: #26262b;
+  --line-strong: #3a3a41;
+  --fg: #f4f4f5;
+  --fg-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --accent: #f472b6;
+  --accent-strong: #ec4899;
+  --accent-soft: rgb(244 114 182 / 0.14);
+  --accent-fg: #0c0c0e;
+  --primary-fill: #f4f4f5;
+  --primary-fg: #0c0c0e;
+  --primary-shadow: none;
+  --signature: #db2777;
   --success: #6ee7b7;
   --success-soft: rgb(52 211 153 / 0.14);
   --warn: #fcd34d;
   --warn-soft: rgb(251 191 36 / 0.14);
   --danger: #fda4af;
   --danger-soft: rgb(251 113 133 / 0.15);
-  --ring: #c4b5fd;
-  --grad-text: linear-gradient(100deg, #c4b5fd 0%, #f9a8d4 48%, #fdba74 100%);
-  --card-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 40px -16px rgb(0 0 0 / 0.6);
+  --ring: #f472b6;
+  --grad-text: linear-gradient(var(--fg), var(--fg));
+  --card-shadow: none;
   /* No frosted blur: it re-blurs the moving background on every frame. */
   --card-blur: 0px;
   /* Waterfall palette, validated for CVD and contrast on the dark surface. */
-  --chart-base: #7c3aed;
-  --chart-up: #0d9488;
-  --chart-down: #ea580c;
-  --chart-muted: #4a4566;
-  --chart-grid: rgb(255 255 255 / 0.08);
+  --chart-base: #f472b6;
+  --chart-up: #2dd4bf;
+  --chart-down: #fb923c;
+  --chart-muted: #3f3f46;
+  --chart-grid: #26262b;
 }
 
 /* Public pages (the landing): neutral light, slate text on #f9fafb. */
@@ -143,6 +153,9 @@
   --danger-soft: #fdecef;
   --ring: #7c3aed;
   --grad-text: linear-gradient(100deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
+  --primary-fill: linear-gradient(115deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
+  --primary-fg: #ffffff;
+  --primary-shadow: 0 8px 24px -10px rgb(219 39 119 / 0.6);
   --card-shadow: 0 1px 2px rgb(10 27 51 / 0.04), 0 1px 1px rgb(10 27 51 / 0.03);
   --card-blur: 0px;
   --chart-base: #7c3aed;
@@ -152,39 +165,43 @@
   --chart-grid: #e2e8f0;
 }
 
-/* Brand Console: crisp and light; gradient only as an accent. */
+/* Brand Console: light and neutral. */
 .theme-brand {
   color-scheme: light;
   --bg: #f9fafb;
   --surface: #ffffff;
   --surface-solid: #ffffff;
-  --surface-2: #f3f1fa;
-  --surface-3: #eae6f5;
-  --line: #e7e4f0;
-  --line-strong: #d4cfe4;
-  --fg: #16132b;
-  --fg-2: #39345a;
-  --muted: #5f5980;
-  --accent: #6d28d9;
-  --accent-strong: #5b21b6;
-  --accent-soft: #f1ecfd;
+  --surface-2: #f3f4f6;
+  --surface-3: #e9eaee;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --fg: #111214;
+  --fg-2: #374151;
+  --muted: #5f6368;
+  --accent: #be185d;
+  --accent-strong: #9d174d;
+  --accent-soft: #fdf0f6;
   --accent-fg: #ffffff;
+  --primary-fill: #111214;
+  --primary-fg: #ffffff;
+  --primary-shadow: none;
+  --signature: #be185d;
   --success: #047857;
   --success-soft: #e6f6ef;
   --warn: #b45309;
   --warn-soft: #fdf3e2;
   --danger: #be123c;
   --danger-soft: #fdecef;
-  --ring: #7c3aed;
-  --grad-text: linear-gradient(100deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
-  --card-shadow: 0 1px 2px rgb(22 19 43 / 0.04), 0 1px 1px rgb(22 19 43 / 0.03);
+  --ring: #be185d;
+  --grad-text: linear-gradient(var(--fg), var(--fg));
+  --card-shadow: none;
   --card-blur: 0px;
   /* Waterfall palette, validated for CVD and contrast on white. */
-  --chart-base: #7c3aed;
+  --chart-base: #be185d;
   --chart-up: #0d9488;
   --chart-down: #c2410c;
-  --chart-muted: #c9c4da;
-  --chart-grid: #ece9f4;
+  --chart-muted: #d1d5db;
+  --chart-grid: #eceef1;
 }
 
 @layer base {
@@ -222,6 +239,11 @@
   ::selection {
     background: rgb(219 39 119 / 0.3);
   }
+  /* Figures line up in every app screen. */
+  .theme-creator,
+  .theme-brand {
+    font-variant-numeric: tabular-nums;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -240,14 +262,23 @@
   color: transparent;
 }
 
-/* Signature gradient, decorative use only (never behind small text). */
+/* Signature gradient, decorative use only (never behind small text). Flat brand
+   colour inside the apps (--signature). */
 @utility bg-signature {
-  background-image: linear-gradient(115deg, #7c3aed 0%, #db2777 55%, #f97316 100%);
+  background: var(--signature, linear-gradient(115deg, #7c3aed 0%, #db2777 55%, #f97316 100%));
 }
 
 /* Gradient for filled buttons: deeper stops keep white text above 4.5:1. */
 @utility bg-signature-strong {
-  background-image: linear-gradient(115deg, #6d28d9 0%, #be185d 55%, #c2410c 100%);
+  background: var(--signature, linear-gradient(115deg, #6d28d9 0%, #be185d 55%, #c2410c 100%));
+}
+
+/* The brand's own gradient, wherever it shows (the logo's "AI"). */
+@utility text-brand {
+  background-image: linear-gradient(100deg, #7c3aed 0%, #db2777 55%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @utility card-surface {

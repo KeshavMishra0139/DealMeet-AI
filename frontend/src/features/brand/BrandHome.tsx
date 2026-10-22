@@ -43,9 +43,10 @@ export default function BrandHome() {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-muted">Overview · {d.brand.category}</p>
-          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{d.brand.name}</h1>
-          <p className="mt-1 text-sm text-fg-2">{d.headline}</p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{d.brand.name}</h1>
+          <p className="mt-1 text-sm text-fg-2">
+            <span className="text-muted">{d.brand.category}.</span> {d.headline}
+          </p>
         </div>
         <Button asChild variant="primary" size="sm">
           <Link to="/brand/campaigns/new">

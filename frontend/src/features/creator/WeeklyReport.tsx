@@ -28,11 +28,10 @@ export function WeeklyReport({ creatorId, youtube = false, className }: { creato
     <section
       aria-labelledby="weekly-report"
       className={cn(
-        "theme-site overflow-hidden rounded-[28px] border border-slate-200/70 bg-white text-[#0a1b33] shadow-[0_30px_80px_-40px_rgb(0_0_0/0.7)]",
+        "theme-site overflow-hidden rounded-[24px] border border-slate-200/70 bg-white text-[#0a1b33]",
         className,
       )}
     >
-      <div className="h-1 bg-signature" aria-hidden />
       <div className="p-4 sm:p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="weekly-report" className="flex items-center gap-2 font-display text-lg font-semibold">

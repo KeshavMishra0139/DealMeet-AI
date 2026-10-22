@@ -108,7 +108,7 @@ function AutoSetup({ source, onFallback }: { source: "youtube" | "instagram"; on
         <span />
       </div>
       <div className="relative z-10 w-full max-w-sm text-center" role="status" aria-live="polite">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-signature text-white shadow-[0_12px_40px_-12px_rgb(219_39_119/0.7)]">
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-signature text-white">
           {source === "youtube" ? <Youtube className="size-6" aria-hidden /> : <Instagram className="size-6" aria-hidden />}
         </span>
         <h1 className="mt-5 font-display text-2xl font-semibold tracking-tight">Setting up your Studio</h1>
@@ -431,7 +431,7 @@ function OnboardingForm() {
                         <Switch checked={f.discoverable} onCheckedChange={(v) => set("discoverable", v)} aria-label="Let brands discover me" />
                       </label>
                       <div className={cn("mt-4 space-y-3 border-t border-line pt-4", !f.discoverable && "opacity-50")}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">What brands can see by default</p>
+                        <p className="text-xs font-semibold text-muted">What brands can see by default</p>
                         {(
                           [
                             ["stats", "Reach and engagement stats"],

@@ -66,7 +66,7 @@ export function ReachPanel({
     <section aria-labelledby={id} className={cn("card-surface relative overflow-hidden rounded-[var(--radius-card)] p-5 sm:p-6", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={id} className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <h2 id={id} className="text-xs font-medium text-muted">
             {w("reach.title")}
           </h2>
           <p className="mt-1.5 font-display text-xl font-semibold leading-snug sm:text-2xl">{headline}</p>

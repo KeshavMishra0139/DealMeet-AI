@@ -400,7 +400,7 @@ function DemoProfiles({ role, next }: { role: Role; next: string | null }) {
 
   return (
     <section aria-labelledby="demo-profiles" className="mt-6">
-      <h2 id="demo-profiles" className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+      <h2 id="demo-profiles" className="text-xs font-semibold text-muted">
         Or explore a demo profile
       </h2>
       <div className="mt-3 space-y-2.5" aria-live="polite">

@@ -68,7 +68,7 @@ export default function Money() {
       <Reveal as="section" aria-labelledby="goal" className="mt-8">
         <div className="card-surface flex flex-col gap-3 rounded-[var(--radius-card)] p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="goal" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <h2 id="goal" className="text-xs font-medium text-muted">
               Your goal
             </h2>
             <p className="num mt-1 font-display text-2xl font-semibold">{inr(m.goal.goal)} a month</p>
@@ -117,13 +117,12 @@ function FairPriceCard({
   return (
     <Reveal as="section" aria-labelledby="fair" className="card-surface mt-6 overflow-hidden rounded-[28px]">
       <div className="relative p-5 sm:p-7">
-        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-[radial-gradient(circle,rgb(124_58_237/0.28),transparent_65%)] blur-2xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 id="fair" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <h2 id="fair" className="text-xs font-medium text-muted">
               Your fair rate · per {words.post}
             </h2>
-            <p className="num mt-1 font-display text-[40px] font-semibold leading-none tracking-tight sm:text-5xl">
+            <p className="num mt-1 font-display text-[40px] font-semibold leading-none tracking-tight">
               <span className="text-gradient">{inrRange(data.range.low, data.range.high)}</span>
             </p>
             <p className="mt-2 text-sm text-fg-2">

@@ -26,7 +26,7 @@ export function Wordmark({ className, compact = false }: { className?: string; c
       {!compact && (
         <span className="font-display text-[17px] font-semibold tracking-tight text-fg">
           DealMeet
-          <span className="text-gradient ml-1 font-bold">AI</span>
+          <span className="text-brand ml-1 font-bold">AI</span>
         </span>
       )}
       {compact && <span className="sr-only">DealMeet AI</span>}

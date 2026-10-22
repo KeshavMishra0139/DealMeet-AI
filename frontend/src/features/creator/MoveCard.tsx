@@ -60,11 +60,8 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
         done && "border-success/30",
       )}
     >
-      {index === 0 && !done && (
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-signature opacity-80" />
-      )}
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+        <span className="inline-flex items-center gap-2 text-xs font-medium text-muted">
           <span className="num grid size-6 place-items-center rounded-full bg-accent-soft text-[12px] text-accent">{index + 1}</span>
           <cat.icon className="size-3.5" aria-hidden />
           {t(cat.label)}
@@ -84,7 +81,7 @@ export function MoveCard({ move, creatorId, index }: { move: Move; creatorId: st
 
       <div className="mt-auto pt-5">
         <div className="rounded-2xl border border-line bg-surface p-3.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{t("common.impact")}</p>
+          <p className="text-xs font-medium text-muted">{t("common.impact")}</p>
           <RangeValue estimate={move.impact} className="mt-1 block" />
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <EstimateNote estimate={move.impact} />

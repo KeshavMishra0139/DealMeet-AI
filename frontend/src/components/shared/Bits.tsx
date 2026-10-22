@@ -148,10 +148,11 @@ export function SectionTitle({
   return (
     <div className={cn("mb-3 flex items-end justify-between gap-3", className)}>
       <div>
-        {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{eyebrow}</p>}
         <h2 id={id} className="font-display text-lg font-semibold">
           {title}
         </h2>
+        {/* Context goes under the title, not as a label above it. */}
+        {eyebrow && <p className="mt-0.5 text-sm text-muted">{eyebrow}</p>}
       </div>
       {action}
     </div>

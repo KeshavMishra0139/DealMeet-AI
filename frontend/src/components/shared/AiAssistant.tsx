@@ -131,12 +131,11 @@ export function AiAssistantBar({ role, className }: { role: Role; className?: st
         }}
         className="pointer-events-auto relative isolate flex w-full max-w-[680px] items-center gap-2 rounded-full border border-line-strong bg-[var(--surface-solid)] p-1.5 pl-1.5 shadow-[0_18px_50px_-16px_rgb(0_0_0/0.55)]"
       >
-        <span aria-hidden className="absolute -inset-[3px] -z-10 rounded-full bg-signature opacity-25 blur-md" />
         <button
           type="button"
           onClick={() => ctx.open()}
           aria-label="Open DealMeet AI"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-signature text-white transition-transform hover:scale-105"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-accent transition-colors hover:bg-surface-3"
         >
           <Sparkles className="size-[18px]" aria-hidden />
         </button>
@@ -152,7 +151,7 @@ export function AiAssistantBar({ role, className }: { role: Role; className?: st
         <button
           type="submit"
           aria-label="Send to DealMeet AI"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-signature-strong text-white transition-opacity disabled:opacity-40"
+          className="grid size-10 shrink-0 place-items-center rounded-full [background:var(--primary-fill)] text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           <ArrowUp className="size-[18px]" aria-hidden />
         </button>
@@ -273,8 +272,7 @@ function AssistantWindow({
         >
           {/* Header */}
           <div className="relative flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
-            <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-signature opacity-70 sm:rounded-t-[28px]" />
-            <span className="relative grid size-9 place-items-center rounded-xl bg-signature text-white">
+            <span className="relative grid size-9 place-items-center rounded-xl bg-surface-2 text-accent">
               <Sparkles className="size-[18px]" aria-hidden />
               <span aria-hidden className={cn("absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[var(--surface-solid)]", state.data?.ai ? "bg-success" : "bg-muted")} />
             </span>
@@ -350,7 +348,7 @@ function AssistantWindow({
               submit();
             }}
           >
-            <div className="flex items-end gap-2 rounded-2xl border border-line-strong bg-surface px-3 py-2 transition-shadow focus-within:shadow-[0_0_0_3px_rgb(124_58_237/0.25)]">
+            <div className="flex items-end gap-2 rounded-2xl border border-line-strong bg-surface px-3 py-2 transition-shadow focus-within:border-[var(--ring)]">
               <textarea
                 ref={input}
                 value={draft}
@@ -371,7 +369,7 @@ function AssistantWindow({
                 type="submit"
                 disabled={!draft.trim() || send.isPending}
                 aria-label="Send"
-                className="grid size-8 shrink-0 place-items-center rounded-xl bg-signature-strong text-white transition-opacity disabled:opacity-35"
+                className="grid size-8 shrink-0 place-items-center rounded-xl [background:var(--primary-fill)] text-[var(--primary-fg)] transition-opacity disabled:opacity-35"
               >
                 <ArrowUp className="size-4" aria-hidden />
               </button>
@@ -388,7 +386,7 @@ function Welcome({ role, name, starters, onPick, reduce }: { role: Role; name?: 
   return (
     <motion.div initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="pt-2">
       <p className="font-display text-2xl font-semibold tracking-tight">
-        <span className="text-gradient">Hi{name ? ` ${name}` : ""}.</span>
+        <span>Hi{name ? ` ${name}` : ""}.</span>
       </p>
       <p className="mt-1 text-[15px] text-fg-2">
         I'm DealMeet AI. I know your {role === "creator" ? "numbers" : "campaigns and deals"}, and I can do things for you. This replaces Ask and the old Assistant.
@@ -406,7 +404,7 @@ function Welcome({ role, name, starters, onPick, reduce }: { role: Role; name?: 
       </ul>
       {starters.length > 0 && (
         <>
-          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.1em] text-muted">Try</p>
+          <p className="mt-6 text-xs font-semibold text-muted">Try</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {starters.map((s) => (
               <button key={s} type="button" onClick={() => onPick(s)} className="rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] text-fg-2 transition-colors hover:border-accent/60 hover:text-fg">
@@ -430,7 +428,7 @@ function UserBubble({ text, reduce }: { text: string; reduce: boolean }) {
 
 function Avatar() {
   return (
-    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-lg bg-signature text-white">
+    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-2 text-accent">
       <Sparkles className="size-3.5" />
     </span>
   );

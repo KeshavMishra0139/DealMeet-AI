@@ -144,7 +144,7 @@ export default function Roadmap() {
                     w.week === 1 ? "bg-signature" : "bg-surface-3",
                   )}
                 />
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+                <p className="text-xs font-semibold text-muted">
                   Week {w.week} · {w.title}
                 </p>
                 <ul className="mt-1.5 space-y-1.5">
@@ -183,7 +183,7 @@ export default function Roadmap() {
               <Badge size="sm" variant="outline" className="mt-3 self-start">
                 {tw.label}
               </Badge>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.1em] text-muted">What they did next</p>
+              <p className="mt-3 text-xs font-semibold text-muted">What they did next</p>
               <ol className="mt-1.5 space-y-1">
                 {tw.steps.map((s, i) => (
                   <li key={s} className="flex gap-2 text-[13px] leading-snug text-fg-2">

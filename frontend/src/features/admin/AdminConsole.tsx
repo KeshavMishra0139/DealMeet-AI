@@ -346,7 +346,7 @@ function OverviewTab() {
             {Object.entries(o.health.modes ?? {}).map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-muted">{k.replace(/_/g, " ")}</dt>
-                <dd className="break-words">{String(v)}</dd>
+                <dd className="break-words">{v === null || v === "" ? <span className="text-muted">—</span> : String(v).replace(/_/g, " ")}</dd>
               </div>
             ))}
           </dl>

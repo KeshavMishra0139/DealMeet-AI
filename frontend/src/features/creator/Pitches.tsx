@@ -278,7 +278,7 @@ function Editor({ creatorId, pitch, onDone }: { creatorId: string; pitch: Pitch;
       <aside className="space-y-4 text-sm">
         {r && (
           <div className="rounded-xl bg-surface-2 p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Suggested price · estimate</p>
+            <p className="text-xs font-semibold text-muted">Suggested price · estimate</p>
             <p className="num mt-1 font-display text-xl font-semibold">{inrRange(r.range.low, r.range.high)}</p>
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-2">
               {r.deliverables} · {r.data_label} <SourceBadge source={r.data_source} />
@@ -286,7 +286,7 @@ function Editor({ creatorId, pitch, onDone }: { creatorId: string; pitch: Pitch;
           </div>
         )}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Fan Proof</p>
+          <p className="text-xs font-semibold text-muted">Fan Proof</p>
           {pitch.fan_proof ? (
             <p className="mt-1">
               {pitch.fan_proof.label} <SourceBadge source={`${pitch.fan_proof.platforms[0]}_api`} />
@@ -296,7 +296,7 @@ function Editor({ creatorId, pitch, onDone }: { creatorId: string; pitch: Pitch;
           )}
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Numbers it can use</p>
+          <p className="text-xs font-semibold text-muted">Numbers it can use</p>
           <ul className="mt-1.5 divide-y divide-line rounded-xl border border-line">
             {pitch.facts.map((f) => (
               <li key={f.key} className="flex flex-wrap items-center gap-2 px-3 py-1.5 text-xs">

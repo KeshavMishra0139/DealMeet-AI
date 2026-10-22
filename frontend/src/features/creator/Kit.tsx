@@ -338,7 +338,7 @@ function Positioning({ creatorId }: { creatorId: string }) {
           </div>
           <div className="space-y-3 text-sm">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Content pillars</p>
+              <p className="text-xs font-semibold text-muted">Content pillars</p>
               <ul className="mt-1.5 flex flex-wrap gap-1.5">
                 {b.pillars.map((p) => (
                   <li key={p}>
@@ -348,7 +348,7 @@ function Positioning({ creatorId }: { creatorId: string }) {
               </ul>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">Bio ideas</p>
+              <p className="text-xs font-semibold text-muted">Bio ideas</p>
               <ul className="mt-1.5 space-y-1.5">
                 {b.bio_suggestions.map((x) => (
                   <li key={x} className="rounded-xl bg-surface-2 px-3 py-2 text-fg-2">

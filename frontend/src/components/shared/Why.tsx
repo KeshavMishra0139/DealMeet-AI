@@ -56,7 +56,7 @@ export function WhyPopover({
                   {inp.value}
                   {inp.provenance === "simulated" && <SimulatedChip />}
                   {inp.provenance === "real" && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-success">Real</span>
+                    <span className="text-xs font-medium text-success">Real</span>
                   )}
                 </dd>
               </div>
@@ -85,7 +85,7 @@ export function SimulatedChip({ className }: { className?: string }) {
       <span
         tabIndex={0}
         className={cn(
-          "inline-flex h-[18px] items-center rounded-full border border-dashed border-warn/60 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-warn",
+          "inline-flex h-[18px] items-center rounded-full border border-dashed border-warn/60 px-1.5 text-xs font-medium text-warn",
           className,
         )}
       >

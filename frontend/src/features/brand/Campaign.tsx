@@ -171,7 +171,7 @@ function MatchSpace({ items, listingId }: { items: BrandMatch[]; listingId: stri
         </h2>
         <p className="text-xs text-muted">{mouse ? "Drag to turn · hover for details · click to open a profile" : "Tap a creator in the list to open a profile"}</p>
       </div>
-      <div className="relative bg-[radial-gradient(ellipse_at_center,rgb(124_58_237/0.07),transparent_70%)]">
+      <div className="relative">
         <Stage3D
           className="h-[380px]"
           label={`3D map of ${items.length} matched creators by fair price, reach and trust, coloured by audience fit. The list below has the same creators and numbers.`}

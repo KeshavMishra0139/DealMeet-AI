@@ -114,7 +114,7 @@ function Item({ q, children }: { q: string; children: ReactNode }) {
 function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="mt-8">
-      <h2 id={id} className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+      <h2 id={id} className="text-xs font-semibold text-muted">
         {title}
       </h2>
       <div className="mt-3 divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">{children}</div>
@@ -136,7 +136,7 @@ export default function HelpCenter({ role }: { role: Role }) {
 
       {ai && (
         <div className="mt-6 flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface-2 p-4">
-          <span className="grid size-9 place-items-center rounded-xl bg-signature text-white">
+          <span className="grid size-9 place-items-center rounded-xl bg-surface-3 text-accent">
             <Sparkles className="size-4" aria-hidden />
           </span>
           <p className="min-w-0 flex-1 text-sm text-fg-2">

@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
+import { PageFade, ScrollProgress } from "@/components/motion/Motion";
 import { AccountMenu } from "@/components/shared/AccountMenu";
 import { EmailNudge } from "@/components/shared/AccountSecurity";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
@@ -81,8 +81,7 @@ function Studio() {
   const location = useLocation();
 
   return (
-    <div className="theme-creator grain relative min-h-dvh">
-      <ParallaxAurora />
+    <div className="theme-creator relative min-h-dvh">
       <ScrollProgress />
       <a
         href="#main"
@@ -226,7 +225,6 @@ function SideLink({ item, label }: { item: NavItem; label: string }) {
     >
       {({ isActive }) => (
         <>
-          {isActive && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-signature" aria-hidden />}
           <item.icon className={cn("size-[18px]", isActive && "text-accent")} aria-hidden />
           {label}
         </>

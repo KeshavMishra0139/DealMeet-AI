@@ -39,7 +39,6 @@ export function KitCard({ kit, footer, headingLevel = 2 }: { kit: Kit; footer?: 
   return (
     <article className="card-surface @container overflow-hidden rounded-[28px]" aria-label={`${kit.name} media kit`} lang={lang}>
       <div className="relative p-6">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-signature opacity-20 blur-2xl" />
         <div className="relative flex items-center gap-4">
           <Avatar name={kit.name} hue={kit.avatar_hue} size={64} generic={kit.is_reference} />
           <div className="min-w-0">
@@ -80,7 +79,7 @@ export function KitCard({ kit, footer, headingLevel = 2 }: { kit: Kit; footer?: 
       <div className="grid gap-5 p-6 @2xl:grid-cols-2">
         {kit.formats && kit.formats.length > 0 && (
           <div>
-            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-muted">
               <TrendingUp className="size-3.5" aria-hidden /> {tx.best}
               <SourceBadge source={kit.formats[0]?.source ?? (kit.formats[0]?.simulated ? "synthetic" : null)} lang={lang} className="normal-case tracking-normal" />
             </p>
@@ -98,7 +97,7 @@ export function KitCard({ kit, footer, headingLevel = 2 }: { kit: Kit; footer?: 
         )}
         {kit.rates && (
           <div>
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
               <BadgeIndianRupee className="size-3.5" aria-hidden /> {own ? tx.ratesOwn : tx.ratesEstimate}
             </p>
             <ul className="mt-2 space-y-1.5 text-sm">
@@ -114,7 +113,7 @@ export function KitCard({ kit, footer, headingLevel = 2 }: { kit: Kit; footer?: 
         )}
         {kit.audience && (
           <div>
-            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-muted">
               <Users className="size-3.5" aria-hidden /> {tx.audience}
               <SourceBadge source={kit.audience.source ?? (kit.audience.simulated ? "synthetic" : null)} lang={lang} className="normal-case tracking-normal" />
             </p>
@@ -123,7 +122,7 @@ export function KitCard({ kit, footer, headingLevel = 2 }: { kit: Kit; footer?: 
         )}
         {kit.safety_note && (
           <div>
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
               <Sparkles className="size-3.5" aria-hidden /> {tx.safety}
             </p>
             <p className="mt-2 text-sm text-fg-2">{kit.safety_note}</p>

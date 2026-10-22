@@ -62,7 +62,7 @@ export function CreatorSearch({ brandId }: { brandId: string }) {
   return (
     <section
       aria-labelledby="find-creators"
-      className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_24px_60px_-40px_rgb(10_27_51/0.35)] sm:p-6"
+      className="rounded-[24px] border border-slate-200/70 bg-white p-4 sm:p-6"
     >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
@@ -186,7 +186,7 @@ function CreatorCard({ c }: { c: CreatorSearchResult }) {
   return (
     <Link
       to={`/brand/creators/${c.id}`}
-      className="group flex h-full min-w-0 gap-3 rounded-2xl border border-slate-200/70 bg-white p-3.5 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_16px_40px_-24px_rgb(10_27_51/0.35)]"
+      className="group flex h-full min-w-0 gap-3 rounded-2xl border border-slate-200/70 bg-white p-3.5 transition-colors duration-200 hover:border-slate-400"
     >
       <Avatar name={c.name} hue={c.avatar_hue} size={44} generic={c.is_reference} />
       <div className="min-w-0 flex-1">

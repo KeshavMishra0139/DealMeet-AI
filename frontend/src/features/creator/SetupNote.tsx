@@ -33,7 +33,7 @@ export function SetupNote({ className }: { className?: string }) {
   };
   return (
     <section aria-label="Set up from your account" className={`card-surface relative flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] p-4 ${className ?? ""}`}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-signature text-white">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent">
         <Sparkles className="size-4" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">

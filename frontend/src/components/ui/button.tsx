@@ -9,8 +9,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary:
-          "bg-signature-strong text-white shadow-[0_8px_24px_-10px_rgb(219_39_119/0.6)] hover:shadow-[0_10px_30px_-8px_rgb(219_39_119/0.7)] hover:brightness-110",
+        // Flat near-white or near-black in the apps; the public pages keep the brand gradient (--primary-*).
+        primary: "[background:var(--primary-fill)] text-[var(--primary-fg)] shadow-[var(--primary-shadow)] hover:opacity-90",
         accent: "bg-accent text-accent-fg hover:bg-accent-strong",
         secondary: "bg-surface-2 text-fg hover:bg-surface-3 border border-line",
         outline: "border border-line-strong bg-transparent text-fg hover:bg-surface-2",
