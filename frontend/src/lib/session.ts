@@ -17,6 +17,8 @@ export interface SessionUser {
   email: string | null;
   creator_id: string | null;
   brand_id: string | null;
+  /** Confirmed by an emailed link, or by Google at sign-in. */
+  email_verified?: boolean;
   demo: boolean;
   providers: string[];
 }

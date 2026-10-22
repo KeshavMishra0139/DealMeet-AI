@@ -5,6 +5,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PageFade, ScrollProgress } from "@/components/motion/Motion";
 import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
 import { AccountMenu } from "@/components/shared/AccountMenu";
+import { EmailNudge } from "@/components/shared/AccountSecurity";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { Wordmark } from "@/components/shared/Wordmark";
@@ -130,6 +131,7 @@ function Console() {
       <div className="lg:pl-[232px]">
         <main id="main" className="load-wipe mx-auto w-full max-w-[1200px] px-4 pb-32 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <ScrollProgress />
+          <EmailNudge role="brand" />
           <PageFade>
             <Outlet />
           </PageFade>

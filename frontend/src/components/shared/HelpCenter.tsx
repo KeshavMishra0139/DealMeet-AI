@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { DeleteAccountButton } from "@/components/shared/AccountMenu";
+import { ChangePassword, EmailStatus, SignedInDevices } from "@/components/shared/AccountSecurity";
 import { useAiAssistant } from "@/components/shared/AiAssistant";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
@@ -175,9 +176,27 @@ export default function HelpCenter({ role }: { role: Role }) {
         <Item q="Signing in and out">
           <p>
             {user?.email ? `You're signed in as ${user.email}. ` : ""}Sign out from the menu under your name at the top of the sidebar (More on a phone). Signing out ends this
-            session on this device.
+            session on this device; Signed-in devices below can sign out the others.
           </p>
         </Item>
+        {!user?.demo && (
+          <>
+            <Item q="Signed-in devices">
+              <p className="mb-3">Each place you're signed in. If you don't recognise one, sign it out and change your password.</p>
+              <SignedInDevices role={role} />
+            </Item>
+            {user?.providers.includes("password") && (
+              <Item q="Change your password">
+                <ChangePassword role={role} />
+              </Item>
+            )}
+            {user?.email && (
+              <Item q="Your email address">
+                <EmailStatus role={role} />
+              </Item>
+            )}
+          </>
+        )}
         <Item q="Delete your account">
           {user?.demo ? (
             <p>Demo profiles can't be deleted: they reset to sample data.</p>

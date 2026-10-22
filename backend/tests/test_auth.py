@@ -22,6 +22,9 @@ PUBLIC = {
     ("POST", "/api/auth/oauth/complete"),  # proves itself with the one-time code from the callback
     ("POST", "/api/auth/youtube"),  # proves itself with a verified Google sign-in
     ("POST", "/api/auth/logout"),
+    ("POST", "/api/auth/password/forgot"),  # same answer for every email; rate-limited per IP and per address
+    ("POST", "/api/auth/password/reset"),  # proves itself with the one-time emailed token
+    ("POST", "/api/auth/email/verify"),  # proves itself with the emailed token
     ("GET", "/api/auth/personas"),
     ("POST", "/api/auth/demo"),
     ("POST", "/api/demo/reset"),

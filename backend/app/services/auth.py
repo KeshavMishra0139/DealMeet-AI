@@ -4,6 +4,9 @@
   cookie; API clients (and the demo's side-by-side frames) send it as a Bearer
   header instead. Only its SHA-256 hash is stored, it expires after
   SESSION_HOURS (72 by default) and signing out revokes it.
+- Each session keeps a device label read from the browser's User-Agent ("Chrome on
+  Android") and when it was last used, for the account's list of signed-in devices. No IP
+  address or location is stored.
 - Every private route depends on `current_user`, then checks that the signed-in
   account owns the creator, brand, listing, deal, collective or invoice it touches.
   Roles and owner ids always come from the session, never from the request body.
@@ -29,6 +32,7 @@ ROLES = ("creator", "brand", "admin")
 SIGNUP_ROLES = ("creator", "brand")  # admin is granted only from the server
 MAX_FAILED_LOGINS = 5
 FAILED_WINDOW = 15 * 60
+LAST_USED_EVERY = 10 * 60  # "last used" is refreshed at most this often, not on every request
 
 
 # ------------------------------------------------------------------ passwords
@@ -55,7 +59,23 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_session(user_id: str, via: str) -> str:
+# (marker in the User-Agent, name), first match wins: Edge and Opera also say "Chrome".
+BROWSERS = (("Edg/", "Edge"), ("OPR/", "Opera"), ("SamsungBrowser/", "Samsung Internet"), ("Firefox/", "Firefox"), ("FxiOS/", "Firefox"),
+            ("CriOS/", "Chrome"), ("Chrome/", "Chrome"), ("Safari/", "Safari"))
+SYSTEMS = (("Android", "Android"), ("iPhone", "iPhone"), ("iPad", "iPad"), ("CrOS", "ChromeOS"), ("Windows", "Windows"), ("Macintosh", "Mac"), ("Linux", "Linux"))
+
+
+def device_label(user_agent: str | None) -> str:
+    """A coarse, human label for a session's device: "Chrome on Android"."""
+    ua = user_agent or ""
+    browser = next((name for mark, name in BROWSERS if mark in ua), None)
+    system = next((name for mark, name in SYSTEMS if mark in ua), None)
+    if not browser and not system:
+        return "An app or script"
+    return f"{browser or 'A browser'} on {system or 'an unknown system'}"
+
+
+def create_session(user_id: str, via: str, user_agent: str | None = None) -> str:
     token = secrets.token_urlsafe(32)
     now = int(time.time())
     get_db().sessions.insert_one(
@@ -63,12 +83,54 @@ def create_session(user_id: str, via: str) -> str:
             "_id": hash_token(token),
             "user_id": user_id,
             "via": via,
+            "device": device_label(user_agent),
             "created_at": now,
+            "last_used": now,
             "expires_at": now + get_settings().session_hours * 3600,
             "revoked_at": None,
         }
     )
     return token
+
+
+def public_session_id(session_hash: str) -> str:
+    """The id a device list shows: the start of the token's hash, which can't sign anyone in."""
+    return session_hash[:16]
+
+
+def list_sessions(user_id: str, current: str | None) -> list[dict]:
+    """The account's signed-in devices, most recently used first."""
+    now = time.time()
+    rows = get_db().sessions.find({"user_id": user_id, "revoked_at": None, "expires_at": {"$gt": now}})
+    out = [
+        {
+            "id": public_session_id(s["_id"]),
+            "device": s.get("device") or "An earlier sign-in",
+            "via": s.get("via"),
+            "created_at": s["created_at"],
+            "last_used": s.get("last_used") or s["created_at"],
+            "current": s["_id"] == current,
+        }
+        for s in rows
+    ]
+    return sorted(out, key=lambda r: (not r["current"], -r["last_used"]))
+
+
+def revoke_session(user_id: str, public_id: str) -> dict | None:
+    """Signs one of the account's devices out. The session, or None if there's no such one."""
+    db = get_db()
+    s = next((s for s in db.sessions.find({"user_id": user_id, "revoked_at": None}) if public_session_id(s["_id"]) == public_id), None)
+    if s:
+        db.sessions.update_one({"_id": s["_id"]}, {"$set": {"revoked_at": int(time.time())}})
+    return s
+
+
+def revoke_others(user_id: str, keep: str | None) -> int:
+    """Signs the account out everywhere except the session `keep` (this device)."""
+    q = {"user_id": user_id, "revoked_at": None}
+    if keep:
+        q["_id"] = {"$ne": keep}
+    return get_db().sessions.update_many(q, {"$set": {"revoked_at": int(time.time())}}).modified_count
 
 
 def revoke_token(token: str) -> None:
@@ -109,11 +171,15 @@ def _resolve(request: Request) -> tuple[dict | None, str]:
         return None, "Sign in to continue."
     db = get_db()
     s = db.sessions.find_one({"_id": hash_token(token)})
-    if not s or s.get("revoked_at") or s["expires_at"] <= time.time():
+    now = time.time()
+    if not s or s.get("revoked_at") or s["expires_at"] <= now:
         return None, "Your session has expired. Sign in again."
     user = db.users.find_one({"_id": s["user_id"]})
     if not user:
         return None, "Your session has expired. Sign in again."
+    request.state.session_id = s["_id"]
+    if now - (s.get("last_used") or s["created_at"]) > LAST_USED_EVERY:
+        db.sessions.update_one({"_id": s["_id"]}, {"$set": {"last_used": int(now)}})
     return user, ""
 
 
@@ -201,6 +267,7 @@ def public_user(user: dict) -> dict:
         "email": user.get("email"),
         "creator_id": user.get("creator_id"),
         "brand_id": user.get("brand_id"),
+        "email_verified": bool(user.get("email_verified")),
         "demo": bool(user.get("demo")),
         "providers": [
             k

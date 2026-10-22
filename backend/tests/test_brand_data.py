@@ -19,43 +19,6 @@ def _csv(*rows: str) -> str:
     return HEADER + "\n".join(rows) + "\n"
 
 
-# ------------------------------------------------------------------ fakes
-class FakeSMTP:
-    sent: list = []
-
-    def __init__(self, host, port, timeout=None, context=None):
-        self.host, self.port = host, port
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
-
-    def starttls(self, context=None):
-        pass
-
-    def login(self, user, password):
-        pass
-
-    def send_message(self, msg):
-        FakeSMTP.sent.append(msg)
-
-
-@pytest.fixture()
-def smtp(monkeypatch, db):
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("EMAIL_FROM", "DealMeet AI <hello@dealmeet.test>")
-    monkeypatch.setenv("FRONTEND_URL", "https://dealmeet.test")
-    config.get_settings.cache_clear()
-    FakeSMTP.sent = []
-    monkeypatch.setattr(mailer.smtplib, "SMTP", FakeSMTP)
-    for name in ("email_log", "email_optouts", "claim_codes", "rate_limits"):
-        db[name].delete_many({})
-    yield FakeSMTP
-    config.get_settings.cache_clear()
-
-
 def _text(msg) -> str:
     return msg.get_content()
 

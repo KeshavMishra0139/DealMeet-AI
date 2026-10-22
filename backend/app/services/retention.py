@@ -4,8 +4,8 @@ Short-lived security records go as soon as they can't be used any more:
 
 - sessions: once expired, or 30 days after being signed out (the audit log keeps the
   sign-in and sign-out events).
-- login codes, brand-claim codes, Instagram sign-in states and rate-limit counters: once
-  expired.
+- login codes, password-reset and email-verification links, brand-claim codes, Instagram
+  sign-in states and rate-limit counters: once expired.
 - failed sign-in attempts: after a day (the lock looks back 15 minutes).
 
 Logs are kept for a year, then removed:
@@ -48,6 +48,8 @@ def sweep(now: float | None = None) -> dict[str, int]:
     rules = {
         "sessions": {"$or": [{"expires_at": {"$lt": now}}, {"revoked_at": {"$ne": None, "$lt": now - SIGNED_OUT_SESSION_DAYS * DAY}}]},
         "login_codes": {"expires": {"$lt": now}},
+        "password_resets": {"expires": {"$lt": now}},
+        "email_verifications": {"expires": {"$lt": now}},
         "claim_codes": {"expires": {"$lt": now}},
         "oauth_states": {"expires": {"$lt": now}},
         "rate_limits": {"expires": {"$lt": now}},

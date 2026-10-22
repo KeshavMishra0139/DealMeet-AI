@@ -21,6 +21,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PageFade, ParallaxAurora, ScrollProgress } from "@/components/motion/Motion";
 import { AccountMenu } from "@/components/shared/AccountMenu";
+import { EmailNudge } from "@/components/shared/AccountSecurity";
 import { RequireSession, SignOutButton } from "@/components/shared/AuthGate";
 import { Avatar } from "@/components/shared/Bits";
 import { AiAssistantBar, AiAssistantProvider } from "@/components/shared/AiAssistant";
@@ -140,6 +141,7 @@ function Studio() {
           id="main"
           className="load-wipe mx-auto w-full max-w-[1000px] px-4 pb-[calc(160px+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:px-10 lg:pb-32 lg:pt-10"
         >
+          <EmailNudge role="creator" />
           <PageFade>
             <Outlet />
           </PageFade>

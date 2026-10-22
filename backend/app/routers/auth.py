@@ -6,20 +6,23 @@ picker signs you in to a seeded demo account instead.
 
 Ways in: email and password, Firebase (Google, phone), and for creators "Continue
 with Instagram" and "Continue with YouTube" (services/social_signin.py).
+
+Account security: signed-in devices and signing them out, password change, reset and
+email verification (services/credentials.py).
 """
 from __future__ import annotations
 
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
 from ..seed.load import DEMO_ADMIN_ID
-from ..services import firebase_auth, ratelimit, social_signin
+from ..services import credentials, firebase_auth, ratelimit, social_signin
 from ..services import instagram as ig
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -46,7 +49,7 @@ def _demo_only() -> None:
 
 
 def _signed_in(request: Request, response: Response, user: dict, via: str, cookie: bool = True) -> dict:
-    token = au.create_session(user["_id"], via)
+    token = au.create_session(user["_id"], via, request.headers.get("user-agent"))
     if cookie:
         au.set_cookie(response, request, token)
     au.audit("signin", user["_id"], user["role"], via=via)
@@ -64,13 +67,16 @@ class SignupIn(BaseModel):
 
 
 @router.post("/signup")
-def signup(body: SignupIn, request: Request, response: Response):
+def signup(body: SignupIn, request: Request, response: Response, background: BackgroundTasks):
     db = get_db()
     email = body.email.strip().lower()
     if db.users.find_one({"email": email}):
         raise HTTPException(409, "An account with this email already exists. Sign in instead.")
-    user = au.new_user(body.role, body.name.strip(), email=email, password_hash=au.hash_password(body.password))
+    user = au.new_user(body.role, body.name.strip(), email=email, password_hash=au.hash_password(body.password), email_verified=False)
     au.audit("signup", user["_id"], user["role"], via="password")
+    send = credentials.send_verification(user, str(request.base_url), quiet=True)
+    if send:
+        background.add_task(send)
     return _signed_in(request, response, user, "password")
 
 
@@ -122,6 +128,101 @@ def delete_account(body: DeleteAccountIn, response: Response, user: dict = Depen
     return {"deleted": out["deleted"]}
 
 
+# ------------------------------------------------------------------ devices, passwords, email
+@router.get("/sessions")
+def sessions(request: Request, user: dict = Depends(au.current_user)):
+    """The account's signed-in devices; `current` marks this one."""
+    return {"items": au.list_sessions(user["_id"], getattr(request.state, "session_id", None))}
+
+
+@router.post("/sessions/{sid}/revoke")
+def revoke_session(request: Request, response: Response, sid: str = Path(pattern=r"^[0-9a-f]{16}$"), user: dict = Depends(au.current_user)):
+    s = au.revoke_session(user["_id"], sid)
+    if not s:
+        raise HTTPException(404, "That device is already signed out.")
+    if s["_id"] == getattr(request.state, "session_id", None):
+        au.clear_cookie(response)
+    au.audit("session_revoked", user["_id"], user["role"], device=s.get("device"))
+    return {"ok": True}
+
+
+@router.post("/sessions/revoke-others")
+def revoke_other_sessions(request: Request, user: dict = Depends(au.current_user)):
+    n = au.revoke_others(user["_id"], getattr(request.state, "session_id", None))
+    au.audit("sessions_revoked", user["_id"], user["role"], count=n)
+    return {"revoked": n}
+
+
+class PasswordChangeIn(BaseModel):
+    current: str = Field(min_length=1, max_length=128)
+    new: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/password")
+def change_password(body: PasswordChangeIn, request: Request, background: BackgroundTasks, user: dict = Depends(au.current_user)):
+    ratelimit.enforce(f"pwchange:{user['_id']}", 10, 3600, "Too many tries. Wait an hour and try again.")
+    send = credentials.change(user, body.current, body.new, getattr(request.state, "session_id", None))
+    if send:
+        background.add_task(send)
+    return {"ok": True}
+
+
+class ForgotIn(BaseModel):
+    email: str = Field(min_length=3, max_length=120, pattern=EMAIL)
+
+
+@router.post("/password/forgot")
+def forgot_password(body: ForgotIn, request: Request, background: BackgroundTasks):
+    email = body.email.strip().lower()
+    ratelimit.enforce(f"pwforgot:{ratelimit.client_ip(request)}", 10, 3600, "Too many reset requests from here. Try again in an hour.")
+    ratelimit.enforce(f"pwforgot:{au.hash_token(email)[:24]}", 3, 3600, "We've already sent a few links to this address. Check your inbox and spam, or try again in an hour.")
+    send = credentials.request_reset(email, str(request.base_url))
+    if send:
+        background.add_task(send)
+    return {"ok": True}
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=20, max_length=100)
+    password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/password/reset")
+def reset_password(body: ResetIn, request: Request, response: Response, background: BackgroundTasks):
+    """Sets a new password from an emailed link, signs out every device, and signs this one in."""
+    ratelimit.enforce(f"pwreset:{ratelimit.client_ip(request)}", 20, 3600, "Too many tries from here. Try again in an hour.")
+    user, send = credentials.reset(body.token, body.password)
+    if send:
+        background.add_task(send)
+    return _signed_in(request, response, user, "password_reset")
+
+
+class VerifyIn(BaseModel):
+    token: str = Field(min_length=20, max_length=100)
+
+
+@router.post("/email/verify")
+def verify_email(body: VerifyIn, request: Request):
+    """The link from the verification email. Works without being signed in: the link is the proof."""
+    ratelimit.enforce(f"emailverify:{ratelimit.client_ip(request)}", 30, 3600, "Too many tries from here. Try again in an hour.")
+    user = credentials.verify(body.token)
+    return {"email": user["email"], "role": user["role"]}
+
+
+@router.post("/email/resend")
+def resend_verification(request: Request, background: BackgroundTasks, user: dict = Depends(au.current_user)):
+    if user.get("email_verified"):
+        raise HTTPException(409, "Your email is already confirmed.")
+    if not user.get("email"):
+        raise HTTPException(409, "This account has no email address.")
+    ratelimit.enforce(f"emailresend:{user['_id']}", 3, 3600, "We've sent a few links already. Check your inbox and spam, or try again in an hour.")
+    send = credentials.send_verification(user, str(request.base_url))
+    if not send:
+        raise HTTPException(503, "Email isn't set up on this server yet.")
+    background.add_task(send)
+    return {"sent_to": user["email"]}
+
+
 @router.get("/me")
 def me(user: dict = Depends(au.current_user)):
     db = get_db()
@@ -158,8 +259,9 @@ def _firebase_account(claims: dict, role: str | None, name: str | None, via: str
         # An email-and-password account with the same verified email: link it, keep its role.
         user = db.users.find_one({"email": verified_email, "firebase_uid": {"$exists": False}})
         if user:
-            db.users.update_one({"_id": user["_id"]}, {"$set": {"firebase_uid": uid}})
-            user["firebase_uid"] = uid
+            # Google verified this address, so it counts as verified here too.
+            db.users.update_one({"_id": user["_id"]}, {"$set": {"firebase_uid": uid, "email_verified": True}})
+            user.update(firebase_uid=uid, email_verified=True)
             au.audit("link_firebase", user["_id"], user["role"], via=provider)
     note = None
     if user:
@@ -173,7 +275,7 @@ def _firebase_account(claims: dict, role: str | None, name: str | None, via: str
         name = (name or claims.get("name") or (email or "").split("@")[0] or claims.get("phone_number") or "New member").strip()[:60]
         fields = {"firebase_uid": uid, "phone": claims.get("phone_number")}
         if verified_email and not db.users.find_one({"email": verified_email}):
-            fields["email"] = verified_email
+            fields.update(email=verified_email, email_verified=True)
         user = au.new_user(role, name, **fields)
         au.audit("signup", user["_id"], user["role"], via=provider)
     return user, note

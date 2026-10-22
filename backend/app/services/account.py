@@ -65,8 +65,8 @@ def delete_account(user: dict) -> dict:
     drop("notifications", {"to": user["_id"]})
     if user.get("email"):
         db.login_failures.delete_many({"email": user["email"]})
-        db.login_codes.delete_many({"email": user["email"]})
-    db.sessions.delete_many({"user_id": user["_id"]})
+    for name in ("login_codes", "password_resets", "email_verifications", "sessions"):
+        db[name].delete_many({"user_id": user["_id"]})
     db.users.delete_one({"_id": user["_id"]})
     au.audit("account_deleted", user["_id"], user.get("role"))
     return {"deleted": True, "removed": removed}

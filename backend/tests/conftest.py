@@ -8,6 +8,8 @@ os.environ.setdefault("USE_MOCK_DB", "1")
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import config  # noqa: E402
+
 from app.db import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed.load import seed_all  # noqa: E402
@@ -76,3 +78,44 @@ def admin(client, db):
 
     user = au.new_user("admin", "Ops Admin", email=f"ops-{uuid.uuid4().hex[:6]}@example.test")
     return Actor(client, au.create_session(user["_id"], "test"), au.public_user(user))
+
+
+class FakeSMTP:
+    """Stands in for smtplib.SMTP: keeps each message instead of sending it."""
+
+    sent: list = []
+
+    def __init__(self, host, port, timeout=None, context=None):
+        self.host, self.port = host, port
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def starttls(self, context=None):
+        pass
+
+    def login(self, user, password):
+        pass
+
+    def send_message(self, msg):
+        FakeSMTP.sent.append(msg)
+
+
+@pytest.fixture()
+def smtp(monkeypatch, db):
+    """Email switched on, sending to FakeSMTP.sent; links point at https://dealmeet.test."""
+    from app.services import mailer
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.test")
+    monkeypatch.setenv("EMAIL_FROM", "DealMeet AI <hello@dealmeet.test>")
+    monkeypatch.setenv("FRONTEND_URL", "https://dealmeet.test")
+    config.get_settings.cache_clear()
+    FakeSMTP.sent = []
+    monkeypatch.setattr(mailer.smtplib, "SMTP", FakeSMTP)
+    for name in ("email_log", "email_optouts", "claim_codes", "rate_limits"):
+        db[name].delete_many({})
+    yield FakeSMTP
+    config.get_settings.cache_clear()

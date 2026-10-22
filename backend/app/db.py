@@ -59,7 +59,7 @@ COLLECTIONS = [
 ]
 # Accounts live apart from the demo data: a demo reset keeps the seeded persona
 # accounts (and their sessions) and never touches the audit log.
-ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit"]
+ACCOUNT_COLLECTIONS = ["users", "sessions", "login_failures", "login_codes", "audit", "password_resets", "email_verifications"]
 # Kept through demo resets too: an address that opted out stays opted out.
 EMAIL_COLLECTIONS = ["email_log", "email_optouts", "app_secrets", "claim_codes"]
 
@@ -146,6 +146,10 @@ def ensure_indexes(db) -> None:
     db.sessions.create_index("user_id")
     db.login_failures.create_index([("email", 1), ("at", 1)])
     db.login_codes.create_index("expires")
+    db.password_resets.create_index("user_id")
+    db.password_resets.create_index("expires")
+    db.email_verifications.create_index("user_id")
+    db.email_verifications.create_index("expires")
     db.email_log.create_index([("to", 1), ("ts", -1)])
     db.claim_codes.create_index("expires")
     # Brand data (services/brand_data.py): duplicate checks on import, invites.

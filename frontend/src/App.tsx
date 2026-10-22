@@ -6,6 +6,8 @@ import { LangScope } from "@/i18n";
 const Landing = lazy(() => import("@/features/public/Landing"));
 const Login = lazy(() => import("@/features/public/Login"));
 const LoginComplete = lazy(() => import("@/features/public/LoginComplete"));
+const ResetPassword = lazy(() => import("@/features/public/AccountLinks").then((m) => ({ default: m.ResetPassword })));
+const VerifyEmail = lazy(() => import("@/features/public/AccountLinks").then((m) => ({ default: m.VerifyEmail })));
 const NotFound = lazy(() => import("@/features/public/NotFound"));
 const CreatorShell = lazy(() => import("@/features/creator/CreatorShell"));
 const BrandShell = lazy(() => import("@/features/brand/BrandShell"));
@@ -52,6 +54,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/login/complete" element={<LoginComplete />} />
+        <Route path="/login/reset" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/c/:handle" element={<LinkInBio />} />
         <Route path="/creators" element={<Creators />} />
         {/* The old public price lookup; anyone could price anyone's channel, so it's gone. */}

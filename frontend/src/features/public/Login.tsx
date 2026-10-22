@@ -247,7 +247,7 @@ function FirebaseSignIn({ role, next, serverReady, loaded }: { role: Role; next:
 }
 
 function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: string | null; demo: boolean; startWithSignup: boolean }) {
-  const [mode, setMode] = useState<"signin" | "signup">(startWithSignup ? "signup" : "signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">(startWithSignup ? "signup" : "signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -260,6 +260,7 @@ function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: 
     onSuccess: ({ user }) => finish(user, next),
   });
 
+  if (mode === "forgot") return <ForgotPassword email={email} setEmail={setEmail} onBack={() => setMode("signin")} />;
   return (
     <section aria-labelledby="account" className="card-surface mt-5 rounded-[var(--radius-card)] p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
@@ -299,6 +300,11 @@ function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: 
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
           {mode === "signup" && <FieldHint>At least 8 characters. Your account is either a creator or a brand, and that can't change later.</FieldHint>}
+          {mode === "signin" && (
+            <button type="button" onClick={() => setMode("forgot")} className="mt-1.5 text-xs font-medium text-accent underline-offset-4 hover:underline">
+              Forgot password?
+            </button>
+          )}
         </div>
         {submit.isError && (
           <p role="alert" className="text-sm text-danger">
@@ -312,6 +318,50 @@ function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: 
           <p className="text-xs text-muted">Demo mode: accounts made here are sandbox data and are removed when the demo resets.</p>
         )}
       </form>
+    </section>
+  );
+}
+
+/** Emails a reset link. The answer is the same whether or not the email has an account. */
+function ForgotPassword({ email, setEmail, onBack }: { email: string; setEmail: (v: string) => void; onBack: () => void }) {
+  const send = useMutation({ mutationFn: () => api("/auth/password/forgot", { method: "POST", json: { email }, role: null }) });
+  return (
+    <section aria-labelledby="forgot" className="card-surface mt-5 rounded-[var(--radius-card)] p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="forgot" className="font-display text-lg font-semibold">
+          Reset your password
+        </h2>
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          Back to sign-in
+        </Button>
+      </div>
+      {send.isSuccess ? (
+        <p className="mt-3 text-sm leading-relaxed text-fg-2" role="status">
+          If an account uses {email}, we've emailed it a link to choose a new password. It works once, for 30 minutes. Check your spam folder if it doesn't arrive.
+        </p>
+      ) : (
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send.mutate();
+          }}
+        >
+          <div>
+            <Label htmlFor="forgot-email">Your account's email</Label>
+            <Input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" maxLength={120} />
+            <FieldHint>For accounts that sign in with an email and password. Google, phone, Instagram and YouTube sign-ins don't use one.</FieldHint>
+          </div>
+          {send.isError && (
+            <p role="alert" className="text-sm text-danger">
+              {(send.error as Error).message}
+            </p>
+          )}
+          <Button type="submit" variant="primary" className="w-full" loading={send.isPending}>
+            Email me a link
+          </Button>
+        </form>
+      )}
     </section>
   );
 }
