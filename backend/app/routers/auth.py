@@ -223,6 +223,21 @@ def resend_verification(request: Request, background: BackgroundTasks, user: dic
     return {"sent_to": user["email"]}
 
 
+@router.get("/export")
+def export_data(request: Request, user: dict = Depends(au.current_user)):
+    """Download my data: every record tied to this account, as a JSON file (services/data_export.py)."""
+    from ..config import today
+    from ..services import data_export
+
+    ratelimit.enforce(f"export:{user['_id']}", 5, 3600, "You've downloaded your data a few times already. Try again in an hour.")
+    body = data_export.as_json(data_export.build(user, getattr(request.state, "session_id", None)))
+    return Response(
+        body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="dealmeet-data-{today().isoformat()}.json"', "Cache-Control": "no-store"},
+    )
+
+
 @router.get("/me")
 def me(user: dict = Depends(au.current_user)):
     db = get_db()

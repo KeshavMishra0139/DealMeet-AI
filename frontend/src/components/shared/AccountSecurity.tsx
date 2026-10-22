@@ -2,7 +2,7 @@
 // out, or all the others), changing the password, and confirming the email address. The
 // server keeps a coarse device label per session ("Chrome on Android"), never an IP address.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Laptop, MailCheck, MailWarning, Smartphone, X } from "lucide-react";
+import { Download, Laptop, MailCheck, MailWarning, Smartphone, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -169,6 +169,28 @@ export function EmailStatus({ role }: { role: Role }) {
         </Button>
       )}
     </div>
+  );
+}
+
+/** Download my data: every record tied to the account, as a JSON file to keep. */
+export function DownloadData({ role }: { role: Role }) {
+  const download = useMutation({
+    mutationFn: () => api<Record<string, unknown>>("/auth/export", { role }),
+    onSuccess: (data) => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dealmeet-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Your data is downloading");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+  return (
+    <Button size="sm" variant="outline" loading={download.isPending} onClick={() => download.mutate()}>
+      <Download aria-hidden /> Download my data
+    </Button>
   );
 }
 

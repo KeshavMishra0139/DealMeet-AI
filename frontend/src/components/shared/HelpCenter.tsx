@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { DeleteAccountButton } from "@/components/shared/AccountMenu";
-import { ChangePassword, EmailStatus, SignedInDevices } from "@/components/shared/AccountSecurity";
+import { ChangePassword, DownloadData, EmailStatus, SignedInDevices } from "@/components/shared/AccountSecurity";
 import { useAiAssistant } from "@/components/shared/AiAssistant";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/overlays";
@@ -197,6 +197,13 @@ export default function HelpCenter({ role }: { role: Role }) {
             )}
           </>
         )}
+        <Item q="Download your data">
+          <p className="mb-3">
+            One file with everything DealMeet holds that's tied to your account: your profile, {role === "creator" ? "deals, rates, media kits, pitches, connected-app numbers and consents" : "campaigns, deals, shortlists and offers"}, your
+            signed-in devices and your activity log. Passwords and app tokens are never included.
+          </p>
+          <DownloadData role={role} />
+        </Item>
         <Item q="Delete your account">
           {user?.demo ? (
             <p>Demo profiles can't be deleted: they reset to sample data.</p>
