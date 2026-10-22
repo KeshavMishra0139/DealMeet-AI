@@ -29,9 +29,10 @@ from ..db import get_db
 from . import auth as au
 
 MAX_PER_COLLECTION = 5000
-# Field names that hold secrets: password, token(s), secrets, one-time codes and their hashes.
+# Field names that hold secrets: password, token(s), secrets, one-time codes (and the admins'
+# two-step settings), and code hashes.
 # Narrower than "anything with key or pass in it", so a person's own fields all come through.
-SECRET = re.compile(r"(^|_)(password|token|secret|otp)(_|$)|(^|_)code_hash$")
+SECRET = re.compile(r"(^|_)(password|token|secret|t?otp)(_|$)|(^|_)code_hash$")
 
 
 def scrub(value: Any) -> Any:

@@ -22,7 +22,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..services import auth as au
 from ..seed.load import DEMO_ADMIN_ID
-from ..services import credentials, firebase_auth, ratelimit, social_signin
+from ..services import credentials, firebase_auth, ratelimit, social_signin, totp
 from ..services import instagram as ig
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -221,6 +221,37 @@ def resend_verification(request: Request, background: BackgroundTasks, user: dic
         raise HTTPException(503, "Email isn't set up on this server yet.")
     background.add_task(send)
     return {"sent_to": user["email"]}
+
+
+# ------------------------------------------------------------------ admins: two-step sign-in
+def _admin(user: dict = Depends(au.current_user)) -> dict:
+    au.require_role(user, "admin")
+    return user
+
+
+@router.get("/mfa")
+def mfa_status(request: Request, user: dict = Depends(_admin)):
+    return totp.status(user, request)
+
+
+@router.post("/mfa/setup")
+def mfa_setup(user: dict = Depends(_admin)):
+    """A new secret for the authenticator app (shown once, as a QR code and as text)."""
+    return totp.start(user)
+
+
+class MfaCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+@router.post("/mfa/enable")
+def mfa_enable(body: MfaCodeIn, request: Request, user: dict = Depends(_admin)):
+    return {"recovery_codes": totp.enable(user, body.code, request)}
+
+
+@router.post("/mfa/verify")
+def mfa_verify(body: MfaCodeIn, request: Request, user: dict = Depends(_admin)):
+    return totp.verify(user, body.code, request)
 
 
 @router.get("/export")

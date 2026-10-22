@@ -15,6 +15,7 @@ import { shortDate, timeOfDay } from "@/lib/format";
 import type { Me } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { TwoStepGate } from "./TwoStep";
 
 // Admin pages carry no demo token: the session is the HttpOnly cookie, and the server
 // checks the admin role on every /api/admin route.
@@ -125,7 +126,11 @@ export default function AdminConsole() {
     );
   if (!me.data) return <Navigate to="/login?next=%2Fadmin" replace />;
   if (me.data.user.role !== "admin") return <NotAdmin />;
-  return <Console me={me.data} />;
+  return (
+    <TwoStepGate>
+      <Console me={me.data} />
+    </TwoStepGate>
+  );
 }
 
 function NotAdmin() {

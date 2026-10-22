@@ -76,8 +76,11 @@ def admin(client, db):
     """An admin account (the role is only ever granted on the server)."""
     from app.services import auth as au
 
-    user = au.new_user("admin", "Ops Admin", email=f"ops-{uuid.uuid4().hex[:6]}@example.test")
-    return Actor(client, au.create_session(user["_id"], "test"), au.public_user(user))
+    user = au.new_user("admin", "Ops Admin", email=f"ops-{uuid.uuid4().hex[:6]}@example.test", totp={"enabled_at": 1})
+    token = au.create_session(user["_id"], "test")
+    # Two-step sign-in is on and this session passed it (tests/test_totp.py covers the check).
+    get_db().sessions.update_one({"_id": au.hash_token(token)}, {"$set": {"mfa_at": 1}})
+    return Actor(client, token, au.public_user(user))
 
 
 class FakeSMTP:

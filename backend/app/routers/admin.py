@@ -14,10 +14,12 @@ from ..services import admin as adm
 from ..services import auth as au
 from ..services import brand_data as bd
 from ..services import directory as dr
+from ..services import totp
 
 
-def require_admin(user: dict = Depends(au.current_user)) -> dict:
+def require_admin(request: Request, user: dict = Depends(au.current_user)) -> dict:
     au.require_role(user, "admin")
+    totp.require(user, request)  # this session passed two-step sign-in (services/totp.py)
     return user
 
 

@@ -26,6 +26,12 @@ def hit(key: str, limit: int, window_s: int) -> bool:
     return doc["n"] <= limit
 
 
+def used(key: str, window_s: int) -> int:
+    """How many times `key` was counted in the current window, without counting this look."""
+    doc = get_db().rate_limits.find_one({"_id": f"{key}:{int(time.time() // window_s)}"})
+    return doc["n"] if doc else 0
+
+
 def enforce(key: str, limit: int, window_s: int, message: str) -> None:
     if not hit(key, limit, window_s):
         raise HTTPException(429, message)

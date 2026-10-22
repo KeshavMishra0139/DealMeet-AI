@@ -16,7 +16,7 @@ def test_sweep_removes_expired_and_old_records_only(db):
     ])
     for name in ("login_codes", "claim_codes", "oauth_states", "rate_limits"):
         db[name].insert_many([{"_id": f"{name}_live", "expires": now + 60}, {"_id": f"{name}_old", "expires": now - 60}])
-    db.login_failures.insert_many([{"_id": "f_new", "at": now - 60}, {"_id": "f_old", "at": now - 2 * DAY}])
+    db.login_failures.insert_many([{"_id": "f_new", "email": "x@example.test", "at": now - 60}, {"_id": "f_old", "email": "x@example.test", "at": now - 2 * DAY}])
     db.audit.insert_many([{"_id": "a_new", "ts": now - 200 * DAY}, {"_id": "a_old", "ts": now - 366 * DAY}])
     db.email_log.insert_many([{"_id": "e_new", "ts": now - 30 * DAY}, {"_id": "e_old", "ts": now - 400 * DAY}])
     db.email_optouts.insert_one({"_id": "brand@example.in", "at": now - 900 * DAY})

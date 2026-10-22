@@ -4,7 +4,20 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /** A QR code drawn in the browser (no outside QR service), with a PNG download. */
-export function QrCode({ url, label, size = 168, fileName = "dealmeet-qr.png" }: { url: string; label: string; size?: number; fileName?: string }) {
+export function QrCode({
+  url,
+  label,
+  size = 168,
+  fileName = "dealmeet-qr.png",
+  downloadable = true,
+}: {
+  url: string;
+  label: string;
+  size?: number;
+  fileName?: string;
+  /** False for codes that hold a secret (two-step sign-in): no download button. */
+  downloadable?: boolean;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -19,11 +32,13 @@ export function QrCode({ url, label, size = 168, fileName = "dealmeet-qr.png" }:
   return (
     <figure className="flex flex-col items-center gap-2">
       <img src={src} width={size} height={size} alt={label} className="rounded-xl bg-white p-1.5" />
-      <Button asChild size="sm" variant="ghost">
-        <a href={src} download={fileName}>
-          <Download aria-hidden /> Download QR
-        </a>
-      </Button>
+      {downloadable && (
+        <Button asChild size="sm" variant="ghost">
+          <a href={src} download={fileName}>
+            <Download aria-hidden /> Download QR
+          </a>
+        </Button>
+      )}
     </figure>
   );
 }
