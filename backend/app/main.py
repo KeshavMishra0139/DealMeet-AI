@@ -96,6 +96,11 @@ async def lifespan(_: FastAPI):
 
     if instagram.configured():
         threading.Thread(target=_refresh_tokens, daemon=True).start()
+    # Expired sign-ins and codes, and logs past their retention (services/retention.py).
+    from .services import retention
+
+    retention.sweep()
+    threading.Thread(target=retention.run_forever, daemon=True).start()
     # The shared demo's timed reset never runs outside demo mode, so it can't touch real accounts.
     if settings.demo_mode and settings.demo_reset_minutes > 0:
         threading.Thread(target=_auto_reset, args=(settings.demo_reset_minutes,), daemon=True).start()
