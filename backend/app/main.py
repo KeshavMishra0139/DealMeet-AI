@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
+from . import headers
 from .config import ROOT, get_settings
 from .db import get_db
 from .routers import admin, assistant, auth, brands, connect, creators, deals, demo, directory, kit, market, meta, pitches, pricing, profiles, reports, shortlist, youtube
@@ -123,6 +124,12 @@ CSRF_EXEMPT = ("/api/payments/razorpay/webhook", "/api/email/unsubscribe")
 
 @app.middleware("http")
 async def guard(request: Request, call_next):
+    response = await _guarded(request, call_next)
+    headers.apply(response.headers, request.url.scheme == "https", INDEX)
+    return response
+
+
+async def _guarded(request: Request, call_next):
     path = request.url.path
     write = request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/")
     if request.method not in ("GET", "HEAD", "OPTIONS"):
@@ -161,5 +168,6 @@ for r in (meta, auth, demo, profiles, creators, market, brands, directory, admin
 
 # Single-port mode: serve the built web app when it exists (npm run build).
 DIST = ROOT / "frontend" / "dist"
+INDEX = DIST / "index.html" if DIST.exists() else None  # its inline script's hash goes in the CSP
 if DIST.exists():
     mount_spa(app, DIST)

@@ -62,7 +62,13 @@ const browser = await launch();
 page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const mobile = page;
 const errors = [];
-page.on("pageerror", (e) => errors.push(String(e)));
+/** Page errors fail the run, and so does anything the Content Security Policy blocks
+ * (served by the API in single-port mode: QA_BASE=http://localhost:8000 after a build). */
+function watch(p) {
+  p.on("pageerror", (e) => errors.push(String(e)));
+  p.on("console", (m) => m.type() === "error" && /Content Security Policy/i.test(m.text()) && errors.push(m.text()));
+}
+watch(page);
 
 await step("Sign-in gate: Creator Studio sends you to sign in", async () => {
   await page.goto(`${BASE}/creator`);
@@ -428,7 +434,7 @@ await step("Hindi toggle: moves, stage and rate gap switch to Hindi", async () =
 await step("Accounts: sign up as a brand, set up the brand, sign out", async () => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const p = await ctx.newPage();
-  p.on("pageerror", (e) => errors.push(String(e)));
+  watch(p);
   page = p;
   await p.goto(`${BASE}/login?role=brand`);
   await p.getByRole("button", { name: "Create an account" }).click();
@@ -463,7 +469,7 @@ await step("Admin: a deal party reports a problem; the admin resolves it, suspen
   // Its own browser context: the admin's session is a cookie, kept apart from the other journeys.
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   page = await ctx.newPage();
-  page.on("pageerror", (e) => errors.push(String(e)));
+  watch(page);
   await page.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
   await page.getByRole("button", { name: "Report a problem with this deal" }).click();
   await page.getByLabel("What's wrong").selectOption("harassment");
@@ -507,7 +513,7 @@ await step("Admin: a deal party reports a problem; the admin resolves it, suspen
 await step("Creators: a visitor picks a niche from the landing bar, sees why each creator matched, and is asked to sign in for more", async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const p = await ctx.newPage();
-  p.on("pageerror", (e) => errors.push(String(e)));
+  watch(p);
   await p.goto(`${BASE}/`);
   await p.getByRole("button", { name: "Creators" }).click();
   const pop = p.getByRole("dialog");
@@ -557,7 +563,7 @@ await step("Creators: a visitor picks a niche from the landing bar, sees why eac
 await step("Brands: what a creator makes finds brands that work with creators like them; visitors are asked to sign up for more", async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const p = await ctx.newPage();
-  p.on("pageerror", (e) => errors.push(String(e)));
+  watch(p);
   await p.goto(`${BASE}/brands?q=dosa`);
   await p.getByText(/Including brands that work with food and cooking creators/).waitFor();
   await p.getByText(/Works with food and cooking creators/).first().waitFor();
@@ -573,7 +579,7 @@ await step("Brands: what a creator makes finds brands that work with creators li
 
 // On a laptop: two tabs in step, and the charts.
 const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-desk.on("pageerror", (e) => errors.push(String(e)));
+watch(desk);
 page = desk;
 
 await step("Live sync: a counter in the creator's tab appears in the brand's tab without a reload", async () => {
@@ -581,7 +587,7 @@ await step("Live sync: a counter in the creator's tab appears in the brand's tab
   // Two tabs of one browser, as a person would open them.
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const [creatorTab, brandTab] = [await ctx.newPage(), await ctx.newPage()];
-  for (const t of [creatorTab, brandTab]) t.on("pageerror", (e) => errors.push(String(e)));
+  for (const t of [creatorTab, brandTab]) watch(t);
   await brandTab.goto(`${BASE}/brand/deals/dl_a_senpai?as=br_senpai`);
   await brandTab.getByText(/58% below the fair price/).waitFor();
   await creatorTab.goto(`${BASE}/creator/deals/dl_a_senpai?as=cr_a`);

@@ -72,6 +72,8 @@ for (const width of [390, 1280]) {
     const ctx = await browser.newContext({ viewport, isMobile: width === 390, hasTouch: width === 390 });
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(`${width}: ${e}`));
+    // The built app is served with its Content Security Policy: anything it blocks fails the run.
+    p.on("console", (m) => m.type() === "error" && /Content Security Policy/i.test(m.text()) && errors.push(`${width}: ${m.text()}`));
     return p;
   };
   const creator = await newPage();
