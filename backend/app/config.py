@@ -90,6 +90,14 @@ class Settings:
     ig_app_secret: str | None = None
     ig_redirect_uri: str | None = None
     frontend_url: str | None = None
+    # Who runs this site, shown on /privacy and /terms (DPDP Act: a contact for questions
+    # and a grievance officer). Unset fields show as "not published yet".
+    legal_name: str | None = None  # the business or person operating the site
+    legal_address: str | None = None
+    contact_email: str | None = None
+    grievance_name: str | None = None
+    grievance_email: str | None = None
+    legal_city: str | None = None  # courts for disputes under the Terms
     # Meta Graph API version for graph.instagram.com calls, and the window for audience
     # demographics. Check both against Meta's changelog; they're settings for that reason.
     ig_graph_version: str = "v25.0"
@@ -165,6 +173,12 @@ def get_settings() -> Settings:
         ig_app_secret=_env("IG_APP_SECRET"),
         ig_redirect_uri=_env("IG_REDIRECT_URI"),
         frontend_url=(_env("FRONTEND_URL") or "").rstrip("/") or None,
+        legal_name=_env("LEGAL_NAME"),
+        legal_address=_env("LEGAL_ADDRESS"),
+        contact_email=_env("CONTACT_EMAIL"),
+        grievance_name=_env("GRIEVANCE_OFFICER_NAME"),
+        grievance_email=_env("GRIEVANCE_OFFICER_EMAIL"),
+        legal_city=_env("LEGAL_CITY"),
         ig_graph_version=_env("IG_GRAPH_VERSION", "v25.0") or "v25.0",
         ig_demographics_timeframe=_env("IG_DEMOGRAPHICS_TIMEFRAME", "this_month") or "this_month",
         atlas_search_index=_search_index(),

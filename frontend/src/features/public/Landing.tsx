@@ -113,6 +113,10 @@ export default function Landing() {
           <Reveal as="div" className="mt-10">
           <footer className="flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <p>Built by Team TheVortex for CodeX 3.0, Problem Statement 3.</p>
+            <nav aria-label="Legal" className="flex gap-4">
+              <Link to="/privacy" className="hover:text-fg">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-fg">Terms of Use</Link>
+            </nav>
             {demo && <p>All brands and profiles in the demo are fictional, except one anonymised reference profile.</p>}
           </footer>
           </Reveal>

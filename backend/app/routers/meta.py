@@ -78,6 +78,19 @@ def _page(title: str, body: str, form: str = "") -> str:
     )
 
 
+@router.get("/legal")
+def legal():
+    """Who runs this site, for the Privacy Policy and Terms pages. None where not set."""
+    s = get_settings()
+    return {
+        "name": s.legal_name,
+        "address": s.legal_address,
+        "contact_email": s.contact_email,
+        "grievance": {"name": s.grievance_name, "email": s.grievance_email or s.contact_email},
+        "city": s.legal_city,
+    }
+
+
 @router.get("/data-deletion", response_class=HTMLResponse)
 def data_deletion_status(code: str = Query(default="", max_length=40)):
     """The status page for a data deletion request (Meta links people here with their code)."""

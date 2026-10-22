@@ -85,6 +85,8 @@ export default function Login() {
             <span>AI: {health.data.modes.ai}</span>
             <span>Payments: {health.data.modes.payments}</span>
             <span>Auth: {health.data.modes.auth}</span>
+            <Link to="/privacy" className="hover:text-fg">Privacy</Link>
+            <Link to="/terms" className="hover:text-fg">Terms</Link>
             {health.data.shared_demo && <span className="w-full">Shared live demo: everyone sees the same data, and it resets automatically when idle.</span>}
           </footer>
         )}
@@ -314,6 +316,13 @@ function AccountForm({ role, next, demo, startWithSignup }: { role: Role; next: 
         <Button type="submit" variant="primary" className="w-full" loading={submit.isPending}>
           {mode === "signin" ? "Sign in" : "Create account"}
         </Button>
+        {mode === "signup" && (
+          <p className="text-xs leading-relaxed text-muted">
+            By creating an account you confirm you're 18 or older and accept the{" "}
+            <Link to="/terms" className="underline underline-offset-2 hover:text-fg">Terms of Use</Link> and{" "}
+            <Link to="/privacy" className="underline underline-offset-2 hover:text-fg">Privacy Policy</Link>.
+          </p>
+        )}
         {demo && mode === "signup" && (
           <p className="text-xs text-muted">Demo mode: accounts made here are sandbox data and are removed when the demo resets.</p>
         )}

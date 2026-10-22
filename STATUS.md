@@ -13,8 +13,8 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 
 | Check | Command | Result |
 | --- | --- | --- |
-| API tests | `make test` | 550 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
-| Copy rules on UI strings | `make test` | 6,922 strings, no promises |
+| API tests | `make test` | 587 passed, 1 skipped (`test_db.py` real-MongoDB round trip, needs `TEST_MONGODB_URI`) |
+| Copy rules on UI strings | `make test` | 7,274 strings, no promises |
 | Type check | `make test` | clean |
 | Demo journeys in a browser | `make e2e` | 29 of 29 pass |
 | Real accounts, demo mode off, 390 px and 1280 px | `make accounts` | 16 of 16 pass |
@@ -232,6 +232,21 @@ What's built, how it was checked, and what still needs credentials or infrastruc
 | No hourly AI cap unless `AI_MAX_CALLS_PER_HOUR` is set | Tested | `test_ai_moves.py` |
 | Public creator and brand search: public pages only, keyword and tag matching with what matched, busiest niches first, visitors see a few and are asked to sign in | Tested | `test_public_search.py`, `qa/flows.mjs` |
 | One AI assistant window (creators and brands) replacing Ask and Assistant: conversation with memory, the account's data as context, tools with Confirm, rupee-amount and copy checks, template answers without AI | Tested against a fake model; browser journeys without AI | `test_assistant_chat.py`; `qa/flows.mjs`; not run with a real key |
+
+## 24. Privacy and security
+
+| Part | Status | Evidence |
+| --- | --- | --- |
+| Security headers (CSP with the inline script's hash, HSTS, no framing, nosniff, referrer and permissions policies) | Tested | `test_headers.py`; all journeys run against the built app with no CSP violations |
+| Retention sweep for expired sign-ins, codes and links, and year-old logs | Tested | `test_retention.py` |
+| Signed-in devices, sign out one or all others, password change | Tested | `test_account_security.py`; browser at 390 px and 1440 px, axe clean |
+| Password reset and email verification by emailed links | Tested | `test_account_security.py` with a fake SMTP server; browser against a local SMTP catcher, axe clean |
+| Download my data, secrets redacted | Tested | `test_data_export.py`; browser download |
+| Instagram deauthorize and data-deletion callbacks with a status page | Tested against signed fakes | `test_instagram.py`; not yet called by Meta |
+| Admin two-step sign-in (RFC 6238, recovery codes, lockout, server reset) | Tested | `test_totp.py` (RFC test vectors); browser set-up, code and recovery code, axe clean |
+| Demo caps only in demo mode; daily limits on live sites | Tested | `test_limits.py` |
+| Privacy Policy and Terms | Implemented | Needs the operator's details and a lawyer's review |
+| pip-audit, npm audit, Dependabot, CodeQL in CI | Running | `.github/workflows/test.yml`, `codeql.yml`, `dependabot.yml` |
 
 ## Bugs found by the new tests and fixed
 
