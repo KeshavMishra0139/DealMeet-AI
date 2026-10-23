@@ -85,7 +85,7 @@ jobs:
         run: node qa/accounts.mjs
       - name: Keep failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-report
           path: |
